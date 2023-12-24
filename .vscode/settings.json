@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.rmd": "markdown",
+        "*.y": "yacc",
+        "types.h": "c"
+    }
+}
