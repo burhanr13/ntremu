@@ -1,0 +1,9 @@
+.vscode
+
+*.bin
+roms
+build
+
+ntremu*
+
+perf*
