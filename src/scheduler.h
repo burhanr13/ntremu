@@ -4,26 +4,8 @@
 #include "types.h"
 
 typedef enum {
-    EVENT_TM0_REL,
-    EVENT_TM1_REL,
-    EVENT_TM2_REL,
-    EVENT_TM3_REL,
-    EVENT_TM0_ENA,
-    EVENT_TM1_ENA,
-    EVENT_TM2_ENA,
-    EVENT_TM3_ENA,
-    EVENT_TM0_IRQ,
-    EVENT_TM1_IRQ,
-    EVENT_TM2_IRQ,
-    EVENT_TM3_IRQ,
-    EVENT_PPU_HDRAW,
-    EVENT_PPU_HBLANK,
-    EVENT_APU_SAMPLE,
-    EVENT_APU_CH1_REL,
-    EVENT_APU_CH2_REL,
-    EVENT_APU_CH3_REL,
-    EVENT_APU_CH4_REL,
-    EVENT_APU_DIV_TICK,
+    EVENT_LCD_HDRAW,
+    EVENT_LCD_HBLANK,
     EVENT_MAX
 } EventType;
 
@@ -43,8 +25,11 @@ typedef struct {
     int n_events;
 } Scheduler;
 
-void run_scheduler(Scheduler* sched, int cycles);
 void run_next_event(Scheduler* sched);
+
+inline bool event_pending(Scheduler* sched) {
+    return sched->n_events && sched->now >= sched->event_queue[0].time;
+}
 
 void add_event(Scheduler* sched, EventType t, u64 time);
 void remove_event(Scheduler* sched, EventType t);

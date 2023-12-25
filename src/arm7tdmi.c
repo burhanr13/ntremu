@@ -14,34 +14,30 @@ void cpu7_step(Arm7TDMI* cpu) {
 void cpu7_fetch_instr(Arm7TDMI* cpu) {
     cpu->cur_instr = cpu->next_instr;
     if (cpu->cpsr.t) {
-        cpu->next_instr = thumb_lookup[cpu7_fetchh(cpu, cpu->pc, cpu->next_seq)];
         cpu->pc += 2;
         cpu->cur_instr_addr += 2;
     } else {
-        cpu->next_instr.w = cpu7_fetchw(cpu, cpu->pc, cpu->next_seq);
         cpu->pc += 4;
         cpu->cur_instr_addr += 4;
     }
-    cpu->next_seq = true;
 }
 
 void cpu7_flush(Arm7TDMI* cpu) {
     if (cpu->cpsr.t) {
         cpu->pc &= ~1;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr = thumb_lookup[cpu7_fetchh(cpu, cpu->pc, false)];
+        cpu->cur_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc, false)];
         cpu->pc += 2;
-        cpu->next_instr = thumb_lookup[cpu7_fetchh(cpu, cpu->pc, true)];
+        cpu->next_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc, true)];
         cpu->pc += 2;
     } else {
         cpu->pc &= ~0b11;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr.w = cpu7_fetchw(cpu, cpu->pc, false);
+        cpu->cur_instr.w = cpu7_fetch32(cpu, cpu->pc, false);
         cpu->pc += 4;
-        cpu->next_instr.w = cpu7_fetchw(cpu, cpu->pc, true);
+        cpu->next_instr.w = cpu7_fetch32(cpu, cpu->pc, true);
         cpu->pc += 4;
     }
-    cpu->next_seq = true;
 }
 
 RegBank get_bank(CpuMode mode) {
@@ -123,93 +119,60 @@ void cpu7_handle_interrupt(Arm7TDMI* cpu, CpuInterrupt intr) {
     cpu7_flush(cpu);
 }
 
-u32 cpu7_readb(Arm7TDMI* cpu, u32 addr, bool sx) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, false, false));
-    u32 data = bus_readb(cpu->master, addr);
-    if (cpu->master->openbus) data = (u8) cpu->bus_val;
+u32 cpu7_read8(Arm7TDMI* cpu, u32 addr, bool sx) {
+    u32 data = bus7_read8(cpu->master, addr);
     if (sx) data = (s8) data;
-    cpu->bus_val = data;
     return data;
 }
 
-u32 cpu7_readh(Arm7TDMI* cpu, u32 addr, bool sx) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, false, false));
-    u32 data = bus_readh(cpu->master, addr);
-    if (cpu->master->openbus) data = (u16) cpu->bus_val;
+u32 cpu7_read16(Arm7TDMI* cpu, u32 addr, bool sx) {
+    u32 data = bus7_read16(cpu->master, addr);
     if (addr & 1) {
         if (sx) {
             data = ((s16) data) >> 8;
         } else data = (data >> 8) | (data << 24);
     } else if (sx) data = (s16) data;
-    cpu->bus_val = data;
     return data;
 }
 
-u32 cpu7_readw(Arm7TDMI* cpu, u32 addr) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, true, false));
-    u32 data = bus_readw(cpu->master, addr);
-    if (cpu->master->openbus) data = cpu->bus_val;
+u32 cpu7_read32(Arm7TDMI* cpu, u32 addr) {
+    u32 data = bus7_read32(cpu->master, addr);
     if (addr & 0b11) {
         data = (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
     }
-    cpu->bus_val = data;
     return data;
 }
 
-u32 cpu7_readm(Arm7TDMI* cpu, u32 addr, int i) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr + 4 * i, true, i != 0));
-    u32 data = bus_readw(cpu->master, addr + 4 * i);
-    if (cpu->master->openbus) data = cpu->bus_val;
-    else cpu->bus_val = data;
-    return data;
+u32 cpu7_read32m(Arm7TDMI* cpu, u32 addr, int i) {
+    return bus7_read32(cpu->master, addr + 4 * i);
 }
 
-void cpu7_writeb(Arm7TDMI* cpu, u32 addr, u8 b) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, false, false));
-    bus_writeb(cpu->master, addr, b);
+void cpu7_write8(Arm7TDMI* cpu, u32 addr, u8 b) {
+    bus7_write8(cpu->master, addr, b);
 }
 
-void cpu7_writeh(Arm7TDMI* cpu, u32 addr, u16 h) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, false, false));
-    bus_writeh(cpu->master, addr, h);
+void cpu7_write16(Arm7TDMI* cpu, u32 addr, u16 h) {
+    bus7_write16(cpu->master, addr, h);
 }
 
-void cpu7_writew(Arm7TDMI* cpu, u32 addr, u32 w) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, true, false));
-    bus_writew(cpu->master, addr, w);
+void cpu7_write32(Arm7TDMI* cpu, u32 addr, u32 w) {
+    bus7_write32(cpu->master, addr, w);
 }
 
-void cpu7_writem(Arm7TDMI* cpu, u32 addr, int i, u32 w) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr + 4 * i, true, i != 0));
-    bus_writew(cpu->master, addr + 4 * i, w);
+void cpu7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w) {
+    bus7_write32(cpu->master, addr + 4 * i, w);
 }
 
-u16 cpu7_fetchh(Arm7TDMI* cpu, u32 addr, bool seq) {
-    tick_components(cpu->master, get_fetch_waitstates(cpu->master, addr, false, seq));
-    u32 data = bus_readh(cpu->master, addr);
-    if (cpu->master->openbus) data = cpu->bus_val;
-    else {
-        u32 reg = addr >> 24;
-        if (reg == R_BIOS || reg == R_IWRAM || reg == R_OAM) {
-            cpu->bus_val &= 0x0000ffff << (16 * (~addr & 1));
-            cpu->bus_val |= data << (16 * (addr & 1));
-        } else cpu->bus_val = data * 0x00010001;
-    }
-    return data;
+u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr, bool seq) {
+    return bus7_read16(cpu->master, addr);
 }
 
-u32 cpu7_fetchw(Arm7TDMI* cpu, u32 addr, bool seq) {
-    tick_components(cpu->master, get_fetch_waitstates(cpu->master, addr, true, seq));
-    u32 data = bus_readw(cpu->master, addr);
-    if (cpu->master->openbus) data = cpu->bus_val;
-    else cpu->bus_val = data;
-    return data;
+u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr, bool seq) {
+    return bus7_read32(cpu->master, addr);
 }
 
 void cpu7_internal_cycle(Arm7TDMI* cpu) {
-    tick_components(cpu->master, 1);
-    cpu->master->prefetcher_cycles++;
-    if (cpu->pc >= 0x8000000) cpu->next_seq = cpu->master->io.waitcnt.prefetch;
+    
 }
 
 char* mode_name(CpuMode m) {
@@ -252,7 +215,7 @@ void print_cpu7_state(Arm7TDMI* cpu) {
 void print_cur_instr(Arm7TDMI* cpu) {
     if (cpu->cpsr.t) {
         printf("%08x: %04x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        thumb_disassemble((Thumb1Instr){bus_readh(cpu->master, cpu->cur_instr_addr)},
+        thumb_disassemble((Thumb1Instr){bus7_read16(cpu->master, cpu->cur_instr_addr)},
                           cpu->cur_instr_addr, stdout);
         printf("\n");
     } else {

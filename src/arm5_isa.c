@@ -5,15 +5,15 @@
 #include "arm946e.h"
 #include "bus9.h"
 
-ArmExecFunc arm_lookup[1 << 12];
+Arm5ExecFunc arm5_lookup[1 << 12];
 
-void arm_generate_lookup() {
+void arm5_generate_lookup() {
     for (int i = 0; i < 1 << 12; i++) {
-        arm_lookup[i] = arm5_decode_instr((Arm5Instr){(((i & 0xf) << 4) | (i >> 4 << 20))});
+        arm5_lookup[i] = arm5_decode_instr((Arm5Instr){(((i & 0xf) << 4) | (i >> 4 << 20))});
     }
 }
 
-ArmExecFunc arm5_decode_instr(Arm5Instr instr) {
+Arm5ExecFunc arm5_decode_instr(Arm5Instr instr) {
     if (instr.sw_intr.c1 == 0b1111) {
         return exec_arm5_sw_intr;
     } else if (instr.branch.c1 == 0b101) {
@@ -79,14 +79,14 @@ bool eval_cond(Arm946E* cpu, Arm5Instr instr) {
     }
 }
 
-void arm_exec_instr(Arm946E* cpu) {
+void arm5_exec_instr(Arm946E* cpu) {
     Arm5Instr instr = cpu->cur_instr;
     if (!eval_cond(cpu, instr)) {
         cpu9_fetch_instr(cpu);
         return;
     }
 
-    arm_lookup[(((instr.w >> 4) & 0xf) | (instr.w >> 20 << 4)) % (1 << 12)](cpu, instr);
+    arm5_lookup[(((instr.w >> 4) & 0xf) | (instr.w >> 20 << 4)) % (1 << 12)](cpu, instr);
 }
 
 u32 arm_shifter(Arm946E* cpu, u8 shift, u32 operand, u32* carry) {
@@ -442,18 +442,16 @@ void exec_arm5_swap(Arm946E* cpu, Arm5Instr instr) {
     u32 addr = cpu->r[instr.swap.rn];
     cpu9_fetch_instr(cpu);
     if (instr.swap.b) {
-        u8 data = cpu9_readb(cpu, addr, false);
+        u8 data = cpu9_read8(cpu, addr, false);
         cpu9_internal_cycle(cpu);
-        cpu9_writeb(cpu, addr, cpu->r[instr.swap.rm]);
+        cpu9_write8(cpu, addr, cpu->r[instr.swap.rm]);
         cpu->r[instr.swap.rd] = data;
     } else {
-        u32 data = cpu9_readw(cpu, addr);
+        u32 data = cpu9_read32(cpu, addr);
         cpu9_internal_cycle(cpu);
-        cpu9_writew(cpu, addr, cpu->r[instr.swap.rm]);
+        cpu9_write32(cpu, addr, cpu->r[instr.swap.rm]);
         cpu->r[instr.swap.rd] = data;
     }
-
-    cpu->next_seq = false;
 }
 
 void exec_arm5_branch_ex(Arm946E* cpu, Arm5Instr instr) {
@@ -483,9 +481,9 @@ void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr) {
                 cpu->r[instr.half_trans.rn] = wback;
             }
             if (instr.half_trans.h) {
-                cpu->r[instr.half_trans.rd] = cpu9_readh(cpu, addr, true);
+                cpu->r[instr.half_trans.rd] = cpu9_read16(cpu, addr, true);
             } else {
-                cpu->r[instr.half_trans.rd] = cpu9_readb(cpu, addr, true);
+                cpu->r[instr.half_trans.rd] = cpu9_read8(cpu, addr, true);
             }
             cpu9_internal_cycle(cpu);
             if (instr.half_trans.rd == 15) cpu9_flush(cpu);
@@ -495,15 +493,14 @@ void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr) {
             if (instr.half_trans.w || !instr.half_trans.p) {
                 cpu->r[instr.half_trans.rn] = wback;
             }
-            cpu->r[instr.half_trans.rd] = cpu9_readh(cpu, addr, false);
+            cpu->r[instr.half_trans.rd] = cpu9_read16(cpu, addr, false);
             cpu9_internal_cycle(cpu);
             if (instr.half_trans.rd == 15) cpu9_flush(cpu);
         } else {
-            cpu9_writeh(cpu, addr, cpu->r[instr.half_trans.rd]);
+            cpu9_write16(cpu, addr, cpu->r[instr.half_trans.rd]);
             if (instr.half_trans.w || !instr.half_trans.p) {
                 cpu->r[instr.half_trans.rn] = wback;
             }
-            cpu->next_seq = false;
         }
     }
 }
@@ -533,30 +530,28 @@ void exec_arm5_single_trans(Arm946E* cpu, Arm5Instr instr) {
             if (instr.single_trans.w || !instr.single_trans.p) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
-            cpu->r[instr.single_trans.rd] = cpu9_readb(cpu, addr, false);
+            cpu->r[instr.single_trans.rd] = cpu9_read8(cpu, addr, false);
             cpu9_internal_cycle(cpu);
             if (instr.single_trans.rd == 15) cpu9_flush(cpu);
         } else {
-            cpu9_writeb(cpu, addr, cpu->r[instr.single_trans.rd]);
+            cpu9_write8(cpu, addr, cpu->r[instr.single_trans.rd]);
             if (instr.single_trans.w || !instr.single_trans.p) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
-            cpu->next_seq = false;
         }
     } else {
         if (instr.single_trans.l) {
             if (instr.single_trans.w || !instr.single_trans.p) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
-            cpu->r[instr.single_trans.rd] = cpu9_readw(cpu, addr);
+            cpu->r[instr.single_trans.rd] = cpu9_read32(cpu, addr);
             cpu9_internal_cycle(cpu);
             if (instr.single_trans.rd == 15) cpu9_flush(cpu);
         } else {
-            cpu9_writew(cpu, addr, cpu->r[instr.single_trans.rd]);
+            cpu9_write32(cpu, addr, cpu->r[instr.single_trans.rd]);
             if (instr.single_trans.w || !instr.single_trans.p) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
-            cpu->next_seq = false;
         }
     }
 }
@@ -605,7 +600,7 @@ void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr) {
     if (instr.block_trans.l) {
         if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         for (int i = 0; i < rcount; i++) {
-            cpu->r[rlist[i]] = cpu9_readm(cpu, addr, i);
+            cpu->r[rlist[i]] = cpu9_read32m(cpu, addr, i);
         }
         cpu9_internal_cycle(cpu);
         if ((instr.block_trans.rlist & (1 << 15)) || !instr.block_trans.rlist) {
@@ -620,10 +615,9 @@ void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr) {
         }
     } else {
         for (int i = 0; i < rcount; i++) {
-            cpu9_writem(cpu, addr, i, cpu->r[rlist[i]]);
+            cpu9_write32m(cpu, addr, i, cpu->r[rlist[i]]);
             if (i == 0 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         }
-        cpu->next_seq = false;
     }
 
     if (user_trans) {
@@ -664,7 +658,7 @@ void exec_arm5_sw_intr(Arm946E* cpu, Arm5Instr instr) {
     cpu9_handle_interrupt(cpu, I_SWI);
 }
 
-void arm_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
+void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
 
     static char* reg_names[16] = {"r0", "r1", "r2",  "r3",  "r4", "r5", "r6", "r7",
                                   "r8", "r9", "r10", "r11", "ip", "sp", "lr", "pc"};

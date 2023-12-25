@@ -2,20 +2,8 @@
 #define ARM946E_H
 
 #include "arm5_isa.h"
+#include "arm_common.h"
 #include "types.h"
-
-typedef enum { B_USER, B_FIQ, B_SVC, B_ABT, B_IRQ, B_UND, B_CT } RegBank;
-typedef enum {
-    M_USER = 0b10000,
-    M_FIQ = 0b10001,
-    M_IRQ = 0b10010,
-    M_SVC = 0b10011,
-    M_ABT = 0b10111,
-    M_UND = 0b11011,
-    M_SYSTEM = 0b11111
-} CpuMode;
-
-typedef enum { I_RESET, I_UND, I_SWI, I_PABT, I_DABT, I_ADDR, I_IRQ, I_FIQ } CpuInterrupt;
 
 typedef struct _NDS NDS;
 
@@ -58,10 +46,6 @@ typedef struct _Arm946E {
     Arm5Instr next_instr;
     u32 cur_instr_addr;
 
-    u32 bus_val;
-
-    bool next_seq;
-
 } Arm946E;
 
 void cpu9_step(Arm946E* cpu);
@@ -72,18 +56,18 @@ void cpu9_flush(Arm946E* cpu);
 void cpu9_update_mode(Arm946E* cpu, CpuMode old);
 void cpu9_handle_interrupt(Arm946E* cpu, CpuInterrupt intr);
 
-u32 cpu9_readb(Arm946E* cpu, u32 addr, bool sx);
-u32 cpu9_readh(Arm946E* cpu, u32 addr, bool sx);
-u32 cpu9_readw(Arm946E* cpu, u32 addr);
-u32 cpu9_readm(Arm946E* cpu, u32 addr, int i);
+u32 cpu9_read8(Arm946E* cpu, u32 addr, bool sx);
+u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx);
+u32 cpu9_read32(Arm946E* cpu, u32 addr);
+u32 cpu9_read32m(Arm946E* cpu, u32 addr, int i);
 
-void cpu9_writeb(Arm946E* cpu, u32 addr, u8 b);
-void cpu9_writeh(Arm946E* cpu, u32 addr, u16 h);
-void cpu9_writew(Arm946E* cpu, u32 addr, u32 w);
-void cpu9_writem(Arm946E* cpu, u32 addr, int i, u32 w);
+void cpu9_write8(Arm946E* cpu, u32 addr, u8 b);
+void cpu9_write16(Arm946E* cpu, u32 addr, u16 h);
+void cpu9_write32(Arm946E* cpu, u32 addr, u32 w);
+void cpu9_write32m(Arm946E* cpu, u32 addr, int i, u32 w);
 
-u16 cpu9_fetchh(Arm946E* cpu, u32 addr, bool seq);
-u32 cpu9_fetchw(Arm946E* cpu, u32 addr, bool seq);
+u16 cpu9_fetch16(Arm946E* cpu, u32 addr, bool seq);
+u32 cpu9_fetch32(Arm946E* cpu, u32 addr, bool seq);
 
 void cpu9_internal_cycle(Arm946E* cpu);
 

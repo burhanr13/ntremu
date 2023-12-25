@@ -2,13 +2,15 @@
 
 #include <SDL2/SDL.h>
 
-#include "arm_isa.h"
-#include "gba.h"
-#include "thumb_isa.h"
+#include "arm4_isa.h"
+#include "arm5_isa.h"
+#include "nds.h"
+#include "thumb1_isa.h"
+#include "thumb2_isa.h"
 
-EmulatorState agbemu;
+EmulatorState ntremu;
 
-const char usage[] = "agbemu [options] <romfile>\n"
+const char usage[] = "ntremu [options] <romfile>\n"
                      "-b <biosfile> -- specify bios file path\n"
                      "-f -- apply color filter\n"
                      "-u -- run at uncapped speed\n"
@@ -16,45 +18,46 @@ const char usage[] = "agbemu [options] <romfile>\n"
 
 int emulator_init(int argc, char** argv) {
     read_args(argc, argv);
-    if (!agbemu.romfile) {
+    if (!ntremu.romfile) {
         printf(usage);
         return -1;
     }
-    if (!agbemu.biosfile) {
-        agbemu.biosfile = "bios.bin";
+    if (!ntremu.biosfile) {
+        ntremu.biosfile = "bios.bin";
     }
 
-    agbemu.gba = malloc(sizeof *agbemu.gba);
-    agbemu.cart = create_cartridge(agbemu.romfile);
-    if (!agbemu.cart) {
-        free(agbemu.gba);
+    ntremu.nds = malloc(sizeof *ntremu.nds);
+    ntremu.cart = create_cartridge(ntremu.romfile);
+    if (!ntremu.cart) {
+        free(ntremu.nds);
         printf("Invalid rom file\n");
         return -1;
     }
 
-    agbemu.bios = load_bios(agbemu.biosfile);
-    if (!agbemu.bios) {
-        free(agbemu.gba);
-        destroy_cartridge(agbemu.cart);
+    ntremu.bios = load_bios(ntremu.biosfile);
+    if (!ntremu.bios) {
+        free(ntremu.nds);
+        destroy_cartridge(ntremu.cart);
         printf("Invalid or missing bios file.\n");
         return -1;
     }
 
-    arm_generate_lookup();
-    thumb_generate_lookup();
-    init_color_lookups();
-    init_gba(agbemu.gba, agbemu.cart, agbemu.bios, agbemu.bootbios);
+    arm4_generate_lookup();
+    thumb1_generate_lookup();
+    arm5_generate_lookup();
+    thumb2_generate_lookup();
+    init_nds(ntremu.nds);
 
-    agbemu.romfilenodir = strrchr(agbemu.romfile, '/');
-    if (agbemu.romfilenodir) agbemu.romfilenodir++;
-    else agbemu.romfilenodir = agbemu.romfile;
+    ntremu.romfilenodir = strrchr(ntremu.romfile, '/');
+    if (ntremu.romfilenodir) ntremu.romfilenodir++;
+    else ntremu.romfilenodir = ntremu.romfile;
     return 0;
 }
 
 void emulator_quit() {
-    destroy_cartridge(agbemu.cart);
-    free(agbemu.bios);
-    free(agbemu.gba);
+    destroy_cartridge(ntremu.cart);
+    free(ntremu.bios);
+    free(ntremu.nds);
 }
 
 void read_args(int argc, char** argv) {
@@ -63,26 +66,26 @@ void read_args(int argc, char** argv) {
             for (char* f = &argv[i][1]; *f; f++) {
                 switch (*f) {
                     case 'u':
-                        agbemu.uncap = true;
+                        ntremu.uncap = true;
                         break;
                     case 'b':
-                        agbemu.bootbios = true;
+                        ntremu.bootbios = true;
                         if (!*(f + 1) && i + 1 < argc) {
-                            agbemu.biosfile = argv[i + 1];
+                            ntremu.biosfile = argv[i + 1];
                         }
                         break;
                     case 'f':
-                        agbemu.filter = true;
+                        ntremu.filter = true;
                         break;
                     case 'd':
-                        agbemu.debugger = true;
+                        ntremu.debugger = true;
                         break;
                     default:
                         printf("Invalid flag\n");
                 }
             }
         } else {
-            agbemu.romfile = argv[i];
+            ntremu.romfile = argv[i];
         }
     }
 }
@@ -90,82 +93,57 @@ void read_args(int argc, char** argv) {
 void hotkey_press(SDL_KeyCode key) {
     switch (key) {
         case SDLK_ESCAPE:
-            agbemu.running = false;
+            ntremu.running = false;
             break;
         case SDLK_p:
-            agbemu.pause = !agbemu.pause;
+            ntremu.pause = !ntremu.pause;
             break;
         case SDLK_m:
-            agbemu.mute = !agbemu.mute;
+            ntremu.mute = !ntremu.mute;
             break;
         case SDLK_f:
-            agbemu.filter = !agbemu.filter;
+            ntremu.filter = !ntremu.filter;
             break;
         case SDLK_r:
-            init_gba(agbemu.gba, agbemu.cart, agbemu.bios, agbemu.bootbios);
-            agbemu.pause = false;
+            init_nds(ntremu.nds, ntremu.cart, ntremu.bios, ntremu.bootbios);
+            ntremu.pause = false;
             break;
         case SDLK_TAB:
-            agbemu.uncap = !agbemu.uncap;
+            ntremu.uncap = !ntremu.uncap;
             break;
         default:
             break;
     }
 }
 
-void update_input_keyboard(NDS* gba) {
+void update_input_keyboard(NDS* nds) {
     const Uint8* keys = SDL_GetKeyboardState(NULL);
-    gba->io.keyinput.a = ~keys[SDL_SCANCODE_Z];
-    gba->io.keyinput.b = ~keys[SDL_SCANCODE_X];
-    gba->io.keyinput.start = ~keys[SDL_SCANCODE_RETURN];
-    gba->io.keyinput.select = ~keys[SDL_SCANCODE_RSHIFT];
-    gba->io.keyinput.left = ~keys[SDL_SCANCODE_LEFT];
-    gba->io.keyinput.right = ~keys[SDL_SCANCODE_RIGHT];
-    gba->io.keyinput.up = ~keys[SDL_SCANCODE_UP];
-    gba->io.keyinput.down = ~keys[SDL_SCANCODE_DOWN];
-    gba->io.keyinput.l = ~keys[SDL_SCANCODE_A];
-    gba->io.keyinput.r = ~keys[SDL_SCANCODE_S];
+    nds->io.keyinput.a = ~keys[SDL_SCANCODE_Z];
+    nds->io.keyinput.b = ~keys[SDL_SCANCODE_X];
+    nds->io.keyinput.start = ~keys[SDL_SCANCODE_RETURN];
+    nds->io.keyinput.select = ~keys[SDL_SCANCODE_RSHIFT];
+    nds->io.keyinput.left = ~keys[SDL_SCANCODE_LEFT];
+    nds->io.keyinput.right = ~keys[SDL_SCANCODE_RIGHT];
+    nds->io.keyinput.up = ~keys[SDL_SCANCODE_UP];
+    nds->io.keyinput.down = ~keys[SDL_SCANCODE_DOWN];
+    nds->io.keyinput.l = ~keys[SDL_SCANCODE_A];
+    nds->io.keyinput.r = ~keys[SDL_SCANCODE_S];
 }
 
-void update_input_controller(NDS* gba, SDL_GameController* controller) {
-    gba->io.keyinput.a &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
-    gba->io.keyinput.b &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
-    gba->io.keyinput.start &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);
-    gba->io.keyinput.select &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
-    gba->io.keyinput.left &=
+void update_input_controller(NDS* nds, SDL_GameController* controller) {
+    nds->io.keyinput.a &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
+    nds->io.keyinput.b &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
+    nds->io.keyinput.start &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);
+    nds->io.keyinput.select &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
+    nds->io.keyinput.left &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-    gba->io.keyinput.right &=
+    nds->io.keyinput.right &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-    gba->io.keyinput.up &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
-    gba->io.keyinput.down &=
+    nds->io.keyinput.up &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
+    nds->io.keyinput.down &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-    gba->io.keyinput.l &=
+    nds->io.keyinput.l &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-    gba->io.keyinput.r &=
+    nds->io.keyinput.r &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
-}
-
-u8 color_lookup[32];
-u8 color_lookup_filter[32];
-
-void init_color_lookups() {
-    for (int i = 0; i < 32; i++) {
-        float c = (float) i / 31;
-        color_lookup[i] = c * 255;
-        color_lookup_filter[i] = pow(c, 1.7) * 255;
-    }
-}
-
-void gba_convert_screen(u16* gba_screen, Uint32* screen) {
-    for (int i = 0; i < NDS_SCREEN_W * NDS_SCREEN_H; i++) {
-        int r = gba_screen[i] & 0x1f;
-        int g = (gba_screen[i] >> 5) & 0x1f;
-        int b = (gba_screen[i] >> 10) & 0x1f;
-        if (agbemu.filter) {
-            screen[i] = color_lookup_filter[r] << 16 | color_lookup_filter[g] << 8 |
-                        color_lookup_filter[b] << 0;
-        } else {
-            screen[i] = color_lookup[r] << 16 | color_lookup[g] << 8 | color_lookup[b] << 0;
-        }
-    }
 }

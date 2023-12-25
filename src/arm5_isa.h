@@ -3,30 +3,8 @@
 
 #include <stdio.h>
 
+#include "arm_common.h"
 #include "types.h"
-
-enum { C_EQ, C_NE, C_CS, C_CC, C_MI, C_PL, C_VS, C_VC, C_HI, C_LS, C_GE, C_LT, C_GT, C_LE, C_AL };
-
-enum {
-    A_AND,
-    A_EOR,
-    A_SUB,
-    A_RSB,
-    A_ADD,
-    A_ADC,
-    A_SBC,
-    A_RSC,
-    A_TST,
-    A_TEQ,
-    A_CMP,
-    A_CMN,
-    A_ORR,
-    A_MOV,
-    A_BIC,
-    A_MVN
-};
-
-enum { S_LSL, S_LSR, S_ASR, S_ROR };
 
 typedef struct _Arm946E Arm946E;
 
@@ -163,14 +141,14 @@ typedef union {
     } sw_intr;
 } Arm5Instr;
 
-typedef void (*ArmExecFunc)(Arm946E*, Arm5Instr);
+typedef void (*Arm5ExecFunc)(Arm946E*, Arm5Instr);
 
-extern ArmExecFunc arm_lookup[1 << 12];
+extern Arm5ExecFunc arm_lookup[1 << 12];
 
-void arm_generate_lookup();
-ArmExecFunc arm5_decode_instr(Arm5Instr instr);
+void arm5_generate_lookup();
+Arm5ExecFunc arm5_decode_instr(Arm5Instr instr);
 
-void arm_exec_instr(Arm946E* cpu);
+void arm5_exec_instr(Arm946E* cpu);
 
 void exec_arm5_data_proc(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_psr_trans(Arm946E* cpu, Arm5Instr instr);
@@ -185,6 +163,6 @@ void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_branch(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_sw_intr(Arm946E* cpu, Arm5Instr instr);
 
-void arm_disassemble(Arm5Instr instr, u32 addr, FILE* out);
+void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out);
 
 #endif

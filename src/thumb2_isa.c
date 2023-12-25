@@ -4,7 +4,7 @@
 
 Arm5Instr thumb2_lookup[1 << 16];
 
-void thumb_generate_lookup() {
+void thumb2_generate_lookup() {
     for (int i = 0; i < 1 << 16; i++) {
         thumb2_lookup[i] = thumb2_decode_instr((Thumb2Instr){i});
     }
@@ -307,6 +307,6 @@ Arm5Instr thumb2_decode_instr(Thumb2Instr instr) {
     return dec;
 }
 
-void thumb_disassemble(Thumb2Instr instr, u32 addr, FILE* out) {
-    arm_disassemble(thumb_lookup[instr.h], addr, out);
+void thumb2_disassemble(Thumb2Instr instr, u32 addr, FILE* out) {
+    arm_disassemble(thumb2_lookup[instr.h], addr, out);
 }

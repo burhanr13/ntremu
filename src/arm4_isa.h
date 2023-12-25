@@ -3,30 +3,8 @@
 
 #include <stdio.h>
 
+#include "arm_common.h"
 #include "types.h"
-
-enum { C_EQ, C_NE, C_CS, C_CC, C_MI, C_PL, C_VS, C_VC, C_HI, C_LS, C_GE, C_LT, C_GT, C_LE, C_AL };
-
-enum {
-    A_AND,
-    A_EOR,
-    A_SUB,
-    A_RSB,
-    A_ADD,
-    A_ADC,
-    A_SBC,
-    A_RSC,
-    A_TST,
-    A_TEQ,
-    A_CMP,
-    A_CMN,
-    A_ORR,
-    A_MOV,
-    A_BIC,
-    A_MVN
-};
-
-enum { S_LSL, S_LSR, S_ASR, S_ROR };
 
 typedef struct _Arm7TDMI Arm7TDMI;
 
@@ -163,14 +141,14 @@ typedef union {
     } sw_intr;
 } Arm4Instr;
 
-typedef void (*ArmExecFunc)(Arm7TDMI*, Arm4Instr);
+typedef void (*Arm4ExecFunc)(Arm7TDMI*, Arm4Instr);
 
-extern ArmExecFunc arm_lookup[1 << 12];
+extern Arm4ExecFunc arm4_lookup[1 << 12];
 
-void arm_generate_lookup();
+void arm4_generate_lookup();
 ArmExecFunc arm4_decode_instr(Arm4Instr instr);
 
-void arm_exec_instr(Arm7TDMI* cpu);
+void arm4_exec_instr(Arm7TDMI* cpu);
 
 void exec_arm4_data_proc(Arm7TDMI* cpu, Arm4Instr instr);
 void exec_arm4_psr_trans(Arm7TDMI* cpu, Arm4Instr instr);

@@ -1,0 +1,118 @@
+#ifndef PPU_H
+#define PPU_H
+
+#include "types.h"
+
+#define NDS_SCREEN_W 256
+#define NDS_SCREEN_H 192
+#define DOTS_W 355
+#define LINES_H 263
+
+typedef union {
+    u16 h;
+    struct {
+        u16 num : 10;
+        u16 hflip : 1;
+        u16 vflip : 1;
+        u16 palette : 4;
+    };
+} BgTile;
+
+enum { OBJ_MODE_NORMAL, OBJ_MODE_SEMITRANS, OBJ_MODE_OBJWIN };
+enum { OBJ_SHAPE_SQR, OBJ_SHAPE_HORZ, OBJ_SHAPE_VERT };
+
+typedef struct {
+    union {
+        u16 attr0;
+        struct {
+            u16 y : 8;
+            u16 aff : 1;
+            u16 disable_double : 1;
+            u16 mode : 2;
+            u16 mosaic : 1;
+            u16 palmode : 1;
+            u16 shape : 2;
+        };
+    };
+    union {
+        u16 attr1;
+        struct {
+            u16 x : 9;
+            u16 unused : 3;
+            u16 hflip : 1;
+            u16 vflip : 1;
+            u16 size : 2;
+        };
+        struct {
+            u16 _x : 9;
+            u16 affparamind : 5;
+            u16 _size : 2;
+        };
+    };
+    union {
+        u16 attr2;
+        struct {
+            u16 tilenum : 10;
+            u16 priority : 2;
+            u16 palette : 4;
+        };
+    };
+    s16 affparam;
+} ObjAttr;
+
+enum { WIN0, WIN1, WOUT, WOBJ };
+enum { LBG0, LBG1, LBG2, LBG3, LOBJ, LBD, LMAX };
+
+enum { EFF_NONE, EFF_ALPHA, EFF_BINC, EFF_BDEC };
+
+typedef struct _NDS NDS;
+
+typedef struct {
+    NDS* master;
+
+    u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
+    u16 ly;
+
+    u16 layerlines[LMAX][NDS_SCREEN_W];
+    struct {
+        u8 priority : 2;
+        u8 semitrans : 1;
+        u8 mosaic : 1;
+        u8 pad : 4;
+    } objdotattrs[NDS_SCREEN_W];
+    u8 window[NDS_SCREEN_W];
+
+    struct {
+        u32 x;
+        u32 y;
+        u32 mosx;
+        u32 mosy;
+    } bgaffintr[2];
+
+    u8 bgmos_y;
+    u8 bgmos_ct;
+    u8 objmos_y;
+    u8 objmos_ct;
+
+    bool draw_bg[4];
+    bool draw_obj;
+    bool in_win[2];
+    bool obj_semitrans;
+    bool obj_mos;
+
+    int obj_cycles;
+
+    bool frame_complete;
+} PPU;
+
+void render_bgs(PPU* ppu);
+void render_objs(PPU* ppu);
+void render_windows(PPU* ppu);
+
+void draw_scanline(PPU* ppu);
+
+void ppu_hdraw(PPU* ppu);
+void ppu_vblank(PPU* ppu);
+void ppu_hblank(PPU* ppu);
+
+#endif
