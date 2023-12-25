@@ -38,12 +38,14 @@ Arm5ExecFunc arm5_decode_instr(Arm5Instr instr) {
     } else if (instr.psr_trans.c1 == 0b00 && instr.psr_trans.c2 == 0b10 &&
                instr.psr_trans.c3 == 0) {
         return exec_arm5_psr_trans;
-    } else {
+    } else if (instr.data_proc.c1 == 0b00) {
         return exec_arm5_data_proc;
+    } else {
+        return NULL;
     }
 }
 
-bool eval_cond(Arm946E* cpu, Arm5Instr instr) {
+bool eval_cond9(Arm946E* cpu, Arm5Instr instr) {
     if (instr.cond == C_AL) return true;
     switch (instr.cond) {
         case C_EQ:
@@ -81,15 +83,18 @@ bool eval_cond(Arm946E* cpu, Arm5Instr instr) {
 
 void arm5_exec_instr(Arm946E* cpu) {
     Arm5Instr instr = cpu->cur_instr;
-    if (!eval_cond(cpu, instr)) {
+    if (!eval_cond9(cpu, instr)) {
         cpu9_fetch_instr(cpu);
         return;
     }
 
-    arm5_lookup[(((instr.w >> 4) & 0xf) | (instr.w >> 20 << 4)) % (1 << 12)](cpu, instr);
+    Arm5ExecFunc func = arm5_lookup[(((instr.w >> 4) & 0xf) | (instr.w >> 20 << 4)) % (1 << 12)];
+    if (func) {
+        func(cpu, instr);
+    }
 }
 
-u32 arm_shifter(Arm946E* cpu, u8 shift, u32 operand, u32* carry) {
+u32 arm5_shifter(Arm946E* cpu, u8 shift, u32 operand, u32* carry) {
     u32 shift_type = (shift >> 1) & 0b11;
     u32 shift_amt = shift >> 3;
     if (shift_amt) {
@@ -183,12 +188,12 @@ void exec_arm5_data_proc(Arm946E* cpu, Arm5Instr instr) {
                         break;
                 }
             } else if (shift_amt > 0) {
-                op2 = arm_shifter(cpu, (shift & 0b111) | shift_amt << 3, op2, &c);
+                op2 = arm5_shifter(cpu, (shift & 0b111) | shift_amt << 3, op2, &c);
             }
 
             op1 = cpu->r[instr.data_proc.rn];
         } else {
-            op2 = arm_shifter(cpu, shift, cpu->r[rm], &c);
+            op2 = arm5_shifter(cpu, shift, cpu->r[rm], &c);
             op1 = cpu->r[instr.data_proc.rn];
             cpu9_fetch_instr(cpu);
         }
@@ -514,7 +519,7 @@ void exec_arm5_single_trans(Arm946E* cpu, Arm5Instr instr) {
         offset = cpu->r[rm];
         u8 shift = instr.single_trans.offset >> 4;
         u32 carry;
-        offset = arm_shifter(cpu, shift, offset, &carry);
+        offset = arm5_shifter(cpu, shift, offset, &carry);
     } else {
         offset = instr.single_trans.offset;
     }
@@ -829,7 +834,7 @@ void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
                     instr.psr_trans.p ? "spsr" : "cpsr");
         }
 
-    } else {
+    } else if (instr.data_proc.c1 == 0b00) {
 
         if (instr.data_proc.i && instr.data_proc.rn == 15 &&
             (instr.data_proc.opcode == A_ADD || instr.data_proc.opcode == A_SUB)) {
@@ -879,5 +884,7 @@ void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
                 }
             }
         }
+    } else {
+        fprintf(out, "unimplemented\n");
     }
 }

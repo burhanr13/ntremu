@@ -27,18 +27,10 @@ int emulator_init(int argc, char** argv) {
     }
 
     ntremu.nds = malloc(sizeof *ntremu.nds);
-    ntremu.cart = create_cartridge(ntremu.romfile);
-    if (!ntremu.cart) {
+    ntremu.card = create_card(ntremu.romfile);
+    if (!ntremu.card) {
         free(ntremu.nds);
         printf("Invalid rom file\n");
-        return -1;
-    }
-
-    ntremu.bios = load_bios(ntremu.biosfile);
-    if (!ntremu.bios) {
-        free(ntremu.nds);
-        destroy_cartridge(ntremu.cart);
-        printf("Invalid or missing bios file.\n");
         return -1;
     }
 
@@ -46,7 +38,7 @@ int emulator_init(int argc, char** argv) {
     thumb1_generate_lookup();
     arm5_generate_lookup();
     thumb2_generate_lookup();
-    init_nds(ntremu.nds);
+    init_nds(ntremu.nds, ntremu.card);
 
     ntremu.romfilenodir = strrchr(ntremu.romfile, '/');
     if (ntremu.romfilenodir) ntremu.romfilenodir++;
@@ -55,8 +47,7 @@ int emulator_init(int argc, char** argv) {
 }
 
 void emulator_quit() {
-    destroy_cartridge(ntremu.cart);
-    free(ntremu.bios);
+    destroy_card(ntremu.card);
     free(ntremu.nds);
 }
 
@@ -105,7 +96,7 @@ void hotkey_press(SDL_KeyCode key) {
             ntremu.filter = !ntremu.filter;
             break;
         case SDLK_r:
-            init_nds(ntremu.nds, ntremu.cart, ntremu.bios, ntremu.bootbios);
+            init_nds(ntremu.nds, ntremu.card);
             ntremu.pause = false;
             break;
         case SDLK_TAB:

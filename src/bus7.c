@@ -47,7 +47,6 @@
             case R_GBASRAM:                                                                        \
                 break;                                                                             \
         }                                                                                          \
-        return -1;                                                                                 \
     }
 
 BUS7READDECL(8)

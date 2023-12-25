@@ -56,4 +56,7 @@ enum {
     T_MVN
 };
 
+char* mode_name(CpuMode m);
+RegBank get_bank(CpuMode mode);
+
 #endif

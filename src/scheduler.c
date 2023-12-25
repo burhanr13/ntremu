@@ -61,6 +61,7 @@ void remove_event(Scheduler* sched, EventType t) {
 void print_scheduled_events(Scheduler* sched) {
     static char* event_names[EVENT_MAX] = {"LCD HDraw", "LCD HBlank"};
 
+    printf("Now: %ld\n", sched->now);
     for (int i = 0; i < sched->n_events; i++) {
         printf("%ld => %s\n", sched->event_queue[i].time, event_names[sched->event_queue[i].type]);
     }

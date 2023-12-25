@@ -3,20 +3,23 @@
 #include <stdio.h>
 
 #include "arm4_isa.h"
+#include "arm_common.h"
 #include "bus7.h"
 #include "thumb1_isa.h"
 #include "types.h"
 
 void cpu7_step(Arm7TDMI* cpu) {
-    arm_exec_instr(cpu);
+    arm4_exec_instr(cpu);
 }
 
 void cpu7_fetch_instr(Arm7TDMI* cpu) {
     cpu->cur_instr = cpu->next_instr;
     if (cpu->cpsr.t) {
+        cpu->next_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
         cpu->cur_instr_addr += 2;
     } else {
+        cpu->next_instr.w = cpu7_fetch32(cpu, cpu->pc);
         cpu->pc += 4;
         cpu->cur_instr_addr += 4;
     }
@@ -26,38 +29,18 @@ void cpu7_flush(Arm7TDMI* cpu) {
     if (cpu->cpsr.t) {
         cpu->pc &= ~1;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc, false)];
+        cpu->cur_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
-        cpu->next_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc, true)];
+        cpu->next_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
     } else {
         cpu->pc &= ~0b11;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr.w = cpu7_fetch32(cpu, cpu->pc, false);
+        cpu->cur_instr.w = cpu7_fetch32(cpu, cpu->pc);
         cpu->pc += 4;
-        cpu->next_instr.w = cpu7_fetch32(cpu, cpu->pc, true);
+        cpu->next_instr.w = cpu7_fetch32(cpu, cpu->pc);
         cpu->pc += 4;
     }
-}
-
-RegBank get_bank(CpuMode mode) {
-    switch (mode) {
-        case M_USER:
-            return B_USER;
-        case M_FIQ:
-            return B_FIQ;
-        case M_IRQ:
-            return B_IRQ;
-        case M_SVC:
-            return B_SVC;
-        case M_ABT:
-            return B_ABT;
-        case M_UND:
-            return B_UND;
-        case M_SYSTEM:
-            return B_USER;
-    }
-    return B_USER;
 }
 
 void cpu7_update_mode(Arm7TDMI* cpu, CpuMode old) {
@@ -126,7 +109,7 @@ u32 cpu7_read8(Arm7TDMI* cpu, u32 addr, bool sx) {
 }
 
 u32 cpu7_read16(Arm7TDMI* cpu, u32 addr, bool sx) {
-    u32 data = bus7_read16(cpu->master, addr);
+    u32 data = bus7_read16(cpu->master, addr & ~1);
     if (addr & 1) {
         if (sx) {
             data = ((s16) data) >> 8;
@@ -136,7 +119,7 @@ u32 cpu7_read16(Arm7TDMI* cpu, u32 addr, bool sx) {
 }
 
 u32 cpu7_read32(Arm7TDMI* cpu, u32 addr) {
-    u32 data = bus7_read32(cpu->master, addr);
+    u32 data = bus7_read32(cpu->master, addr & ~3);
     if (addr & 0b11) {
         data = (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
     }
@@ -144,7 +127,7 @@ u32 cpu7_read32(Arm7TDMI* cpu, u32 addr) {
 }
 
 u32 cpu7_read32m(Arm7TDMI* cpu, u32 addr, int i) {
-    return bus7_read32(cpu->master, addr + 4 * i);
+    return bus7_read32(cpu->master, (addr & ~3) + 4 * i);
 }
 
 void cpu7_write8(Arm7TDMI* cpu, u32 addr, u8 b) {
@@ -152,75 +135,52 @@ void cpu7_write8(Arm7TDMI* cpu, u32 addr, u8 b) {
 }
 
 void cpu7_write16(Arm7TDMI* cpu, u32 addr, u16 h) {
-    bus7_write16(cpu->master, addr, h);
+    bus7_write16(cpu->master, addr & ~1, h);
 }
 
 void cpu7_write32(Arm7TDMI* cpu, u32 addr, u32 w) {
-    bus7_write32(cpu->master, addr, w);
+    bus7_write32(cpu->master, addr & ~3, w);
 }
 
 void cpu7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w) {
-    bus7_write32(cpu->master, addr + 4 * i, w);
+    bus7_write32(cpu->master, (addr & ~3) + 4 * i, w);
 }
 
-u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr, bool seq) {
-    return bus7_read16(cpu->master, addr);
+u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr) {
+    return bus7_read16(cpu->master, addr & ~1);
 }
 
-u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr, bool seq) {
-    return bus7_read32(cpu->master, addr);
+u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr) {
+    return bus7_read32(cpu->master, addr & ~3);
 }
 
-void cpu7_internal_cycle(Arm7TDMI* cpu) {
-    
-}
-
-char* mode_name(CpuMode m) {
-    switch (m) {
-        case M_USER:
-            return "USER";
-        case M_FIQ:
-            return "FIQ";
-        case M_IRQ:
-            return "IRQ";
-        case M_SVC:
-            return "SVC";
-        case M_ABT:
-            return "ABT";
-        case M_UND:
-            return "UND";
-        case M_SYSTEM:
-            return "SYSTEM";
-        default:
-            return "ILLEGAL";
-    }
-}
+void cpu7_internal_cycle(Arm7TDMI* cpu) {}
 
 void print_cpu7_state(Arm7TDMI* cpu) {
     static char* reg_names[16] = {"r0", "r1", "r2",  "r3",  "r4", "r5", "r6", "r7",
                                   "r8", "r9", "r10", "r11", "ip", "sp", "lr", "pc"};
     for (int i = 0; i < 4; i++) {
-        if (i == 0) printf("CPU ");
-        else printf("    ");
+        if (i == 0) printf("CPU7 ");
+        else printf("     ");
         for (int j = 0; j < 4; j++) {
             printf("%3s=0x%08x ", reg_names[4 * i + j], cpu->r[4 * i + j]);
         }
         printf("\n");
     }
-    printf("    cpsr=%08x (n=%d,z=%d,c=%d,v=%d,i=%d,f=%d,t=%d,m=%s)\n", cpu->cpsr.w, cpu->cpsr.n,
+    printf("     cpsr=%08x (n=%d,z=%d,c=%d,v=%d,i=%d,f=%d,t=%d,m=%s)\n", cpu->cpsr.w, cpu->cpsr.n,
            cpu->cpsr.z, cpu->cpsr.c, cpu->cpsr.v, cpu->cpsr.i, cpu->cpsr.v, cpu->cpsr.t,
            mode_name(cpu->cpsr.m));
 }
 
-void print_cur_instr(Arm7TDMI* cpu) {
+void print_cur_instr7(Arm7TDMI* cpu) {
     if (cpu->cpsr.t) {
         printf("%08x: %04x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        thumb_disassemble((Thumb1Instr){bus7_read16(cpu->master, cpu->cur_instr_addr)},
-                          cpu->cur_instr_addr, stdout);
+        thumb1_disassemble((Thumb1Instr){bus7_read16(cpu->master, cpu->cur_instr_addr)},
+                           cpu->cur_instr_addr, stdout);
         printf("\n");
     } else {
         printf("%08x: %08x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        arm_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
+        arm4_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
         printf("\n");
     }
 }

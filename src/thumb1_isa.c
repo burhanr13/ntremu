@@ -308,5 +308,5 @@ Arm4Instr thumb1_decode_instr(Thumb1Instr instr) {
 }
 
 void thumb1_disassemble(Thumb1Instr instr, u32 addr, FILE* out) {
-    arm_disassemble(thumb1_lookup[instr.h], addr, out);
+    arm4_disassemble(thumb1_lookup[instr.h], addr, out);
 }
