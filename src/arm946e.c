@@ -7,7 +7,6 @@
 #include "thumb2_isa.h"
 #include "types.h"
 
-
 void cpu9_step(Arm946E* cpu) {
     arm_exec_instr(cpu);
 }
@@ -15,34 +14,30 @@ void cpu9_step(Arm946E* cpu) {
 void cpu9_fetch_instr(Arm946E* cpu) {
     cpu->cur_instr = cpu->next_instr;
     if (cpu->cpsr.t) {
-        cpu->next_instr = thumb_lookup[cpu9_fetchh(cpu, cpu->pc, cpu->next_seq)];
         cpu->pc += 2;
         cpu->cur_instr_addr += 2;
     } else {
-        cpu->next_instr.w = cpu9_fetchw(cpu, cpu->pc, cpu->next_seq);
         cpu->pc += 4;
         cpu->cur_instr_addr += 4;
     }
-    cpu->next_seq = true;
 }
 
 void cpu9_flush(Arm946E* cpu) {
     if (cpu->cpsr.t) {
         cpu->pc &= ~1;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr = thumb_lookup[cpu9_fetchh(cpu, cpu->pc, false)];
+        cpu->cur_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc, false)];
         cpu->pc += 2;
-        cpu->next_instr = thumb_lookup[cpu9_fetchh(cpu, cpu->pc, true)];
+        cpu->next_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc, true)];
         cpu->pc += 2;
     } else {
         cpu->pc &= ~0b11;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr.w = cpu9_fetchw(cpu, cpu->pc, false);
+        cpu->cur_instr.w = cpu9_fetch32(cpu, cpu->pc, false);
         cpu->pc += 4;
-        cpu->next_instr.w = cpu9_fetchw(cpu, cpu->pc, true);
+        cpu->next_instr.w = cpu9_fetch32(cpu, cpu->pc, true);
         cpu->pc += 4;
     }
-    cpu->next_seq = true;
 }
 
 RegBank get_bank(CpuMode mode) {
@@ -124,94 +119,59 @@ void cpu9_handle_interrupt(Arm946E* cpu, CpuInterrupt intr) {
     cpu9_flush(cpu);
 }
 
-u32 cpu9_readb(Arm946E* cpu, u32 addr, bool sx) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, false, false));
-    u32 data = bus_readb(cpu->master, addr);
-    if (cpu->master->openbus) data = (u8) cpu->bus_val;
+u32 cpu9_read8(Arm946E* cpu, u32 addr, bool sx) {
+    u32 data = bus9_read8(cpu->master, addr);
     if (sx) data = (s8) data;
-    cpu->bus_val = data;
     return data;
 }
 
-u32 cpu9_readh(Arm946E* cpu, u32 addr, bool sx) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, false, false));
-    u32 data = bus_readh(cpu->master, addr);
-    if (cpu->master->openbus) data = (u16) cpu->bus_val;
+u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx) {
+    u32 data = bus9_read16(cpu->master, addr);
     if (addr & 1) {
         if (sx) {
             data = ((s16) data) >> 8;
         } else data = (data >> 8) | (data << 24);
     } else if (sx) data = (s16) data;
-    cpu->bus_val = data;
     return data;
 }
 
-u32 cpu9_readw(Arm946E* cpu, u32 addr) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, true, false));
-    u32 data = bus_readw(cpu->master, addr);
-    if (cpu->master->openbus) data = cpu->bus_val;
+u32 cpu9_read32(Arm946E* cpu, u32 addr) {
+    u32 data = bus9_read32(cpu->master, addr);
     if (addr & 0b11) {
         data = (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
     }
-    cpu->bus_val = data;
     return data;
 }
 
-u32 cpu9_readm(Arm946E* cpu, u32 addr, int i) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr + 4 * i, true, i != 0));
-    u32 data = bus_readw(cpu->master, addr + 4 * i);
-    if (cpu->master->openbus) data = cpu->bus_val;
-    else cpu->bus_val = data;
-    return data;
+u32 cpu9_read32m(Arm946E* cpu, u32 addr, int i) {
+    return bus9_read32(cpu->master, addr + 4 * i);
 }
 
-void cpu9_writeb(Arm946E* cpu, u32 addr, u8 b) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, false, false));
-    bus_writeb(cpu->master, addr, b);
+void cpu9_write8(Arm946E* cpu, u32 addr, u8 b) {
+    bus9_write8(cpu->master, addr, b);
 }
 
-void cpu9_writeh(Arm946E* cpu, u32 addr, u16 h) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, false, false));
-    bus_writeh(cpu->master, addr, h);
+void cpu9_write16(Arm946E* cpu, u32 addr, u16 h) {
+    bus9_write16(cpu->master, addr, h);
 }
 
-void cpu9_writew(Arm946E* cpu, u32 addr, u32 w) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr, true, false));
-    bus_writew(cpu->master, addr, w);
+void cpu9_write32(Arm946E* cpu, u32 addr, u32 w) {
+    bus9_write32(cpu->master, addr, w);
 }
 
-void cpu9_writem(Arm946E* cpu, u32 addr, int i, u32 w) {
-    tick_components(cpu->master, get_waitstates(cpu->master, addr + 4 * i, true, i != 0));
-    bus_writew(cpu->master, addr + 4 * i, w);
+void cpu9_write32m(Arm946E* cpu, u32 addr, int i, u32 w) {
+    bus9_write32(cpu->master, addr + 4 * i, w);
 }
 
-u16 cpu9_fetchh(Arm946E* cpu, u32 addr, bool seq) {
-    tick_components(cpu->master, get_fetch_waitstates(cpu->master, addr, false, seq));
-    u32 data = bus_readh(cpu->master, addr);
-    if (cpu->master->openbus) data = cpu->bus_val;
-    else {
-        u32 reg = addr >> 24;
-        if (reg == R_BIOS || reg == R_IWRAM || reg == R_OAM) {
-            cpu->bus_val &= 0x0000ffff << (16 * (~addr & 1));
-            cpu->bus_val |= data << (16 * (addr & 1));
-        } else cpu->bus_val = data * 0x00010001;
-    }
-    return data;
+u16 cpu9_fetch16(Arm946E* cpu, u32 addr, bool seq) {
+    return bus9_read16(cpu->master, addr);
 }
 
-u32 cpu9_fetchw(Arm946E* cpu, u32 addr, bool seq) {
-    tick_components(cpu->master, get_fetch_waitstates(cpu->master, addr, true, seq));
-    u32 data = bus_readw(cpu->master, addr);
-    if (cpu->master->openbus) data = cpu->bus_val;
-    else cpu->bus_val = data;
-    return data;
+u32 cpu9_fetch32(Arm946E* cpu, u32 addr, bool seq) {
+    return bus9_read32(cpu->master, addr);
 }
 
-void cpu9_internal_cycle(Arm946E* cpu) {
-    tick_components(cpu->master, 1);
-    cpu->master->prefetcher_cycles++;
-    if (cpu->pc >= 0x8000000) cpu->next_seq = cpu->master->io.waitcnt.prefetch;
-}
+void cpu9_internal_cycle(Arm946E* cpu) {}
 
 char* mode_name(CpuMode m) {
     switch (m) {
@@ -253,7 +213,7 @@ void print_cpu9_state(Arm946E* cpu) {
 void print_cur_instr(Arm946E* cpu) {
     if (cpu->cpsr.t) {
         printf("%08x: %04x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        thumb_disassemble((Thumb2Instr){bus_readh(cpu->master, cpu->cur_instr_addr)},
+        thumb_disassemble((Thumb2Instr){bus9_read16(cpu->master, cpu->cur_instr_addr)},
                           cpu->cur_instr_addr, stdout);
         printf("\n");
     } else {

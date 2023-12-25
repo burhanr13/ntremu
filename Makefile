@@ -6,7 +6,7 @@ LDFLAGS := $(shell sdl2-config --libs) -lm -lz
 BUILD_DIR := build
 SRC_DIR := src
 
-TARGET_EXEC := agbemu
+TARGET_EXEC := ntremu
 
 SRCS := $(basename $(notdir $(wildcard $(SRC_DIR)/*.c)))
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)

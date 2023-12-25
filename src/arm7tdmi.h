@@ -2,20 +2,8 @@
 #define ARM7TDMI_H
 
 #include "arm4_isa.h"
+#include "arm_common.h"
 #include "types.h"
-
-typedef enum { B_USER, B_FIQ, B_SVC, B_ABT, B_IRQ, B_UND, B_CT } RegBank;
-typedef enum {
-    M_USER = 0b10000,
-    M_FIQ = 0b10001,
-    M_IRQ = 0b10010,
-    M_SVC = 0b10011,
-    M_ABT = 0b10111,
-    M_UND = 0b11011,
-    M_SYSTEM = 0b11111
-} CpuMode;
-
-typedef enum { I_RESET, I_UND, I_SWI, I_PABT, I_DABT, I_ADDR, I_IRQ, I_FIQ } CpuInterrupt;
 
 typedef struct _NDS NDS;
 
@@ -57,10 +45,6 @@ typedef struct _Arm7TDMI {
     Arm4Instr next_instr;
     u32 cur_instr_addr;
 
-    u32 bus_val;
-
-    bool next_seq;
-
 } Arm7TDMI;
 
 void cpu7_step(Arm7TDMI* cpu);
@@ -71,18 +55,18 @@ void cpu7_flush(Arm7TDMI* cpu);
 void cpu7_update_mode(Arm7TDMI* cpu, CpuMode old);
 void cpu7_handle_interrupt(Arm7TDMI* cpu, CpuInterrupt intr);
 
-u32 cpu7_readb(Arm7TDMI* cpu, u32 addr, bool sx);
-u32 cpu7_readh(Arm7TDMI* cpu, u32 addr, bool sx);
-u32 cpu7_readw(Arm7TDMI* cpu, u32 addr);
-u32 cpu7_readm(Arm7TDMI* cpu, u32 addr, int i);
+u32 cpu7_read8(Arm7TDMI* cpu, u32 addr, bool sx);
+u32 cpu7_read16(Arm7TDMI* cpu, u32 addr, bool sx);
+u32 cpu7_read32(Arm7TDMI* cpu, u32 addr);
+u32 cpu7_read32m(Arm7TDMI* cpu, u32 addr, int i);
 
-void cpu7_writeb(Arm7TDMI* cpu, u32 addr, u8 b);
-void cpu7_writeh(Arm7TDMI* cpu, u32 addr, u16 h);
-void cpu7_writew(Arm7TDMI* cpu, u32 addr, u32 w);
-void cpu7_writem(Arm7TDMI* cpu, u32 addr, int i, u32 w);
+void cpu7_write8(Arm7TDMI* cpu, u32 addr, u8 b);
+void cpu7_write16(Arm7TDMI* cpu, u32 addr, u16 h);
+void cpu7_write32(Arm7TDMI* cpu, u32 addr, u32 w);
+void cpu7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w);
 
-u16 cpu7_fetchh(Arm7TDMI* cpu, u32 addr, bool seq);
-u32 cpu7_fetchw(Arm7TDMI* cpu, u32 addr, bool seq);
+u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr, bool seq);
+u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr, bool seq);
 
 void cpu7_internal_cycle(Arm7TDMI* cpu);
 

@@ -3,13 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "apu.h"
-#include "arm_isa.h"
-#include "cartridge.h"
-#include "debugger.h"
 #include "emulator.h"
-#include "gba.h"
-#include "thumb_isa.h"
+#include "nds.h"
 #include "types.h"
 
 char wintitle[200];
@@ -43,7 +38,7 @@ int main(int argc, char** argv) {
     SDL_Renderer* renderer;
     SDL_CreateWindowAndRenderer(NDS_SCREEN_W * 4, NDS_SCREEN_H * 4, SDL_WINDOW_RESIZABLE, &window,
                                 &renderer);
-    snprintf(wintitle, 199, "agbemu | %s | %.2lf FPS", agbemu.romfilenodir, 0.0);
+    snprintf(wintitle, 199, "ntremu | %s | %.2lf FPS", ntremu.romfilenodir, 0.0);
     SDL_SetWindowTitle(window, wintitle);
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
@@ -52,49 +47,44 @@ int main(int argc, char** argv) {
         SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
                           NDS_SCREEN_W, NDS_SCREEN_H);
 
-    SDL_AudioSpec audio_spec = {
-        .freq = SAMPLE_FREQ, .format = AUDIO_F32, .channels = 2, .samples = SAMPLE_BUF_LEN / 2};
-    SDL_AudioDeviceID audio = SDL_OpenAudioDevice(NULL, 0, &audio_spec, NULL, 0);
-    SDL_PauseAudioDevice(audio, 0);
-
     Uint64 prev_time = SDL_GetPerformanceCounter();
     Uint64 prev_fps_update = prev_time;
     Uint64 prev_fps_frame = 0;
     const Uint64 frame_ticks = SDL_GetPerformanceFrequency() / 60;
     Uint64 frame = 0;
 
-    agbemu.running = !agbemu.debugger;
+    ntremu.running = !ntremu.debugger;
     while (true) {
-        while (agbemu.running) {
+        while (ntremu.running) {
             Uint64 cur_time;
             Uint64 elapsed;
-            bool play_audio = !(agbemu.pause || agbemu.mute || agbemu.uncap || agbemu.gba->stop) &&
-                              (agbemu.gba->io.nr52 & (1 << 7));
+            bool play_audio = !(ntremu.pause || ntremu.mute || ntremu.uncap || ntremu.nds->stop) &&
+                              (ntremu.nds->io.nr52 & (1 << 7));
 
-            if (!(agbemu.pause || agbemu.gba->stop)) {
+            if (!(ntremu.pause || ntremu.nds->stop)) {
                 do {
-                    while (!agbemu.gba->stop && !agbemu.gba->ppu.frame_complete) {
-                        gba_step(agbemu.gba);
-                        if (agbemu.gba->apu.samples_full) {
+                    while (!ntremu.nds->stop && !ntremu.nds->ppu.frame_complete) {
+                        nds_step(ntremu.nds);
+                        if (ntremu.nds->apu.samples_full) {
                             if (play_audio) {
-                                SDL_QueueAudio(audio, agbemu.gba->apu.sample_buf,
-                                               sizeof agbemu.gba->apu.sample_buf);
+                                SDL_QueueAudio(audio, ntremu.nds->apu.sample_buf,
+                                               sizeof ntremu.nds->apu.sample_buf);
                             }
-                            agbemu.gba->apu.samples_full = false;
+                            ntremu.nds->apu.samples_full = false;
                         }
                     }
-                    agbemu.gba->ppu.frame_complete = false;
+                    ntremu.nds->ppu.frame_complete = false;
                     frame++;
 
                     cur_time = SDL_GetPerformanceCounter();
                     elapsed = cur_time - prev_time;
-                } while (agbemu.uncap && elapsed < frame_ticks);
+                } while (ntremu.uncap && elapsed < frame_ticks);
             }
 
             void* pixels;
             int pitch;
             SDL_LockTexture(texture, NULL, &pixels, &pitch);
-            gba_convert_screen((u16*) agbemu.gba->ppu.screen, pixels);
+            nds_convert_screen((u16*) ntremu.nds->ppu.screen, pixels);
             SDL_UnlockTexture(texture);
 
             int windowW, windowH;
@@ -107,12 +97,12 @@ int main(int argc, char** argv) {
 
             SDL_Event e;
             while (SDL_PollEvent(&e)) {
-                if (e.type == SDL_QUIT) agbemu.running = false;
+                if (e.type == SDL_QUIT) ntremu.running = false;
                 if (e.type == SDL_KEYDOWN) hotkey_press(e.key.keysym.sym);
             }
-            update_input_keyboard(agbemu.gba);
-            if (controller) update_input_controller(agbemu.gba, controller);
-            update_keypad_irq(agbemu.gba);
+            update_input_keyboard(ntremu.nds);
+            if (controller) update_input_controller(ntremu.nds, controller);
+            update_keypad_irq(ntremu.nds);
 
             cur_time = SDL_GetPerformanceCounter();
             elapsed = cur_time - prev_time;
@@ -120,7 +110,7 @@ int main(int argc, char** argv) {
 
             if (play_audio) {
                 while (SDL_GetQueuedAudioSize(audio) >= 16 * SAMPLE_BUF_LEN) SDL_Delay(1);
-            } else if (wait > 0 && !agbemu.uncap) {
+            } else if (wait > 0 && !ntremu.uncap) {
                 SDL_Delay(wait * 1000 / SDL_GetPerformanceFrequency());
             }
             cur_time = SDL_GetPerformanceCounter();
@@ -128,7 +118,7 @@ int main(int argc, char** argv) {
             if (elapsed >= SDL_GetPerformanceFrequency() / 2) {
                 double fps =
                     (double) SDL_GetPerformanceFrequency() * (frame - prev_fps_frame) / elapsed;
-                snprintf(wintitle, 199, "agbemu | %s | %.2lf FPS", agbemu.romfilenodir, fps);
+                snprintf(wintitle, 199, "ntremu | %s | %.2lf FPS", ntremu.romfilenodir, fps);
                 SDL_SetWindowTitle(window, wintitle);
                 prev_fps_update = cur_time;
                 prev_fps_frame = frame;
@@ -136,7 +126,7 @@ int main(int argc, char** argv) {
             prev_time = cur_time;
         }
 
-        if (agbemu.debugger) {
+        if (ntremu.debugger) {
             debugger_run();
         } else {
             break;

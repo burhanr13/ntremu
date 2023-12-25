@@ -3,7 +3,7 @@
 
 #include <SDL2/SDL.h>
 
-#include "gba.h"
+#include "nds.h"
 #include "types.h"
 
 typedef struct {
@@ -18,22 +18,22 @@ typedef struct {
     bool mute;
     bool debugger;
 
-    NDS* gba;
+    NDS* nds;
     Cartridge* cart;
     u8* bios;
 
 } EmulatorState;
 
-extern EmulatorState agbemu;
+extern EmulatorState ntremu;
 
 int emulator_init(int argc, char** argv);
 void emulator_quit();
 
 void read_args(int argc, char** argv);
 void hotkey_press(SDL_KeyCode key);
-void update_input_keyboard(NDS* gba);
-void update_input_controller(NDS* gba, SDL_GameController* controller);
+void update_input_keyboard(NDS* nds);
+void update_input_controller(NDS* nds, SDL_GameController* controller);
 void init_color_lookups();
-void gba_convert_screen(u16* gba_screen, Uint32* screen);
+void nds_convert_screen(u16* nds_screen, Uint32* screen);
 
 #endif

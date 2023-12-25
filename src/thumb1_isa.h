@@ -2,26 +2,8 @@
 #define THUMB_ISA_H
 
 #include "arm4_isa.h"
+#include "arm_common.h"
 #include "types.h"
-
-enum {
-    T_AND,
-    T_EOR,
-    T_LSL,
-    T_LSR,
-    T_ASR,
-    T_ADC,
-    T_SBC,
-    T_ROR,
-    T_TST,
-    T_NEG,
-    T_CMP,
-    T_CMN,
-    T_ORR,
-    T_MUL,
-    T_BIC,
-    T_MVN
-};
 
 typedef union {
     u16 h;
@@ -156,10 +138,10 @@ typedef union {
 
 extern Arm4Instr thumb1_lookup[1 << 16];
 
-void thumb_generate_lookup();
+void thumb1_generate_lookup();
 
 Arm4Instr thumb1_decode_instr(Thumb1Instr instr);
 
-void thumb_disassemble(Thumb1Instr instr, u32 addr, FILE* out);
+void thumb1_disassemble(Thumb1Instr instr, u32 addr, FILE* out);
 
 #endif

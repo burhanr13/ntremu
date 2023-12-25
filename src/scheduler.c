@@ -2,13 +2,8 @@
 
 #include <stdio.h>
 
-#include "apu.h"
-#include "gba.h"
+#include "nds.h"
 #include "ppu.h"
-#include "timer.h"
-
-void (*apu_events[])(APU*) = {apu_new_sample, ch1_reload, ch2_reload,
-                              ch3_reload,     ch4_reload, apu_div_tick};
 
 void run_scheduler(Scheduler* sched, int cycles) {
     u64 end_time = sched->now + cycles;
@@ -28,18 +23,10 @@ void run_next_event(Scheduler* sched) {
     }
     sched->now = e.time;
 
-    if (e.type < EVENT_TM0_ENA) {
-        reload_timer(&sched->master->tmc, e.type);
-    } else if (e.type < EVENT_TM0_IRQ) {
-        enable_timer(&sched->master->tmc, e.type - EVENT_TM0_ENA);
-    } else if (e.type < EVENT_PPU_HDRAW) {
-        sched->master->io.ifl.timer |= 1 << (e.type - EVENT_TM0_IRQ);
-    } else if (e.type == EVENT_PPU_HDRAW) {
+    if (e.type == EVENT_LCD_HDRAW) {
         ppu_hdraw(&sched->master->ppu);
-    } else if (e.type == EVENT_PPU_HBLANK) {
+    } else if (e.type == EVENT_LCD_HBLANK) {
         ppu_hblank(&sched->master->ppu);
-    } else {
-        apu_events[e.type - EVENT_APU_SAMPLE](&sched->master->apu);
     }
 }
 
@@ -72,11 +59,7 @@ void remove_event(Scheduler* sched, EventType t) {
 }
 
 void print_scheduled_events(Scheduler* sched) {
-    static char* event_names[EVENT_MAX] = {
-        "TM0 reload",     "TM1 reload",     "TM2 reload",     "TM3 reload",     "TM0 enable",
-        "TM1 enable",     "TM2 enable",     "TM3 enable",     "TM0 interrupt",  "TM1 interrupt",
-        "TM2 interrupt",  "TM3 interrupt",  "PPU hdraw",      "PPU hblank",     "APU sample",
-        "APU reload ch1", "APU reload ch2", "APU reload ch3", "APU reload ch4", "APU DIV tick"};
+    static char* event_names[EVENT_MAX] = {"LCD HDraw", "LCD HBlank"};
 
     for (int i = 0; i < sched->n_events; i++) {
         printf("%ld => %s\n", sched->event_queue[i].time, event_names[sched->event_queue[i].type]);

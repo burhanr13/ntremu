@@ -1,10 +1,10 @@
-#include "thumb_isa.h"
+#include "thumb1_isa.h"
 
 #include "arm7tdmi.h"
 
 Arm4Instr thumb1_lookup[1 << 16];
 
-void thumb_generate_lookup() {
+void thumb1_generate_lookup() {
     for (int i = 0; i < 1 << 16; i++) {
         thumb1_lookup[i] = thumb1_decode_instr((Thumb1Instr){i});
     }
@@ -307,6 +307,6 @@ Arm4Instr thumb1_decode_instr(Thumb1Instr instr) {
     return dec;
 }
 
-void thumb_disassemble(Thumb1Instr instr, u32 addr, FILE* out) {
-    arm_disassemble(thumb_lookup[instr.h], addr, out);
+void thumb1_disassemble(Thumb1Instr instr, u32 addr, FILE* out) {
+    arm_disassemble(thumb1_lookup[instr.h], addr, out);
 }
