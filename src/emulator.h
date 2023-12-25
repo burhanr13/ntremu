@@ -3,6 +3,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "gamecard.h"
 #include "nds.h"
 #include "types.h"
 
@@ -19,7 +20,7 @@ typedef struct {
     bool debugger;
 
     NDS* nds;
-    Cartridge* cart;
+    GameCard* card;
     u8* bios;
 
 } EmulatorState;
@@ -33,7 +34,5 @@ void read_args(int argc, char** argv);
 void hotkey_press(SDL_KeyCode key);
 void update_input_keyboard(NDS* nds);
 void update_input_controller(NDS* nds, SDL_GameController* controller);
-void init_color_lookups();
-void nds_convert_screen(u16* nds_screen, Uint32* screen);
 
 #endif

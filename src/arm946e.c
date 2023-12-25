@@ -3,20 +3,23 @@
 #include <stdio.h>
 
 #include "arm5_isa.h"
+#include "arm_common.h"
 #include "bus9.h"
 #include "thumb2_isa.h"
 #include "types.h"
 
 void cpu9_step(Arm946E* cpu) {
-    arm_exec_instr(cpu);
+    arm5_exec_instr(cpu);
 }
 
 void cpu9_fetch_instr(Arm946E* cpu) {
     cpu->cur_instr = cpu->next_instr;
     if (cpu->cpsr.t) {
+        cpu->next_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
         cpu->cur_instr_addr += 2;
     } else {
+        cpu->next_instr.w = cpu9_fetch32(cpu, cpu->pc);
         cpu->pc += 4;
         cpu->cur_instr_addr += 4;
     }
@@ -26,38 +29,18 @@ void cpu9_flush(Arm946E* cpu) {
     if (cpu->cpsr.t) {
         cpu->pc &= ~1;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc, false)];
+        cpu->cur_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
-        cpu->next_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc, true)];
+        cpu->next_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
     } else {
         cpu->pc &= ~0b11;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr.w = cpu9_fetch32(cpu, cpu->pc, false);
+        cpu->cur_instr.w = cpu9_fetch32(cpu, cpu->pc);
         cpu->pc += 4;
-        cpu->next_instr.w = cpu9_fetch32(cpu, cpu->pc, true);
+        cpu->next_instr.w = cpu9_fetch32(cpu, cpu->pc);
         cpu->pc += 4;
     }
-}
-
-RegBank get_bank(CpuMode mode) {
-    switch (mode) {
-        case M_USER:
-            return B_USER;
-        case M_FIQ:
-            return B_FIQ;
-        case M_IRQ:
-            return B_IRQ;
-        case M_SVC:
-            return B_SVC;
-        case M_ABT:
-            return B_ABT;
-        case M_UND:
-            return B_UND;
-        case M_SYSTEM:
-            return B_USER;
-    }
-    return B_USER;
 }
 
 void cpu9_update_mode(Arm946E* cpu, CpuMode old) {
@@ -115,7 +98,7 @@ void cpu9_handle_interrupt(Arm946E* cpu, CpuInterrupt intr) {
     cpu9_fetch_instr(cpu);
     cpu->cpsr.t = 0;
     cpu->cpsr.i = 1;
-    cpu->pc = 4 * intr;
+    cpu->pc = 0xffff0000 + 4 * intr;
     cpu9_flush(cpu);
 }
 
@@ -126,7 +109,7 @@ u32 cpu9_read8(Arm946E* cpu, u32 addr, bool sx) {
 }
 
 u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx) {
-    u32 data = bus9_read16(cpu->master, addr);
+    u32 data = bus9_read16(cpu->master, addr & ~1);
     if (addr & 1) {
         if (sx) {
             data = ((s16) data) >> 8;
@@ -136,7 +119,7 @@ u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx) {
 }
 
 u32 cpu9_read32(Arm946E* cpu, u32 addr) {
-    u32 data = bus9_read32(cpu->master, addr);
+    u32 data = bus9_read32(cpu->master, addr & ~3);
     if (addr & 0b11) {
         data = (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
     }
@@ -144,7 +127,7 @@ u32 cpu9_read32(Arm946E* cpu, u32 addr) {
 }
 
 u32 cpu9_read32m(Arm946E* cpu, u32 addr, int i) {
-    return bus9_read32(cpu->master, addr + 4 * i);
+    return bus9_read32(cpu->master, (addr & ~3) + 4 * i);
 }
 
 void cpu9_write8(Arm946E* cpu, u32 addr, u8 b) {
@@ -152,73 +135,52 @@ void cpu9_write8(Arm946E* cpu, u32 addr, u8 b) {
 }
 
 void cpu9_write16(Arm946E* cpu, u32 addr, u16 h) {
-    bus9_write16(cpu->master, addr, h);
+    bus9_write16(cpu->master, addr & ~1, h);
 }
 
 void cpu9_write32(Arm946E* cpu, u32 addr, u32 w) {
-    bus9_write32(cpu->master, addr, w);
+    bus9_write32(cpu->master, addr & ~3, w);
 }
 
 void cpu9_write32m(Arm946E* cpu, u32 addr, int i, u32 w) {
-    bus9_write32(cpu->master, addr + 4 * i, w);
+    bus9_write32(cpu->master, (addr & ~3) + 4 * i, w);
 }
 
-u16 cpu9_fetch16(Arm946E* cpu, u32 addr, bool seq) {
-    return bus9_read16(cpu->master, addr);
+u16 cpu9_fetch16(Arm946E* cpu, u32 addr) {
+    return bus9_read16(cpu->master, addr & ~1);
 }
 
-u32 cpu9_fetch32(Arm946E* cpu, u32 addr, bool seq) {
-    return bus9_read32(cpu->master, addr);
+u32 cpu9_fetch32(Arm946E* cpu, u32 addr) {
+    return bus9_read32(cpu->master, addr & ~3);
 }
 
 void cpu9_internal_cycle(Arm946E* cpu) {}
-
-char* mode_name(CpuMode m) {
-    switch (m) {
-        case M_USER:
-            return "USER";
-        case M_FIQ:
-            return "FIQ";
-        case M_IRQ:
-            return "IRQ";
-        case M_SVC:
-            return "SVC";
-        case M_ABT:
-            return "ABT";
-        case M_UND:
-            return "UND";
-        case M_SYSTEM:
-            return "SYSTEM";
-        default:
-            return "ILLEGAL";
-    }
-}
 
 void print_cpu9_state(Arm946E* cpu) {
     static char* reg_names[16] = {"r0", "r1", "r2",  "r3",  "r4", "r5", "r6", "r7",
                                   "r8", "r9", "r10", "r11", "ip", "sp", "lr", "pc"};
     for (int i = 0; i < 4; i++) {
-        if (i == 0) printf("CPU ");
-        else printf("    ");
+        if (i == 0) printf("CPU9 ");
+        else printf("     ");
         for (int j = 0; j < 4; j++) {
             printf("%3s=0x%08x ", reg_names[4 * i + j], cpu->r[4 * i + j]);
         }
         printf("\n");
     }
-    printf("    cpsr=%08x (n=%d,z=%d,c=%d,v=%d,i=%d,f=%d,t=%d,m=%s)\n", cpu->cpsr.w, cpu->cpsr.n,
-           cpu->cpsr.z, cpu->cpsr.c, cpu->cpsr.v, cpu->cpsr.i, cpu->cpsr.v, cpu->cpsr.t,
-           mode_name(cpu->cpsr.m));
+    printf("     cpsr=%08x (n=%d,z=%d,c=%d,v=%d,q=%d,i=%d,f=%d,t=%d,m=%s)\n", cpu->cpsr.w,
+           cpu->cpsr.n, cpu->cpsr.z, cpu->cpsr.c, cpu->cpsr.v, cpu->cpsr.q, cpu->cpsr.i,
+           cpu->cpsr.v, cpu->cpsr.t, mode_name(cpu->cpsr.m));
 }
 
-void print_cur_instr(Arm946E* cpu) {
+void print_cur_instr9(Arm946E* cpu) {
     if (cpu->cpsr.t) {
         printf("%08x: %04x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        thumb_disassemble((Thumb2Instr){bus9_read16(cpu->master, cpu->cur_instr_addr)},
-                          cpu->cur_instr_addr, stdout);
+        thumb2_disassemble((Thumb2Instr){bus9_read16(cpu->master, cpu->cur_instr_addr)},
+                           cpu->cur_instr_addr, stdout);
         printf("\n");
     } else {
         printf("%08x: %08x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        arm_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
+        arm5_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
         printf("\n");
     }
 }

@@ -65,12 +65,12 @@ void cpu7_write16(Arm7TDMI* cpu, u32 addr, u16 h);
 void cpu7_write32(Arm7TDMI* cpu, u32 addr, u32 w);
 void cpu7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w);
 
-u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr, bool seq);
-u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr, bool seq);
+u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr);
+u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr);
 
 void cpu7_internal_cycle(Arm7TDMI* cpu);
 
 void print_cpu7_state(Arm7TDMI* cpu);
-void print_cur_instr(Arm7TDMI* cpu);
+void print_cur_instr7(Arm7TDMI* cpu);
 
 #endif

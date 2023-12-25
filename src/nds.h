@@ -1,8 +1,9 @@
 #ifndef NDS_H
-#define HDS_H
+#define NDS_H
 
 #include "arm7tdmi.h"
 #include "arm946e.h"
+#include "gamecard.h"
 #include "io.h"
 #include "ppu.h"
 #include "scheduler.h"
@@ -22,6 +23,8 @@
 
 #define OAMSIZE (1 << 10)
 #define OAMOBJS 128
+
+typedef enum { CPU9, CPU7 } CPUType;
 
 enum {
     R_BIOS7,
@@ -63,7 +66,7 @@ typedef struct _NDS {
             u16 palA[PALSIZE >> 1];
             u16 palB[PALSIZE >> 1];
         };
-        pal[2 * PALSIZE];
+        u8 pal[2 * PALSIZE];
     };
 
     union {
@@ -93,13 +96,14 @@ typedef struct _NDS {
 
     u8* bios7;
     u8* bios9;
+    GameCard* card;
 
-    int cur_cpu;
+    CPUType cur_cpu;
 
 } NDS;
 
-void init_nds(NDS* nds);
+void init_nds(NDS* nds, GameCard* card);
 
-void nds_step(NDS* nds);
+bool nds_step(NDS* nds);
 
 #endif

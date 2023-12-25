@@ -59,7 +59,6 @@
             case R_GBASRAM:                                                                        \
                 break;                                                                             \
         }                                                                                          \
-        return -1;                                                                                 \
     }
 
 BUS9READDECL(8)

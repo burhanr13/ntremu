@@ -66,12 +66,12 @@ void cpu9_write16(Arm946E* cpu, u32 addr, u16 h);
 void cpu9_write32(Arm946E* cpu, u32 addr, u32 w);
 void cpu9_write32m(Arm946E* cpu, u32 addr, int i, u32 w);
 
-u16 cpu9_fetch16(Arm946E* cpu, u32 addr, bool seq);
-u32 cpu9_fetch32(Arm946E* cpu, u32 addr, bool seq);
+u16 cpu9_fetch16(Arm946E* cpu, u32 addr);
+u32 cpu9_fetch32(Arm946E* cpu, u32 addr);
 
 void cpu9_internal_cycle(Arm946E* cpu);
 
 void print_cpu9_state(Arm946E* cpu);
-void print_cur_instr(Arm946E* cpu);
+void print_cur_instr9(Arm946E* cpu);
 
 #endif

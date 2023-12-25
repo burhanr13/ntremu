@@ -308,5 +308,5 @@ Arm5Instr thumb2_decode_instr(Thumb2Instr instr) {
 }
 
 void thumb2_disassemble(Thumb2Instr instr, u32 addr, FILE* out) {
-    arm_disassemble(thumb2_lookup[instr.h], addr, out);
+    arm5_disassemble(thumb2_lookup[instr.h], addr, out);
 }

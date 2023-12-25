@@ -146,7 +146,7 @@ typedef void (*Arm4ExecFunc)(Arm7TDMI*, Arm4Instr);
 extern Arm4ExecFunc arm4_lookup[1 << 12];
 
 void arm4_generate_lookup();
-ArmExecFunc arm4_decode_instr(Arm4Instr instr);
+Arm4ExecFunc arm4_decode_instr(Arm4Instr instr);
 
 void arm4_exec_instr(Arm7TDMI* cpu);
 
@@ -163,6 +163,6 @@ void exec_arm4_block_trans(Arm7TDMI* cpu, Arm4Instr instr);
 void exec_arm4_branch(Arm7TDMI* cpu, Arm4Instr instr);
 void exec_arm4_sw_intr(Arm7TDMI* cpu, Arm4Instr instr);
 
-void arm_disassemble(Arm4Instr instr, u32 addr, FILE* out);
+void arm4_disassemble(Arm4Instr instr, u32 addr, FILE* out);
 
 #endif
