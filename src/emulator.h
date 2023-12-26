@@ -19,6 +19,10 @@ typedef struct {
     bool mute;
     bool debugger;
 
+    bool frame_adv;
+
+    u32 breakpoint;
+
     NDS* nds;
     GameCard* card;
     u8* bios;

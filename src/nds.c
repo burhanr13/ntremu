@@ -28,6 +28,8 @@ void init_nds(NDS* nds, GameCard* card) {
 
     memcpy(&nds->ram[header->arm9_ram_offset & 0xffffff], &card->rom[header->arm9_rom_offset],
            header->arm9_size);
+    nds->cpu9.itcm_virtsize = 0x2000000;
+    nds->cpu9.dtcm_base = 0x27c0000;
     nds->cpu9.pc = header->arm9_entry;
     nds->cpu9.cpsr.m = M_SYSTEM;
     cpu9_flush(&nds->cpu9);

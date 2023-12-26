@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "debugger.h"
 #include "emulator.h"
 #include "nds.h"
 #include "types.h"
@@ -10,15 +11,15 @@
 char wintitle[200];
 
 static inline void center_screen_in_window(int windowW, int windowH, SDL_Rect* dst) {
-    if (windowH > windowW) {
+    if (windowW * (2 * NDS_SCREEN_H) / NDS_SCREEN_W > windowH) {
         dst->h = windowH;
         dst->y = 0;
-        dst->w = dst->h * NDS_SCREEN_W / 2*NDS_SCREEN_H;
+        dst->w = dst->h * NDS_SCREEN_W / (2 * NDS_SCREEN_H);
         dst->x = (windowW - dst->w) / 2;
     } else {
         dst->w = windowW;
         dst->x = 0;
-        dst->h = dst->w * NDS_SCREEN_H / 2*NDS_SCREEN_W;
+        dst->h = dst->w * (2 * NDS_SCREEN_H) / NDS_SCREEN_W;
         dst->y = (windowH - dst->h) / 2;
     }
 }
@@ -45,7 +46,7 @@ int main(int argc, char** argv) {
 
     SDL_Texture* texture =
         SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR555, SDL_TEXTUREACCESS_STREAMING,
-                          NDS_SCREEN_W, 2*NDS_SCREEN_H);
+                          NDS_SCREEN_W, 2 * NDS_SCREEN_H);
 
     Uint64 prev_time = SDL_GetPerformanceCounter();
     Uint64 prev_fps_update = prev_time;
@@ -53,17 +54,35 @@ int main(int argc, char** argv) {
     const Uint64 frame_ticks = SDL_GetPerformanceFrequency() / 60;
     Uint64 frame = 0;
 
+    bool bkpthit = false;
+
     ntremu.running = !ntremu.debugger;
     while (true) {
         while (ntremu.running) {
             Uint64 cur_time;
             Uint64 elapsed;
-            
+
+            bkpthit = false;
+
             if (!(ntremu.pause)) {
                 do {
                     while (!ntremu.nds->ppu.frame_complete) {
+                        if (ntremu.debugger) {
+                            if (ntremu.nds->cur_cpu) {
+                                if (ntremu.nds->cpu7.cur_instr_addr == ntremu.breakpoint) {
+                                    bkpthit = true;
+                                    break;
+                                }
+                            } else {
+                                if (ntremu.nds->cpu9.cur_instr_addr == ntremu.breakpoint) {
+                                    bkpthit = true;
+                                    break;
+                                }
+                            }
+                        }
                         nds_step(ntremu.nds);
                     }
+                    if (bkpthit) break;
                     ntremu.nds->ppu.frame_complete = false;
                     frame++;
 
@@ -71,6 +90,7 @@ int main(int argc, char** argv) {
                     elapsed = cur_time - prev_time;
                 } while (ntremu.uncap && elapsed < frame_ticks);
             }
+            if (bkpthit) break;
 
             void* pixels;
             int pitch;
@@ -112,9 +132,18 @@ int main(int argc, char** argv) {
                 prev_fps_frame = frame;
             }
             prev_time = cur_time;
+
+            if(ntremu.frame_adv) {
+                ntremu.running = false;
+                ntremu.frame_adv = false;
+            }
         }
 
         if (ntremu.debugger) {
+            if (bkpthit) {
+                ntremu.running = false;
+                printf("Breakpoint hit: %08x\n", ntremu.breakpoint);
+            }
             debugger_run();
         } else {
             break;

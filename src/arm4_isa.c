@@ -91,7 +91,7 @@ void arm4_exec_instr(Arm7TDMI* cpu) {
     Arm4ExecFunc func = arm4_lookup[(((instr.w >> 4) & 0xf) | (instr.w >> 20 << 4)) % (1 << 12)];
     if (func) {
         func(cpu, instr);
-    }
+    } else cpu7_fetch_instr(cpu);
 }
 
 u32 arm4_shifter(Arm7TDMI* cpu, u8 shift, u32 operand, u32* carry) {

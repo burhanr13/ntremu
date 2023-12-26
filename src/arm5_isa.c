@@ -91,7 +91,7 @@ void arm5_exec_instr(Arm946E* cpu) {
     Arm5ExecFunc func = arm5_lookup[(((instr.w >> 4) & 0xf) | (instr.w >> 20 << 4)) % (1 << 12)];
     if (func) {
         func(cpu, instr);
-    }
+    } else cpu9_fetch_instr(cpu);
 }
 
 u32 arm5_shifter(Arm946E* cpu, u8 shift, u32 operand, u32* carry) {
