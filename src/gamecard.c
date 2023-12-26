@@ -1,6 +1,7 @@
 #include "gamecard.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 GameCard* create_card(char* filename) {
     FILE* fp = fopen(filename, "rb");

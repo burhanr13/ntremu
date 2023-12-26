@@ -445,7 +445,7 @@ void render_windows(PPU* ppu) {
         u8 x1 = ppu->master->io.winh[i].x1;
         u8 x2 = ppu->master->io.winh[i].x2;
         for (u8 x = x1; x != x2; x++) {
-            if (x < NDS_SCREEN_W) ppu->window[x] = i;
+            ppu->window[x] = i;
         }
     }
 }
@@ -672,7 +672,7 @@ void ppu_hdraw(PPU* ppu) {
 
     ppu->master->io.dispstat.hblank = 0;
 
-    if (ppu->ly == ppu->master->io.dispstat.lyc | ppu->master->io.dispstat.lyc_hi << 8) {
+    if (ppu->ly == (ppu->master->io.dispstat.lyc | ppu->master->io.dispstat.lyc_hi << 8)) {
         ppu->master->io.dispstat.vcounteq = 1;
         if (ppu->master->io.dispstat.vcount_irq) ppu->master->io.ifl.vcounteq = 1;
     } else ppu->master->io.dispstat.vcounteq = 0;
