@@ -11,15 +11,20 @@
 
 const char* help = "Debugger commands:\n"
                    "c -- continue emulation\n"
+                   "f -- advance single frame\n"
                    "n -- next instruction\n"
-                   "s -- switch CPUs\n"
+                   "s -- switch CPU\n"
+                   "b [addr] -- set or check breakpoint\n"
                    "i -- cpu state info\n"
+                   "e -- scheduler events info\n"
                    "r<b/h/w> <addr> -- read from memory\n"
+                   "l -- show code\n"
                    "r -- reset\n"
                    "q -- quit debugger\n"
                    "h -- help\n";
 
 int read_num(char* str, u32* res) {
+    if (!str) return -1;
     if (sscanf(str, "0x%x", res) < 1) {
         if (sscanf(str, "%d", res) < 1) return -1;
     }
@@ -57,6 +62,7 @@ void debugger_run() {
                 ntremu.debugger = false;
                 return;
             case 'c':
+                nds_step(ntremu.nds);
                 ntremu.running = true;
                 return;
             case 'h':
@@ -101,7 +107,7 @@ void debugger_run() {
                         if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
                             printf("Invalid address\n");
                         } else {
-                            printf("[%08x] = %02x\n", addr, bus9_read8(ntremu.nds, addr));
+                            printf("[%08x] = 0x%02x\n", addr, bus9_read8(ntremu.nds, addr));
                         }
                         break;
                     }
@@ -110,7 +116,7 @@ void debugger_run() {
                         if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
                             printf("Invalid address\n");
                         } else {
-                            printf("[%08x] = %04x\n", addr, bus9_read16(ntremu.nds, addr));
+                            printf("[%08x] = 0x%04x\n", addr, bus9_read16(ntremu.nds, addr));
                         }
                         break;
                     }
@@ -119,7 +125,7 @@ void debugger_run() {
                         if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
                             printf("Invalid address\n");
                         } else {
-                            printf("[%08x] = %08x\n", addr, bus9_read32(ntremu.nds, addr));
+                            printf("[%08x] = 0x%08x\n", addr, bus9_read32(ntremu.nds, addr));
                         }
                         break;
                     }
@@ -136,6 +142,26 @@ void debugger_run() {
                 break;
             case 'e':
                 print_scheduled_events(&ntremu.nds->sched);
+                break;
+            case 'b':
+                if (read_num(strtok(NULL, " \t\n"), &ntremu.breakpoint) < 0)
+                    printf("Current breakpoint: 0x%08x\n", ntremu.breakpoint);
+                else printf("Breakpoint set: 0x%08x\n", ntremu.breakpoint);
+                break;
+            case 'f':
+                ntremu.running = true;
+                ntremu.frame_adv = true;
+                return;
+            case 'l':
+                u32 lines;
+                if (read_num(strtok(NULL, " \t\n"), &lines) < 0) lines = 5;
+                for (int i = 0; i < 2 * lines; i++) {
+                    if (i == lines) printf("-> ");
+                    else printf("   ");
+                    u32 addr = ntremu.nds->cpu9.cur_instr_addr + ((i - lines) << 2);
+                    arm5_disassemble((Arm5Instr){bus9_read32(ntremu.nds, addr)}, addr, stdout);
+                    printf("\n");
+                }
                 break;
             default:
                 printf("Invalid command\n");

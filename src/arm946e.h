@@ -5,6 +5,9 @@
 #include "arm_common.h"
 #include "types.h"
 
+#define ITCMSIZE (1<<15)
+#define DTCMSIZE (1<<14)
+
 typedef struct _NDS NDS;
 
 typedef struct _Arm946E {
@@ -45,6 +48,12 @@ typedef struct _Arm946E {
     Arm5Instr cur_instr;
     Arm5Instr next_instr;
     u32 cur_instr_addr;
+
+    u8 itcm[ITCMSIZE];
+    u8 dtcm[DTCMSIZE];
+
+    u32 itcm_virtsize;
+    u32 dtcm_base;
 
 } Arm946E;
 

@@ -672,7 +672,7 @@ void ppu_hdraw(PPU* ppu) {
 
     ppu->master->io.dispstat.hblank = 0;
 
-    if (ppu->ly == ppu->master->io.dispstat.lyc) {
+    if (ppu->ly == ppu->master->io.dispstat.lyc | ppu->master->io.dispstat.lyc_hi << 8) {
         ppu->master->io.dispstat.vcounteq = 1;
         if (ppu->master->io.dispstat.vcount_irq) ppu->master->io.ifl.vcounteq = 1;
     } else ppu->master->io.dispstat.vcounteq = 0;
