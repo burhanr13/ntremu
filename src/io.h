@@ -90,6 +90,20 @@ enum {
     IPCFIFOSEND = 0x188,
     IPCFIFORECV = 0x100000,
 
+    // memory control
+    VRAMCNT_A = 0x240,
+    VRAMCNT_B = 0x241,
+    VRAMCNT_C = 0x242,
+    VRAMCNT_D = 0x243,
+    VRAMCNT_E = 0x244,
+    VRAMCNT_F = 0x245,
+    VRAMCNT_G = 0x246,
+    WRAMCNT = 0x247,
+    VRAMCNT_H = 0x248,
+    VRAMCNT_I = 0x249,
+    VRAMSTAT = 0x240,
+    WRAMSTAT = 0x241,
+
     // system/interrupt control
     EXMEMCNT = 0x204,
     IME = 0x208,
@@ -268,7 +282,7 @@ typedef struct _IO {
                 } cnt;
             } dma[4];
             u32 dmafill[4];
-            u8 gap_0ex[TM0CNT_L - DMA3FILL - 4];
+            u8 unused_0ex[TM0CNT_L - DMA3FILL - 4];
             struct {
                 u16 reload;
                 union {
@@ -412,7 +426,29 @@ typedef struct _IO {
                     u32 unusedhi : 7;
                 };
             } ifl;
-            u8 unused_2xx[PPUB_OFF - IF - 4];
+            u8 gap_22x[VRAMCNT_A - IF - 4];
+            union {
+                union {
+                    u8 b;
+                    struct {
+                        u8 mst : 3;
+                        u8 ofs : 2;
+                        u8 unused : 2;
+                        u8 enable : 1;
+                    };
+                } vramcnt[10];
+                struct {
+                    u8 pad_wram1[7];
+                    u8 wramcnt;
+                    u8 pad_wram2[2];
+                };
+                struct {
+                    u8 vramstat;
+                    u8 wramstat;
+                    u8 pad_vramstat[8];
+                };
+            };
+            u8 gap_2xx[PPUB_OFF - VRAMCNT_I - 1];
             PPUIO ppuB;
         };
     };

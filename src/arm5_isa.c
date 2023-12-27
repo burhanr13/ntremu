@@ -581,6 +581,17 @@ void exec_arm5_undefined(Arm946E* cpu, Arm5Instr instr) {
     cpu9_handle_interrupt(cpu, I_UND);
 }
 
+u32* get_user_reg9(Arm946E* cpu, int reg) {
+    if (reg < 8 || reg == 15) return &cpu->r[reg];
+    if (reg < 13) {
+        if (cpu->cpsr.m == M_FIQ) return &cpu->banked_r8_12[0][reg - 8];
+        else return &cpu->r[reg];
+    }
+    if (reg == 13) return &cpu->banked_sp[0];
+    if (reg == 14) return &cpu->banked_lr[0];
+    return NULL;
+}
+
 void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr) {
     int rcount = 0;
     int rlist[16];
@@ -597,8 +608,7 @@ void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr) {
             addr = wback;
         }
     } else {
-        rcount = 1;
-        rlist[0] = 15;
+        rcount = 0;
         if (instr.block_trans.u) {
             wback += 0x40;
         } else {
@@ -610,42 +620,47 @@ void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr) {
     if (instr.block_trans.p == instr.block_trans.u) addr += 4;
     cpu9_fetch_instr(cpu);
 
-    bool user_trans =
-        instr.block_trans.s && !((instr.block_trans.rlist & (1 << 15)) && instr.block_trans.l);
-    CpuMode mode = cpu->cpsr.m;
-    if (user_trans) {
-        cpu->cpsr.m = M_USER;
-        cpu9_update_mode(cpu, mode);
-    }
-
-    if (instr.block_trans.l) {
-        if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
-        for (int i = 0; i < rcount; i++) {
-            cpu->r[rlist[i]] = cpu9_read32m(cpu, addr, i);
-        }
-        cpu9_internal_cycle(cpu);
-        if ((instr.block_trans.rlist & (1 << 15)) || !instr.block_trans.rlist) {
-            if (instr.block_trans.s) {
-                CpuMode mode = cpu->cpsr.m;
-                if (!(mode == M_USER || mode == M_SYSTEM)) {
-                    cpu->cpsr.w = cpu->spsr;
-                    cpu9_update_mode(cpu, mode);
-                }
+    if (instr.block_trans.s && !((instr.block_trans.rlist & (1 << 15)) && instr.block_trans.l)) {
+        if (instr.block_trans.l) {
+            for (int i = 0; i < rcount; i++) {
+                if (i == rcount - 1 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+                *get_user_reg9(cpu, rlist[i]) = cpu9_read32m(cpu, addr, i);
             }
-            cpu->cpsr.t = cpu->pc & 1;
-            cpu9_flush(cpu);
+            if (rcount < 2 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+            cpu9_internal_cycle(cpu);
+        } else {
+            for (int i = 0; i < rcount; i++) {
+                cpu9_write32m(cpu, addr, i, *get_user_reg9(cpu,rlist[i]));
+            }
+            if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         }
     } else {
-        for (int i = 0; i < rcount; i++) {
-            cpu9_write32m(cpu, addr, i, cpu->r[rlist[i]]);
-            if (i == 0 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+        if (instr.block_trans.l) {
+            for (int i = 0; i < rcount; i++) {
+                if (i == rcount - 1 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+                cpu->r[rlist[i]] = cpu9_read32m(cpu, addr, i);
+            }
+            if (rcount < 2 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+            cpu9_internal_cycle(cpu);
+            if (instr.block_trans.rlist & (1 << 15)) {
+                if (instr.block_trans.s) {
+                    CpuMode mode = cpu->cpsr.m;
+                    if (!(mode == M_USER || mode == M_SYSTEM)) {
+                        cpu->cpsr.w = cpu->spsr;
+                        cpu9_update_mode(cpu, mode);
+                    }
+                }
+                cpu->cpsr.t = cpu->pc & 1;
+                cpu9_flush(cpu);
+            }
+        } else {
+            for (int i = 0; i < rcount; i++) {
+                cpu9_write32m(cpu, addr, i, cpu->r[rlist[i]]);
+            }
+            if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         }
     }
 
-    if (user_trans) {
-        cpu->cpsr.m = mode;
-        cpu9_update_mode(cpu, M_USER);
-    }
 }
 
 void exec_arm5_branch(Arm946E* cpu, Arm5Instr instr) {
@@ -678,7 +693,7 @@ void exec_arm5_branch(Arm946E* cpu, Arm5Instr instr) {
 
 void exec_arm5_cp_reg_trans(Arm946E* cpu, Arm5Instr instr) {
     cpu9_fetch_instr(cpu);
-    
+
     if (instr.cp_reg_trans.cpnum == 15 && instr.cp_reg_trans.cpopc == 0) {
         if (instr.cp_reg_trans.l) {
             cpu->r[instr.cp_reg_trans.rd] = cp15_read(

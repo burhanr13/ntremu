@@ -565,6 +565,17 @@ void exec_arm4_undefined(Arm7TDMI* cpu, Arm4Instr instr) {
     cpu7_handle_interrupt(cpu, I_UND);
 }
 
+u32* get_user_reg7(Arm7TDMI* cpu, int reg) {
+    if (reg < 8 || reg == 15) return &cpu->r[reg];
+    if (reg < 13) {
+        if (cpu->cpsr.m == M_FIQ) return &cpu->banked_r8_12[0][reg - 8];
+        else return &cpu->r[reg];
+    }
+    if (reg == 13) return &cpu->banked_sp[0];
+    if (reg == 14) return &cpu->banked_lr[0];
+    return NULL;
+}
+
 void exec_arm4_block_trans(Arm7TDMI* cpu, Arm4Instr instr) {
     int rcount = 0;
     int rlist[16];
@@ -594,40 +605,42 @@ void exec_arm4_block_trans(Arm7TDMI* cpu, Arm4Instr instr) {
     if (instr.block_trans.p == instr.block_trans.u) addr += 4;
     cpu7_fetch_instr(cpu);
 
-    bool user_trans =
-        instr.block_trans.s && !((instr.block_trans.rlist & (1 << 15)) && instr.block_trans.l);
-    CpuMode mode = cpu->cpsr.m;
-    if (user_trans) {
-        cpu->cpsr.m = M_USER;
-        cpu7_update_mode(cpu, mode);
-    }
-
-    if (instr.block_trans.l) {
-        if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
-        for (int i = 0; i < rcount; i++) {
-            cpu->r[rlist[i]] = cpu7_read32m(cpu, addr, i);
-        }
-        cpu7_internal_cycle(cpu);
-        if ((instr.block_trans.rlist & (1 << 15)) || !instr.block_trans.rlist) {
-            if (instr.block_trans.s) {
-                CpuMode mode = cpu->cpsr.m;
-                if (!(mode == M_USER || mode == M_SYSTEM)) {
-                    cpu->cpsr.w = cpu->spsr;
-                    cpu7_update_mode(cpu, mode);
-                }
+    if (instr.block_trans.s && !((instr.block_trans.rlist & (1 << 15)) && instr.block_trans.l)) {
+        if (instr.block_trans.l) {
+            if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+            for (int i = 0; i < rcount; i++) {
+                *get_user_reg7(cpu, rlist[i]) = cpu7_read32m(cpu, addr, i);
             }
-            cpu7_flush(cpu);
+            cpu7_internal_cycle(cpu);
+        } else {
+            for (int i = 0; i < rcount; i++) {
+                cpu7_write32m(cpu, addr, i, *get_user_reg7(cpu, rlist[i]));
+                if (i == 0 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+            }
         }
     } else {
-        for (int i = 0; i < rcount; i++) {
-            cpu7_write32m(cpu, addr, i, cpu->r[rlist[i]]);
-            if (i == 0 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+        if (instr.block_trans.l) {
+            if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+            for (int i = 0; i < rcount; i++) {
+                cpu->r[rlist[i]] = cpu7_read32m(cpu, addr, i);
+            }
+            cpu7_internal_cycle(cpu);
+            if ((instr.block_trans.rlist & (1 << 15)) || !instr.block_trans.rlist) {
+                if (instr.block_trans.s) {
+                    CpuMode mode = cpu->cpsr.m;
+                    if (!(mode == M_USER || mode == M_SYSTEM)) {
+                        cpu->cpsr.w = cpu->spsr;
+                        cpu7_update_mode(cpu, mode);
+                    }
+                }
+                cpu7_flush(cpu);
+            }
+        } else {
+            for (int i = 0; i < rcount; i++) {
+                cpu7_write32m(cpu, addr, i, cpu->r[rlist[i]]);
+                if (i == 0 && instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+            }
         }
-    }
-
-    if (user_trans) {
-        cpu->cpsr.m = mode;
-        cpu7_update_mode(cpu, M_USER);
     }
 }
 
