@@ -11,9 +11,9 @@
 
 const char* help = "Debugger commands:\n"
                    "c -- continue emulation\n"
-                   "f -- advance single frame\n"
+                   "a -- advance single frame\n"
                    "n -- next instruction\n"
-                   "s -- switch CPU\n"
+                   "f -- fast forward to next event and switch CPU\n"
                    "b [addr] -- set or check breakpoint\n"
                    "i -- cpu state info\n"
                    "e -- scheduler events info\n"
@@ -82,7 +82,7 @@ void debugger_run() {
                     print_cur_instr9(&ntremu.nds->cpu9);
                 }
                 break;
-            case 's':
+            case 'f':
                 while (!nds_step(ntremu.nds)) {
                 }
                 if (ntremu.nds->cur_cpu) {
@@ -148,7 +148,7 @@ void debugger_run() {
                     printf("Current breakpoint: 0x%08x\n", ntremu.breakpoint);
                 else printf("Breakpoint set: 0x%08x\n", ntremu.breakpoint);
                 break;
-            case 'f':
+            case 'a':
                 ntremu.running = true;
                 ntremu.frame_adv = true;
                 return;

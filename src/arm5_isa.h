@@ -137,6 +137,18 @@ typedef union {
         u32 cond : 4;
     } branch;
     struct {
+        u32 crm : 4;
+        u32 c2 : 1; // 1
+        u32 cp : 3;
+        u32 cpnum : 4;
+        u32 rd : 4;
+        u32 crn : 4;
+        u32 l : 1;
+        u32 cpopc : 3;
+        u32 c1 : 4; // 1110
+        u32 cond : 4;
+    } cp_reg_trans;
+    struct {
         u32 arg : 24;
         u32 c1 : 4; // 1111
         u32 cond : 4;
@@ -163,6 +175,7 @@ void exec_arm5_single_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_undefined(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_branch(Arm946E* cpu, Arm5Instr instr);
+void exec_arm5_cp_reg_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_sw_intr(Arm946E* cpu, Arm5Instr instr);
 
 void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out);

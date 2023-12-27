@@ -885,6 +885,6 @@ void arm4_disassemble(Arm4Instr instr, u32 addr, FILE* out) {
             }
         }
     } else {
-        fprintf(out, "unimplemented\n");
+        fprintf(out, "coprocessor");
     }
 }

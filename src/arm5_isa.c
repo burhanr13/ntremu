@@ -16,6 +16,8 @@ void arm5_generate_lookup() {
 Arm5ExecFunc arm5_decode_instr(Arm5Instr instr) {
     if (instr.sw_intr.c1 == 0b1111) {
         return exec_arm5_sw_intr;
+    } else if (instr.cp_reg_trans.c1 == 0b1110 && instr.cp_reg_trans.c2 == 1) {
+        return exec_arm5_cp_reg_trans;
     } else if (instr.branch.c1 == 0b101) {
         return exec_arm5_branch;
     } else if (instr.block_trans.c1 == 0b100) {
@@ -461,10 +463,16 @@ void exec_arm5_swap(Arm946E* cpu, Arm5Instr instr) {
 }
 
 void exec_arm5_branch_ex(Arm946E* cpu, Arm5Instr instr) {
-    if (instr.branch_ex.l) cpu->lr = cpu->pc - 4;
+    if (instr.branch_ex.l) {
+        if (cpu->cpsr.t) {
+            cpu->lr = (cpu->pc - 2) | 1;
+        } else {
+            cpu->lr = cpu->pc - 4;
+        }
+    }
     cpu9_fetch_instr(cpu);
     cpu->pc = cpu->r[instr.branch_ex.rn];
-    cpu->cpsr.t = cpu->r[instr.branch_ex.rn] & 1;
+    cpu->cpsr.t = cpu->pc & 1;
     cpu9_flush(cpu);
 }
 
@@ -502,7 +510,10 @@ void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr) {
             }
             cpu->r[instr.half_trans.rd] = cpu9_read16(cpu, addr, false);
             cpu9_internal_cycle(cpu);
-            if (instr.half_trans.rd == 15) cpu9_flush(cpu);
+            if (instr.half_trans.rd == 15) {
+                cpu->cpsr.t = cpu->pc & 1;
+                cpu9_flush(cpu);
+            }
         } else {
             cpu9_write16(cpu, addr, cpu->r[instr.half_trans.rd]);
             if (instr.half_trans.w || !instr.half_trans.p) {
@@ -553,7 +564,10 @@ void exec_arm5_single_trans(Arm946E* cpu, Arm5Instr instr) {
             }
             cpu->r[instr.single_trans.rd] = cpu9_read32(cpu, addr);
             cpu9_internal_cycle(cpu);
-            if (instr.single_trans.rd == 15) cpu9_flush(cpu);
+            if (instr.single_trans.rd == 15) {
+                cpu->cpsr.t = cpu->pc & 1;
+                cpu9_flush(cpu);
+            }
         } else {
             cpu9_write32(cpu, addr, cpu->r[instr.single_trans.rd]);
             if (instr.single_trans.w || !instr.single_trans.p) {
@@ -618,6 +632,7 @@ void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr) {
                     cpu9_update_mode(cpu, mode);
                 }
             }
+            cpu->cpsr.t = cpu->pc & 1;
             cpu9_flush(cpu);
         }
     } else {
@@ -661,6 +676,20 @@ void exec_arm5_branch(Arm946E* cpu, Arm5Instr instr) {
     cpu9_flush(cpu);
 }
 
+void exec_arm5_cp_reg_trans(Arm946E* cpu, Arm5Instr instr) {
+    cpu9_fetch_instr(cpu);
+    
+    if (instr.cp_reg_trans.cpnum == 15 && instr.cp_reg_trans.cpopc == 0) {
+        if (instr.cp_reg_trans.l) {
+            cpu->r[instr.cp_reg_trans.rd] = cp15_read(
+                cpu, instr.cp_reg_trans.crn, instr.cp_reg_trans.crm, instr.cp_reg_trans.cp);
+        } else {
+            cp15_write(cpu, instr.cp_reg_trans.crn, instr.cp_reg_trans.crm, instr.cp_reg_trans.cp,
+                       cpu->r[instr.cp_reg_trans.rd]);
+        }
+    }
+}
+
 void exec_arm5_sw_intr(Arm946E* cpu, Arm5Instr instr) {
     cpu9_handle_interrupt(cpu, I_SWI);
 }
@@ -686,6 +715,13 @@ void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
         u32 off = instr.branch.offset;
         if (off & (1 << 23)) off |= 0xff000000;
         fprintf(out, "b%s%s 0x%x", instr.branch.l ? "l" : "", cond, addr + 8 + (off << 2));
+
+    } else if (instr.cp_reg_trans.c1 == 0b1110 && instr.cp_reg_trans.c2 == 1) {
+
+        fprintf(out, "%s%s p%d, %d, %s, c%d, c%d, %d", instr.cp_reg_trans.l ? "mrc" : "mcr",
+                cond_names[instr.cond], instr.cp_reg_trans.cpnum, instr.cp_reg_trans.cpopc,
+                reg_names[instr.cp_reg_trans.rd], instr.cp_reg_trans.crn, instr.cp_reg_trans.crm,
+                instr.cp_reg_trans.cp);
 
     } else if (instr.block_trans.c1 == 0b100) {
 
@@ -889,6 +925,6 @@ void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
             }
         }
     } else {
-        fprintf(out, "unimplemented\n");
+        fprintf(out, "coprocessor");
     }
 }

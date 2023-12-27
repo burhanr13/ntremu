@@ -9,10 +9,11 @@
 #include "types.h"
 
 void cpu9_step(Arm946E* cpu) {
-    if (!cpu->cpsr.i && cpu->irq) {
+    if (cpu->irq && (cpu->halt || !cpu->cpsr.i)) {
+        cpu->halt = false;
         cpu9_handle_interrupt(cpu, I_IRQ);
         return;
-    }
+    } else if (cpu->halt) return;
     arm5_exec_instr(cpu);
 }
 
@@ -108,8 +109,8 @@ void cpu9_handle_interrupt(Arm946E* cpu, CpuInterrupt intr) {
 
 u32 cpu9_read8(Arm946E* cpu, u32 addr, bool sx) {
     u32 data;
-    if (addr - cpu->dtcm_base < DTCMSIZE) data = *(u8*) &cpu->dtcm[addr - cpu->dtcm_base];
-    else if (addr < cpu->itcm_virtsize) data = *(u8*) &cpu->itcm[addr % ITCMSIZE];
+    if (addr < cpu->itcm_virtsize) data = *(u8*) &cpu->itcm[addr % ITCMSIZE];
+    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize) data = *(u8*) &cpu->dtcm[addr % DTCMSIZE];
     else data = bus9_read8(cpu->master, addr);
     if (sx) data = (s8) data;
     return data;
@@ -117,8 +118,9 @@ u32 cpu9_read8(Arm946E* cpu, u32 addr, bool sx) {
 
 u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx) {
     u32 data;
-    if (addr - cpu->dtcm_base < DTCMSIZE) data = *(u16*) &cpu->dtcm[(addr & ~1) - cpu->dtcm_base];
-    else if (addr < cpu->itcm_virtsize) data = *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE];
+    if (addr < cpu->itcm_virtsize) data = *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE];
+    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
+        data = *(u16*) &cpu->dtcm[(addr & ~1) % DTCMSIZE];
     else data = bus9_read16(cpu->master, addr & ~1);
     if (addr & 1) {
         if (sx) {
@@ -130,8 +132,9 @@ u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx) {
 
 u32 cpu9_read32(Arm946E* cpu, u32 addr) {
     u32 data;
-    if (addr - cpu->dtcm_base < DTCMSIZE) data = *(u32*) &cpu->dtcm[(addr & ~3) - cpu->dtcm_base];
-    else if (addr < cpu->itcm_virtsize) data = *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE];
+    if (addr < cpu->itcm_virtsize) data = *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE];
+    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
+        data = *(u32*) &cpu->dtcm[(addr & ~3) % DTCMSIZE];
     else data = bus9_read32(cpu->master, addr & ~3);
     if (addr & 0b11) {
         data = (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
@@ -140,34 +143,36 @@ u32 cpu9_read32(Arm946E* cpu, u32 addr) {
 }
 
 u32 cpu9_read32m(Arm946E* cpu, u32 addr, int i) {
-    if (addr - cpu->dtcm_base < DTCMSIZE)
-        return *(u32*) &cpu->dtcm[((addr & ~3) + 4 * i) - cpu->dtcm_base];
-    else if (addr < cpu->itcm_virtsize) return *(u32*) &cpu->itcm[((addr & ~3) + 4 * i) % ITCMSIZE];
+    if (addr < cpu->itcm_virtsize) return *(u32*) &cpu->itcm[((addr & ~3) + 4 * i) % ITCMSIZE];
+    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
+        return *(u32*) &cpu->dtcm[((addr & ~3) + 4 * i) % DTCMSIZE];
     else return bus9_read32(cpu->master, (addr & ~3) + 4 * i);
 }
 
 void cpu9_write8(Arm946E* cpu, u32 addr, u8 b) {
-    if (addr - cpu->dtcm_base < DTCMSIZE) *(u8*) &cpu->dtcm[addr - cpu->dtcm_base] = b;
-    else if (addr < cpu->itcm_virtsize) *(u8*) &cpu->itcm[addr % ITCMSIZE] = b;
+    if (addr < cpu->itcm_virtsize) *(u8*) &cpu->itcm[addr % ITCMSIZE] = b;
+    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize) *(u8*) &cpu->dtcm[addr % DTCMSIZE] = b;
     else bus9_write8(cpu->master, addr, b);
 }
 
 void cpu9_write16(Arm946E* cpu, u32 addr, u16 h) {
-    if (addr - cpu->dtcm_base < DTCMSIZE) *(u16*) &cpu->dtcm[(addr & ~1) - cpu->dtcm_base] = h;
-    else if (addr < cpu->itcm_virtsize) *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE] = h;
+    if (addr < cpu->itcm_virtsize) *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE] = h;
+    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
+        *(u16*) &cpu->dtcm[(addr & ~1) % DTCMSIZE] = h;
     else bus9_write16(cpu->master, addr & ~1, h);
 }
 
 void cpu9_write32(Arm946E* cpu, u32 addr, u32 w) {
-    if (addr - cpu->dtcm_base < DTCMSIZE) *(u32*) &cpu->dtcm[(addr & ~3) - cpu->dtcm_base] = w;
-    else if (addr < cpu->itcm_virtsize) *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE] = w;
+    if (addr < cpu->itcm_virtsize) *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE] = w;
+    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
+        *(u32*) &cpu->dtcm[(addr & ~3) % DTCMSIZE] = w;
     else bus9_write32(cpu->master, addr & ~3, w);
 }
 
 void cpu9_write32m(Arm946E* cpu, u32 addr, int i, u32 w) {
-    if (addr - cpu->dtcm_base < DTCMSIZE)
-        *(u32*) &cpu->dtcm[((addr & ~3) + 4 * i) - cpu->dtcm_base] = w;
-    else if (addr < cpu->itcm_virtsize) *(u32*) &cpu->itcm[((addr & ~3) + 4 * i) % ITCMSIZE] = w;
+    if (addr < cpu->itcm_virtsize) *(u32*) &cpu->itcm[((addr & ~3) + 4 * i) % ITCMSIZE] = w;
+    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
+        *(u32*) &cpu->dtcm[((addr & ~3) + 4 * i) % DTCMSIZE] = w;
     else bus9_write32(cpu->master, (addr & ~3) + 4 * i, w);
 }
 
@@ -182,6 +187,42 @@ u32 cpu9_fetch32(Arm946E* cpu, u32 addr) {
 }
 
 void cpu9_internal_cycle(Arm946E* cpu) {}
+
+u32 cp15_read(Arm946E* cpu, u32 cn, u32 cm, u32 cp) {
+    if (cn == 9 && cm == 1) {
+        u32 virtsize = 0, base = 0;
+        if (cp == 0) {
+            virtsize = cpu->dtcm_virtsize;
+            base = cpu->dtcm_base;
+        } else if (cp == 1) {
+            virtsize = cpu->itcm_virtsize;
+        }
+        virtsize >>= 10;
+        while (virtsize) {
+            base += 2;
+            virtsize >>= 1;
+        }
+        return base;
+    }
+    return 0;
+}
+
+void cp15_write(Arm946E* cpu, u32 cn, u32 cm, u32 cp, u32 data) {
+    if (cn == 7) {
+        if ((cm == 0 && cp == 4) || (cm == 8 && cp == 2)) {
+            cpu->halt = true;
+        }
+    } else if (cn == 9 && cm == 1) {
+        u32 virtsize = 512 << ((data & 0x3e) >> 1);
+        u32 base = data & 0xfffff000;
+        if (cp == 0) {
+            cpu->dtcm_virtsize = virtsize;
+            cpu->dtcm_base = base;
+        } else if (cp == 1) {
+            cpu->itcm_virtsize = virtsize;
+        }
+    }
+}
 
 void print_cpu9_state(Arm946E* cpu) {
     static char* reg_names[16] = {"r0", "r1", "r2",  "r3",  "r4", "r5", "r6", "r7",
@@ -201,9 +242,9 @@ void print_cpu9_state(Arm946E* cpu) {
 
 void print_cur_instr9(Arm946E* cpu) {
     if (cpu->cpsr.t) {
-        printf("%08x: %04x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        thumb2_disassemble((Thumb2Instr){bus9_read16(cpu->master, cpu->cur_instr_addr)},
-                           cpu->cur_instr_addr, stdout);
+        Thumb2Instr instr = {bus9_read16(cpu->master, cpu->cur_instr_addr)};
+        printf("%08x: %04x ", cpu->cur_instr_addr, instr.h);
+        thumb2_disassemble(instr, cpu->cur_instr_addr, stdout);
         printf("\n");
     } else {
         printf("%08x: %08x ", cpu->cur_instr_addr, cpu->cur_instr.w);
