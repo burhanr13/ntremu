@@ -36,6 +36,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
            header->arm9_size);
     nds->cpu9.itcm_virtsize = 0x2000000;
     nds->cpu9.dtcm_base = 0x27c0000;
+    nds->cpu9.dtcm_virtsize = DTCMSIZE;
     nds->cpu9.pc = header->arm9_entry;
     nds->cpu9.cpsr.m = M_SYSTEM;
     cpu9_flush(&nds->cpu9);

@@ -179,9 +179,9 @@ void print_cpu7_state(Arm7TDMI* cpu) {
 
 void print_cur_instr7(Arm7TDMI* cpu) {
     if (cpu->cpsr.t) {
-        printf("%08x: %04x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        thumb1_disassemble((Thumb1Instr){bus7_read16(cpu->master, cpu->cur_instr_addr)},
-                           cpu->cur_instr_addr, stdout);
+        Thumb1Instr instr = {bus7_read16(cpu->master, cpu->cur_instr_addr)};
+        printf("%08x: %04x ", cpu->cur_instr_addr, instr.h);
+        thumb1_disassemble(instr, cpu->cur_instr_addr, stdout);
         printf("\n");
     } else {
         printf("%08x: %08x ", cpu->cur_instr_addr, cpu->cur_instr.w);

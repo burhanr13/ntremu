@@ -55,20 +55,20 @@ enum {
     // dma control
     DMA0SAD = 0x0b0,
     DMA0DAD = 0x0b4,
-    DMA0CNT_L = 0x0b8,
-    DMA0CNT_H = 0x0ba,
+    DMA0CNT = 0x0b8,
     DMA1SAD = 0x0bc,
     DMA1DAD = 0x0c0,
-    DMA1CNT_L = 0x0c4,
-    DMA1CNT_H = 0x0c6,
+    DMA1CNT = 0x0c4,
     DMA2SAD = 0x0c8,
     DMA2DAD = 0x0cc,
-    DMA2CNT_L = 0x0d0,
-    DMA2CNT_H = 0x0d2,
+    DMA2CNT = 0x0d0,
     DMA3SAD = 0x0d4,
     DMA3DAD = 0x0d8,
-    DMA3CNT_L = 0x0dc,
-    DMA3CNT_H = 0x0de,
+    DMA3CNT = 0x0dc,
+    DMA0FILL = 0x0e0,
+    DMA1FILL = 0x0e4,
+    DMA2FILL = 0x0e8,
+    DMA3FILL = 0x0ec,
 
     // timer control
     TM0CNT_L = 0x100,
@@ -83,6 +83,12 @@ enum {
     // key control
     KEYINPUT = 0x130,
     KEYCNT = 0x132,
+
+    // ipc
+    IPCSYNC = 0x180,
+    IPCFIFOCNT = 0x184,
+    IPCFIFOSEND = 0x188,
+    IPCFIFORECV = 0x100000,
 
     // system/interrupt control
     EXMEMCNT = 0x204,
@@ -246,23 +252,23 @@ typedef struct _IO {
             struct {
                 u32 sad;
                 u32 dad;
-                u16 ct;
                 union {
-                    u16 h;
+                    u32 w;
                     struct {
-                        u16 unused : 5;
-                        u16 dadcnt : 2;
-                        u16 sadcnt : 2;
-                        u16 repeat : 1;
-                        u16 wsize : 1;
-                        u16 drq : 1;
-                        u16 start : 2;
-                        u16 irq : 1;
-                        u16 enable : 1;
+                        u32 len : 21;
+                        u32 dadcnt : 2;
+                        u32 sadcnt : 2;
+                        u32 repeat : 1;
+                        u32 wsize : 1;
+                        u32 drq : 1;
+                        u32 start : 2;
+                        u32 irq : 1;
+                        u32 enable : 1;
                     };
                 } cnt;
             } dma[4];
-            u8 unused_0xx[TM0CNT_L - DMA3CNT_H - 2];
+            u32 dmafill[4];
+            u8 gap_0ex[TM0CNT_L - DMA3FILL - 4];
             struct {
                 u16 reload;
                 union {
@@ -277,7 +283,7 @@ typedef struct _IO {
                     };
                 } cnt;
             } tm[4];
-            u8 gap1xx[KEYINPUT - TM3CNT_H - 2];
+            u8 gap11x[KEYINPUT - TM3CNT_H - 2];
             union {
                 u16 h;
                 struct {
@@ -307,7 +313,38 @@ typedef struct _IO {
                     u16 irq_cond : 1;
                 };
             } keycnt;
-            u8 gap2xx[EXMEMCNT - KEYCNT - 2];
+            u8 gap15x[IPCSYNC - KEYCNT - 2];
+            union {
+                u32 w;
+                struct {
+                    u32 in : 4;
+                    u32 unused : 4;
+                    u32 out : 4;
+                    u32 unused2 : 1;
+                    u32 irqsend : 1;
+                    u32 irq : 1;
+                    u32 unused3 : 17;
+                };
+            } ipcsync;
+            union {
+                u32 w;
+                struct {
+                    u32 sendempty : 1;
+                    u32 sendfull : 1;
+                    u32 send_irq : 1;
+                    u32 send_clear : 1;
+                    u32 unused : 4;
+                    u32 recvempty : 1;
+                    u32 recvfull : 1;
+                    u32 recv_irq : 1;
+                    u32 unused2 : 3;
+                    u32 error : 1;
+                    u32 fifo_enable : 1;
+                    u32 unused3 : 16;
+                };
+            } ipcfifocnt;
+            u32 ipcfifosend;
+            u8 gap19x[EXMEMCNT - IPCFIFOSEND - 4];
             union {
                 u32 w;
                 struct {

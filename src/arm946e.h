@@ -50,12 +50,14 @@ typedef struct _Arm946E {
     u32 cur_instr_addr;
 
     bool irq;
+    bool halt;
 
     u8 itcm[ITCMSIZE];
     u8 dtcm[DTCMSIZE];
 
     u32 itcm_virtsize;
     u32 dtcm_base;
+    u32 dtcm_virtsize;
 
 } Arm946E;
 
@@ -81,6 +83,9 @@ u16 cpu9_fetch16(Arm946E* cpu, u32 addr);
 u32 cpu9_fetch32(Arm946E* cpu, u32 addr);
 
 void cpu9_internal_cycle(Arm946E* cpu);
+
+u32 cp15_read(Arm946E* cpu, u32 cn, u32 cm, u32 cp);
+void cp15_write(Arm946E* cpu, u32 cn, u32 cm, u32 cp, u32 data);
 
 void print_cpu9_state(Arm946E* cpu);
 void print_cur_instr9(Arm946E* cpu);

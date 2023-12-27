@@ -36,7 +36,23 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             io->dispstat.h &= 0b111;
             io->dispstat.h |= data;
             break;
+        case VCOUNT:
+            break;
         case KEYINPUT:
+            break;
+        case IPCSYNC:
+            data &= ~0xf;
+            io->ipcsync.w &= 0xf;
+            io->ipcsync.w |= data;
+            io->master->io9.ipcsync.in = io->ipcsync.out;
+            if (io->ipcsync.irqsend) {
+                io->ipcsync.irqsend = 0;
+                if (io->master->io9.ipcsync.irq) {
+                    io->master->io9.ifl.ipcsync = 1;
+                    io->master->cpu9.irq =
+                        (io->master->io9.ime & 1) && (io->master->io9.ie.w & io->master->io9.ifl.w);
+                }
+            }
             break;
         case IME:
         case IE:
@@ -63,6 +79,7 @@ void io7_write32(IO* io, u32 addr, u32 data) {
     switch (addr) {
         case IF:
             io->ifl.w &= ~data;
+            io->master->cpu7.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
             break;
         default:
             io7_write16(io, addr, data);
@@ -102,7 +119,23 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             io->dispstat.h &= 0b111;
             io->dispstat.h |= data;
             break;
+        case VCOUNT:
+            break;
         case KEYINPUT:
+            break;
+        case IPCSYNC:
+            data &= ~0xf;
+            io->ipcsync.w &= 0xf;
+            io->ipcsync.w |= data;
+            io->master->io7.ipcsync.in = io->ipcsync.out;
+            if (io->ipcsync.irqsend) {
+                io->ipcsync.irqsend = 0;
+                if (io->master->io7.ipcsync.irq) {
+                    io->master->io7.ifl.ipcsync = 1;
+                    io->master->cpu7.irq =
+                        (io->master->io7.ime & 1) && (io->master->io7.ie.w & io->master->io7.ifl.w);
+                }
+            }
             break;
         case IME:
         case IE:
@@ -127,8 +160,11 @@ u32 io9_read32(IO* io, u32 addr) {
 
 void io9_write32(IO* io, u32 addr, u32 data) {
     switch (addr) {
+        case DMA3CNT:
+            break;
         case IF:
             io->ifl.w &= ~data;
+            io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
             break;
         default:
             io9_write16(io, addr, data);
