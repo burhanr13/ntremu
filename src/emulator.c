@@ -11,8 +11,6 @@
 EmulatorState ntremu;
 
 const char usage[] = "ntremu [options] <romfile>\n"
-                     "-b <biosfile> -- specify bios file path\n"
-                     "-f -- apply color filter\n"
                      "-u -- run at uncapped speed\n"
                      "-d -- run the debugger\n";
 
@@ -22,9 +20,23 @@ int emulator_init(int argc, char** argv) {
         printf(usage);
         return -1;
     }
-    if (!ntremu.biosfile) {
-        ntremu.biosfile = "bios.bin";
+
+    ntremu.bios7 = malloc(BIOS7SIZE);
+    FILE* f = fopen("bios7.bin", "rb");
+    if(!f) {
+        printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' exist.\n");
+        return -1;
     }
+    fread(ntremu.bios7, 1, BIOS7SIZE, f);
+    fclose(f);
+    ntremu.bios9 = malloc(BIOS9SIZE);
+    f = fopen("bios9.bin", "rb");
+    if (!f) {
+        printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' exist.\n");
+        return -1;
+    }
+    fread(ntremu.bios9, 1, BIOS9SIZE, f);
+    fclose(f);
 
     ntremu.nds = malloc(sizeof *ntremu.nds);
     ntremu.card = create_card(ntremu.romfile);
@@ -38,7 +50,7 @@ int emulator_init(int argc, char** argv) {
     thumb1_generate_lookup();
     arm5_generate_lookup();
     thumb2_generate_lookup();
-    init_nds(ntremu.nds, ntremu.card);
+    init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9);
 
     ntremu.romfilenodir = strrchr(ntremu.romfile, '/');
     if (ntremu.romfilenodir) ntremu.romfilenodir++;
@@ -49,6 +61,8 @@ int emulator_init(int argc, char** argv) {
 void emulator_quit() {
     destroy_card(ntremu.card);
     free(ntremu.nds);
+    free(ntremu.bios7);
+    free(ntremu.bios9);
 }
 
 void read_args(int argc, char** argv) {
@@ -58,15 +72,6 @@ void read_args(int argc, char** argv) {
                 switch (*f) {
                     case 'u':
                         ntremu.uncap = true;
-                        break;
-                    case 'b':
-                        ntremu.bootbios = true;
-                        if (!*(f + 1) && i + 1 < argc) {
-                            ntremu.biosfile = argv[i + 1];
-                        }
-                        break;
-                    case 'f':
-                        ntremu.filter = true;
                         break;
                     case 'd':
                         ntremu.debugger = true;
@@ -92,11 +97,8 @@ void hotkey_press(SDL_KeyCode key) {
         case SDLK_m:
             ntremu.mute = !ntremu.mute;
             break;
-        case SDLK_f:
-            ntremu.filter = !ntremu.filter;
-            break;
         case SDLK_r:
-            init_nds(ntremu.nds, ntremu.card);
+            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9);
             ntremu.pause = false;
             break;
         case SDLK_TAB:
@@ -109,32 +111,34 @@ void hotkey_press(SDL_KeyCode key) {
 
 void update_input_keyboard(NDS* nds) {
     const Uint8* keys = SDL_GetKeyboardState(NULL);
-    nds->io.keyinput.a = ~keys[SDL_SCANCODE_Z];
-    nds->io.keyinput.b = ~keys[SDL_SCANCODE_X];
-    nds->io.keyinput.start = ~keys[SDL_SCANCODE_RETURN];
-    nds->io.keyinput.select = ~keys[SDL_SCANCODE_RSHIFT];
-    nds->io.keyinput.left = ~keys[SDL_SCANCODE_LEFT];
-    nds->io.keyinput.right = ~keys[SDL_SCANCODE_RIGHT];
-    nds->io.keyinput.up = ~keys[SDL_SCANCODE_UP];
-    nds->io.keyinput.down = ~keys[SDL_SCANCODE_DOWN];
-    nds->io.keyinput.l = ~keys[SDL_SCANCODE_A];
-    nds->io.keyinput.r = ~keys[SDL_SCANCODE_S];
+    nds->io7.keyinput.a = ~keys[SDL_SCANCODE_Z];
+    nds->io7.keyinput.b = ~keys[SDL_SCANCODE_X];
+    nds->io7.keyinput.start = ~keys[SDL_SCANCODE_RETURN];
+    nds->io7.keyinput.select = ~keys[SDL_SCANCODE_RSHIFT];
+    nds->io7.keyinput.left = ~keys[SDL_SCANCODE_LEFT];
+    nds->io7.keyinput.right = ~keys[SDL_SCANCODE_RIGHT];
+    nds->io7.keyinput.up = ~keys[SDL_SCANCODE_UP];
+    nds->io7.keyinput.down = ~keys[SDL_SCANCODE_DOWN];
+    nds->io7.keyinput.l = ~keys[SDL_SCANCODE_A];
+    nds->io7.keyinput.r = ~keys[SDL_SCANCODE_S];
+    nds->io9.keyinput = nds->io7.keyinput;
 }
 
 void update_input_controller(NDS* nds, SDL_GameController* controller) {
-    nds->io.keyinput.a &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
-    nds->io.keyinput.b &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
-    nds->io.keyinput.start &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);
-    nds->io.keyinput.select &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
-    nds->io.keyinput.left &=
+    nds->io7.keyinput.a &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
+    nds->io7.keyinput.b &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
+    nds->io7.keyinput.start &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);
+    nds->io7.keyinput.select &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
+    nds->io7.keyinput.left &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-    nds->io.keyinput.right &=
+    nds->io7.keyinput.right &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-    nds->io.keyinput.up &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
-    nds->io.keyinput.down &=
+    nds->io7.keyinput.up &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
+    nds->io7.keyinput.down &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-    nds->io.keyinput.l &=
+    nds->io7.keyinput.l &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-    nds->io.keyinput.r &=
+    nds->io7.keyinput.r &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+    nds->io9.keyinput = nds->io7.keyinput;
 }

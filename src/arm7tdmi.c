@@ -5,10 +5,15 @@
 #include "arm4_isa.h"
 #include "arm_common.h"
 #include "bus7.h"
+#include "nds.h"
 #include "thumb1_isa.h"
 #include "types.h"
 
 void cpu7_step(Arm7TDMI* cpu) {
+    if (!cpu->cpsr.i && cpu->irq) {
+        cpu7_handle_interrupt(cpu, I_IRQ);
+        return;
+    }
     arm4_exec_instr(cpu);
 }
 

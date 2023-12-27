@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-#define IO_SIZE 0x1400
+#define IO_SIZE 0x1070
 
 enum {
     // display control
@@ -50,6 +50,8 @@ enum {
     BLDALPHA = 0x052,
     BLDY = 0x054,
 
+    MASTERBRIGHT = 0x06c,
+
     // dma control
     DMA0SAD = 0x0b0,
     DMA0DAD = 0x0b4,
@@ -83,15 +85,133 @@ enum {
     KEYCNT = 0x132,
 
     // system/interrupt control
-    IE = 0x200,
-    IF = 0x202,
-    WAITCNT = 0x204,
+    EXMEMCNT = 0x204,
     IME = 0x208,
+    IE = 0x210,
+    IF = 0x214,
     POSTFLG = 0x300,
-    HALTCNT = 0x301
+    HALTCNT = 0x301,
+
+    PPUB_OFF = 0x1000
 };
 
 typedef struct _NDS NDS;
+
+typedef struct {
+    union {
+        u32 w;
+        struct {
+            u32 bg_mode : 3;
+            u32 enable_3d : 1;
+            u32 obj_mapmode : 1;
+            u32 obj_bm_dim : 1;
+            u32 obj_bm_mapmode : 1;
+            u32 forced_blank : 1;
+            u32 bg_enable : 4;
+            u32 obj_enable : 1;
+            u32 win_enable : 2;
+            u32 winobj_enable : 1;
+            u32 disp_mode : 2;
+            u32 vram_block : 2;
+            u32 obj_boundary : 2;
+            u32 obj_bm_boundary : 1;
+            u32 hblank_free : 1;
+            u32 tile_base : 3;
+            u32 tilemap_base : 3;
+            u32 bg_extpal : 1;
+            u32 obj_extpal : 1;
+        };
+    } dispcnt;
+    u16 dispstat;
+    u16 vcount;
+    union {
+        u16 h;
+        struct {
+            u16 priority : 2;
+            u16 tile_base : 2;
+            u16 unused : 2;
+            u16 mosaic : 1;
+            u16 palmode : 1;
+            u16 tilemap_base : 5;
+            u16 overflow : 1;
+            u16 size : 2;
+        };
+    } bgcnt[4];
+    struct {
+        u16 hofs;
+        u16 vofs;
+    } bgtext[4];
+    struct {
+        s16 pa;
+        s16 pb;
+        s16 pc;
+        s16 pd;
+        s32 x;
+        s32 y;
+    } bgaff[2];
+    union {
+        u16 h;
+        struct {
+            u8 x2;
+            u8 x1;
+        };
+    } winh[2];
+    union {
+        u16 h;
+        struct {
+            u8 y2;
+            u8 y1;
+        };
+    } winv[2];
+    union {
+        struct {
+            u16 winin;
+            u16 winout;
+        };
+        struct {
+            u8 bg_enable : 4;
+            u8 obj_enable : 1;
+            u8 effects_enable : 1;
+            u8 unused : 2;
+        } wincnt[4];
+    };
+    union {
+        u32 w;
+        struct {
+            u32 bg_h : 4;
+            u32 bg_v : 4;
+            u32 obj_h : 4;
+            u32 obj_v : 4;
+        };
+    } mosaic;
+    union {
+        u16 h;
+        struct {
+            u16 target1 : 6;
+            u16 effect : 2;
+            u16 target2 : 6;
+            u16 unused : 2;
+        };
+    } bldcnt;
+    union {
+        u16 h;
+        struct {
+            u16 eva : 5;
+            u16 unused1 : 3;
+            u16 evb : 5;
+            u16 unused2 : 3;
+        };
+    } bldalpha;
+    union {
+        u32 w;
+        struct {
+            u32 evy : 5;
+            u32 unused : 27;
+        };
+    } bldy;
+    u8 gap[MASTERBRIGHT - BLDY - 4];
+    u32 masterbright;
+} PPUIO;
 
 typedef struct _IO {
     NDS* master;
@@ -101,236 +221,28 @@ typedef struct _IO {
         u32 w[IO_SIZE >> 2];
         struct {
             union {
-                u32 w;
+                PPUIO ppuA;
                 struct {
-                    u32 bg_mode : 3;
-                    u32 enable_3d : 1;
-                    u32 obj_mapmode : 1;
-                    u32 obj_bm_dim : 1;
-                    u32 obj_bm_mapmode : 1;
-                    u32 forced_blank : 1;
-                    u32 bg_enable : 4;
-                    u32 obj_enable : 1;
-                    u32 win_enable : 2;
-                    u32 winobj_enable : 1;
-                    u32 disp_mode : 2;
-                    u32 vram_block : 2;
-                    u32 obj_boundary : 2;
-                    u32 obj_bm_boundary : 1;
-                    u32 hblank_free : 1;
-                    u32 tile_base : 3;
-                    u32 tilemap_base : 3;
-                    u32 bg_extpal : 1;
-                    u32 obj_extpal : 1;
-                };
-            } dispcnt;
-            union {
-                u16 h;
-                struct {
-                    u16 vblank : 1;
-                    u16 hblank : 1;
-                    u16 vcounteq : 1;
-                    u16 vblank_irq : 1;
-                    u16 hblank_irq : 1;
-                    u16 vcount_irq : 1;
-                    u16 unused : 1;
-                    u16 lyc_hi : 1;
-                    u16 lyc : 8;
-                };
-            } dispstat;
-            u16 vcount;
-            union {
-                u16 h;
-                struct {
-                    u16 priority : 2;
-                    u16 tile_base : 2;
-                    u16 unused : 2;
-                    u16 mosaic : 1;
-                    u16 palmode : 1;
-                    u16 tilemap_base : 5;
-                    u16 overflow : 1;
-                    u16 size : 2;
-                };
-            } bgcnt[4];
-            struct {
-                u16 hofs;
-                u16 vofs;
-            } bgtext[4];
-            struct {
-                s16 pa;
-                s16 pb;
-                s16 pc;
-                s16 pd;
-                s32 x;
-                s32 y;
-            } bgaff[2];
-            union {
-                u16 h;
-                struct {
-                    u8 x2;
-                    u8 x1;
-                };
-            } winh[2];
-            union {
-                u16 h;
-                struct {
-                    u8 y2;
-                    u8 y1;
-                };
-            } winv[2];
-            union {
-                struct {
-                    u16 winin;
-                    u16 winout;
-                };
-                struct {
-                    u8 bg_enable : 4;
-                    u8 obj_enable : 1;
-                    u8 effects_enable : 1;
-                    u8 unused : 2;
-                } wincnt[4];
-            };
-            union {
-                u32 w;
-                struct {
-                    u32 bg_h : 4;
-                    u32 bg_v : 4;
-                    u32 obj_h : 4;
-                    u32 obj_v : 4;
-                };
-            } mosaic;
-            union {
-                u16 h;
-                struct {
-                    u16 target1 : 6;
-                    u16 effect : 2;
-                    u16 target2 : 6;
-                    u16 unused : 2;
-                };
-            } bldcnt;
-            union {
-                u16 h;
-                struct {
-                    u16 eva : 5;
-                    u16 unused1 : 3;
-                    u16 evb : 5;
-                    u16 unused2 : 3;
-                };
-            } bldalpha;
-            union {
-                u32 w;
-                struct {
-                    u32 evy : 5;
-                    u32 unused : 27;
-                };
-            } bldy;
-            u64 unused_058;
-            union {
-                u16 sound1cntl;
-                u8 nr10;
-            };
-            union {
-                u16 sound1cnth;
-                struct {
-                    u8 nr11;
-                    u8 nr12;
+                    u32 dispcntA;
+                    union {
+                        u16 h;
+                        struct {
+                            u16 vblank : 1;
+                            u16 hblank : 1;
+                            u16 vcounteq : 1;
+                            u16 vblank_irq : 1;
+                            u16 hblank_irq : 1;
+                            u16 vcount_irq : 1;
+                            u16 unused : 1;
+                            u16 lyc_hi : 1;
+                            u16 lyc : 8;
+                        };
+                    } dispstat;
+                    u16 vcount;
+                    u8 pad_ppuA[MASTERBRIGHT - VCOUNT + 2];
                 };
             };
-            union {
-                u32 sound1cntx;
-                struct {
-                    u8 nr13;
-                    u8 nr14;
-                };
-            };
-            union {
-                u32 sound2cntl;
-                struct {
-                    u8 nr21;
-                    u8 nr22;
-                };
-            };
-            union {
-                u32 sound2cnth;
-                struct {
-                    u8 nr23;
-                    u8 nr24;
-                };
-            };
-            union {
-                u16 sound3cntl;
-                u8 nr30;
-            };
-            union {
-                u16 sound3cnth;
-                struct {
-                    u8 nr31;
-                    u8 nr32;
-                };
-            };
-            union {
-                u32 sound3cntx;
-                struct {
-                    u8 nr33;
-                    u8 nr34;
-                };
-            };
-            union {
-                u32 sound4cntl;
-                struct {
-                    u8 nr41;
-                    u8 nr42;
-                };
-            };
-            union {
-                u32 sound4cnth;
-                struct {
-                    u8 nr43;
-                    u8 nr44;
-                };
-            };
-            union {
-                u16 soundcntl;
-                struct {
-                    u8 nr50;
-                    u8 nr51;
-                };
-            };
-            union {
-                u16 h;
-                struct {
-                    u16 gb_volume : 2;
-                    u16 cha_volume : 1;
-                    u16 chb_volume : 1;
-                    u16 unused : 4;
-                    u16 cha_ena_right : 1;
-                    u16 cha_ena_left : 1;
-                    u16 cha_timer : 1;
-                    u16 cha_reset : 1;
-                    u16 chb_ena_right : 1;
-                    u16 chb_ena_left : 1;
-                    u16 chb_timer : 1;
-                    u16 chb_reset : 1;
-                };
-            } soundcnth;
-            union {
-                u32 soundcntx;
-                u8 nr52;
-            };
-            union {
-                u32 w;
-                struct {
-                    u32 bias : 10;
-                    u32 unused1 : 4;
-                    u32 samplerate : 2;
-                    u32 unused2 : 16;
-                };
-            } soundbias;
-            u32 unused_08c;
-            u8 waveram[0x10];
-            u32 fifo_a;
-            u32 fifo_b;
-            u64 unused_0a8;
+            u8 gap_0xx[DMA0SAD - MASTERBRIGHT - 4];
             struct {
                 u32 sad;
                 u32 dad;
@@ -395,35 +307,7 @@ typedef struct _IO {
                     u16 irq_cond : 1;
                 };
             } keycnt;
-            u8 gap2xx[IE - KEYCNT - 2];
-            union {
-                u16 h;
-                struct {
-                    u16 vblank : 1;
-                    u16 hblank : 1;
-                    u16 vcounteq : 1;
-                    u16 timer : 4;
-                    u16 serial : 1;
-                    u16 dma : 4;
-                    u16 keypad : 1;
-                    u16 gamepak : 1;
-                    u16 unused : 2;
-                };
-            } ie;
-            union {
-                u16 h;
-                struct {
-                    u16 vblank : 1;
-                    u16 hblank : 1;
-                    u16 vcounteq : 1;
-                    u16 timer : 4;
-                    u16 serial : 1;
-                    u16 dma : 4;
-                    u16 keypad : 1;
-                    u16 gamepak : 1;
-                    u16 unused : 2;
-                };
-            } ifl;
+            u8 gap2xx[EXMEMCNT - KEYCNT - 2];
             union {
                 u32 w;
                 struct {
@@ -440,11 +324,59 @@ typedef struct _IO {
                     u32 gamepaktype : 1;
                     u32 unused1 : 16;
                 };
-            } waitcnt;
+            } exmemcnt;
             u32 ime;
-            u8 unused_2xx[POSTFLG - IME - 4];
-            u8 postflg;
-            u8 haltcnt;
+            u32 unused_20c;
+            union {
+                u32 w;
+                struct {
+                    u32 vblank : 1;
+                    u32 hblank : 1;
+                    u32 vcounteq : 1;
+                    u32 timer : 4;
+                    u32 serial : 1;
+                    u32 dma : 4;
+                    u32 keypad : 1;
+                    u32 gamepak : 1;
+                    u32 unused : 2;
+                    u32 ipcsync : 1;
+                    u32 ipcsend : 1;
+                    u32 ipcrecv : 1;
+                    u32 gamecardtrans : 1;
+                    u32 gamecard : 1;
+                    u32 geofifo : 1;
+                    u32 unfold : 1;
+                    u32 spi : 1;
+                    u32 wifi : 1;
+                    u32 unusedhi : 7;
+                };
+            } ie;
+            union {
+                u32 w;
+                struct {
+                    u32 vblank : 1;
+                    u32 hblank : 1;
+                    u32 vcounteq : 1;
+                    u32 timer : 4;
+                    u32 serial : 1;
+                    u32 dma : 4;
+                    u32 keypad : 1;
+                    u32 gamepak : 1;
+                    u32 unused : 2;
+                    u32 ipcsync : 1;
+                    u32 ipcsend : 1;
+                    u32 ipcrecv : 1;
+                    u32 gamecardtrans : 1;
+                    u32 gamecard : 1;
+                    u32 geofifo : 1;
+                    u32 unfold : 1;
+                    u32 spi : 1;
+                    u32 wifi : 1;
+                    u32 unusedhi : 7;
+                };
+            } ifl;
+            u8 unused_2xx[PPUB_OFF - IF - 4];
+            PPUIO ppuB;
         };
     };
 } IO;

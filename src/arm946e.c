@@ -9,6 +9,10 @@
 #include "types.h"
 
 void cpu9_step(Arm946E* cpu) {
+    if (!cpu->cpsr.i && cpu->irq) {
+        cpu9_handle_interrupt(cpu, I_IRQ);
+        return;
+    }
     arm5_exec_instr(cpu);
 }
 

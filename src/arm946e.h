@@ -49,6 +49,8 @@ typedef struct _Arm946E {
     Arm5Instr next_instr;
     u32 cur_instr_addr;
 
+    bool irq;
+
     u8 itcm[ITCMSIZE];
     u8 dtcm[DTCMSIZE];
 

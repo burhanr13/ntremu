@@ -1,6 +1,7 @@
 #ifndef PPU_H
 #define PPU_H
 
+#include "io.h"
 #include "types.h"
 
 #define NDS_SCREEN_W 256
@@ -70,6 +71,8 @@ typedef struct _NDS NDS;
 typedef struct {
     NDS* master;
 
+    PPUIO* io;
+
     u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
     u16 ly;
 
@@ -102,17 +105,12 @@ typedef struct {
 
     int obj_cycles;
 
-    bool frame_complete;
 } PPU;
-
-void render_bgs(PPU* ppu);
-void render_objs(PPU* ppu);
-void render_windows(PPU* ppu);
 
 void draw_scanline(PPU* ppu);
 
-void ppu_hdraw(PPU* ppu);
-void ppu_vblank(PPU* ppu);
-void ppu_hblank(PPU* ppu);
+void lcd_hdraw(NDS* nds);
+void lcd_vblank(NDS* nds);
+void lcd_hblank(NDS* nds);
 
 #endif

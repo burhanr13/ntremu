@@ -75,7 +75,9 @@ typedef union {
     } swap;
     struct {
         u32 rn : 4;
-        u32 c3 : 4; // 0001
+        u32 c4 : 1; // 1
+        u32 l : 1;
+        u32 c3 : 2; // 00
         u32 c2 : 12;
         u32 c1 : 8; // 00010010
         u32 cond : 4;
