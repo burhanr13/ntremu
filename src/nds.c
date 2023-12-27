@@ -2,13 +2,17 @@
 
 #include <string.h>
 
-void init_nds(NDS* nds, GameCard* card) {
+void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
     memset(nds, 0, sizeof *nds);
     nds->sched.master = nds;
     nds->cpu7.master = nds;
     nds->cpu9.master = nds;
-    nds->ppu.master = nds;
-    nds->io.master = nds;
+    nds->ppuA.master = nds;
+    nds->ppuA.io = &nds->io9.ppuA;
+    nds->ppuB.master = nds;
+    nds->ppuB.io = &nds->io9.ppuB;
+    nds->io7.master = nds;
+    nds->io9.master = nds;
 
     nds->vrambanks[0] = nds->vramA;
     nds->vrambanks[1] = nds->vramB;
@@ -21,6 +25,8 @@ void init_nds(NDS* nds, GameCard* card) {
     nds->vrambanks[8] = nds->vramI;
 
     nds->card = card;
+    nds->bios7 = bios7;
+    nds->bios9 = bios9;
 
     CardHeader* header = (CardHeader*) card->rom;
 
@@ -59,6 +65,8 @@ bool nds_step(NDS* nds) {
     if(event_pending(&nds->sched)) {
         nds->cur_cpu = !nds->cur_cpu;
         run_next_event(&nds->sched);
+        nds->cpu7.irq = (nds->io7.ime & 1) && (nds->io7.ie.w & nds->io7.ifl.w);
+        nds->cpu9.irq = (nds->io9.ime & 1) && (nds->io9.ie.w & nds->io9.ifl.w);
         return true;
     }
     return false;

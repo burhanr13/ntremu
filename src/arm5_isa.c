@@ -24,7 +24,8 @@ Arm5ExecFunc arm5_decode_instr(Arm5Instr instr) {
         return exec_arm5_undefined;
     } else if (instr.single_trans.c1 == 0b01) {
         return exec_arm5_single_trans;
-    } else if (instr.branch_ex.c1 == 0b00010010 && instr.branch_ex.c3 == 0b0001) {
+    } else if (instr.branch_ex.c1 == 0b00010010 && instr.branch_ex.c3 == 0b00 &&
+               instr.branch_ex.c4 == 1) {
         return exec_arm5_branch_ex;
     } else if (instr.swap.c1 == 0b00010 && instr.swap.c2 == 0b00 && instr.swap.c4 == 0b1001) {
         return exec_arm5_swap;
@@ -460,6 +461,7 @@ void exec_arm5_swap(Arm946E* cpu, Arm5Instr instr) {
 }
 
 void exec_arm5_branch_ex(Arm946E* cpu, Arm5Instr instr) {
+    if (instr.branch_ex.l) cpu->lr = cpu->pc - 4;
     cpu9_fetch_instr(cpu);
     cpu->pc = cpu->r[instr.branch_ex.rn];
     cpu->cpsr.t = cpu->r[instr.branch_ex.rn] & 1;
@@ -754,9 +756,11 @@ void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
             }
         }
 
-    } else if (instr.branch_ex.c1 == 0b00010010 && instr.branch_ex.c3 == 0b0001) {
+    } else if (instr.branch_ex.c1 == 0b00010010 && instr.branch_ex.c3 == 0b00 &&
+               instr.branch_ex.c4 == 1) {
 
-        fprintf(out, "bx%s %s", cond, reg_names[instr.branch_ex.rn]);
+        fprintf(out, "%s%s %s", instr.branch_ex.l ? "blx" : "bx", cond,
+                reg_names[instr.branch_ex.rn]);
 
     } else if (instr.swap.c1 == 0b00010 && instr.swap.c2 == 0b00 && instr.swap.c4 == 0b1001) {
 

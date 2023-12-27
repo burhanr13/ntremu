@@ -8,24 +8,23 @@
 #include "types.h"
 
 typedef struct {
-    bool running;
     char* romfile;
     char* romfilenodir;
-    char* biosfile;
+
+    bool running;
     bool uncap;
     bool bootbios;
-    bool filter;
     bool pause;
     bool mute;
     bool debugger;
-
     bool frame_adv;
 
     u32 breakpoint;
 
     NDS* nds;
     GameCard* card;
-    u8* bios;
+    u8* bios7;
+    u8* bios9;
 
 } EmulatorState;
 

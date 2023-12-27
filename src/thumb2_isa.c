@@ -135,7 +135,9 @@ Arm5Instr thumb2_decode_instr(Thumb2Instr instr) {
                             dec.data_proc.opcode = A_MOV;
                             break;
                         case 3:
-                            dec.branch_ex.c3 = 0b0001;
+                            dec.branch_ex.c4 = 1;
+                            dec.branch_ex.l = 0;
+                            dec.branch_ex.c3 = 0b00;
                             dec.branch_ex.c1 = 0b00010010;
                             dec.branch_ex.rn = instr.hi_ops.rs | (instr.hi_ops.h2 << 3);
                             break;

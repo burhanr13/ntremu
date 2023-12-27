@@ -24,9 +24,9 @@ void run_next_event(Scheduler* sched) {
     sched->now = e.time;
 
     if (e.type == EVENT_LCD_HDRAW) {
-        ppu_hdraw(&sched->master->ppu);
+        lcd_hdraw(sched->master);
     } else if (e.type == EVENT_LCD_HBLANK) {
-        ppu_hblank(&sched->master->ppu);
+        lcd_hblank(sched->master);
     }
 }
 

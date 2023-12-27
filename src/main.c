@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 
             if (!(ntremu.pause)) {
                 do {
-                    while (!ntremu.nds->ppu.frame_complete) {
+                    while (!ntremu.nds->frame_complete) {
                         if (ntremu.debugger) {
                             if (ntremu.nds->cur_cpu) {
                                 if (ntremu.nds->cpu7.cur_instr_addr == ntremu.breakpoint) {
@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
                         nds_step(ntremu.nds);
                     }
                     if (bkpthit) break;
-                    ntremu.nds->ppu.frame_complete = false;
+                    ntremu.nds->frame_complete = false;
                     frame++;
 
                     cur_time = SDL_GetPerformanceCounter();
@@ -95,7 +95,8 @@ int main(int argc, char** argv) {
             void* pixels;
             int pitch;
             SDL_LockTexture(texture, NULL, &pixels, &pitch);
-            memcpy(pixels, ntremu.nds->ppu.screen, sizeof ntremu.nds->ppu.screen);
+            memcpy(pixels, ntremu.nds->ppuA.screen, sizeof ntremu.nds->ppuA.screen);
+            memcpy(pixels + sizeof ntremu.nds->ppuA.screen, ntremu.nds->ppuB.screen, sizeof ntremu.nds->ppuB.screen);
             SDL_UnlockTexture(texture);
 
             int windowW, windowH;

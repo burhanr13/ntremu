@@ -11,7 +11,7 @@
             case R_WRAM:                                                                           \
                 break;                                                                             \
             case R_IO:                                                                             \
-                return io9_read##size(&nds->io, addr & 0xffffff);                                  \
+                return io9_read##size(&nds->io9, addr & 0xffffff);                                 \
                 break;                                                                             \
             case R_PAL:                                                                            \
                 return *(u##size*) (&nds->pal[addr % PALSIZE]);                                    \
@@ -28,6 +28,9 @@
                 break;                                                                             \
             case R_GBASRAM:                                                                        \
                 break;                                                                             \
+            case 0xff:                                                                             \
+                if (addr >= 0xffff0000 && addr < (0xffff0000 + BIOS9SIZE))                         \
+                    return *(u##size*) (&nds->bios9[addr - 0xffff0000]);                           \
         }                                                                                          \
         return -1;                                                                                 \
     }
@@ -41,7 +44,7 @@
             case R_WRAM:                                                                           \
                 break;                                                                             \
             case R_IO:                                                                             \
-                io9_write##size(&nds->io, addr & 0xffffff, data);                                        \
+                io9_write##size(&nds->io9, addr & 0xffffff, data);                                 \
                 break;                                                                             \
             case R_PAL:                                                                            \
                 *(u##size*) (&nds->pal[addr % PALSIZE]) = data;                                    \

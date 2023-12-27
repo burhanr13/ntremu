@@ -6,6 +6,7 @@
     u##size bus7_read##size(NDS* nds, u32 addr) {                                                  \
         switch (addr >> 24) {                                                                      \
             case R_BIOS7:                                                                          \
+                if (addr < BIOS7SIZE) return *(u##size*) (&nds->bios7[addr]);                      \
                 break;                                                                             \
             case R_RAM:                                                                            \
                 return *(u##size*) (&nds->ram[addr % RAMSIZE]);                                    \
@@ -14,7 +15,7 @@
                 return *(u##size*) (&nds->wram7[addr % WRAM7SIZE]);                                \
                 break;                                                                             \
             case R_IO:                                                                             \
-                return io7_read##size(&nds->io, addr & 0xffffff);                                  \
+                return io7_read##size(&nds->io7, addr & 0xffffff);                                 \
                 break;                                                                             \
             case R_VRAM:                                                                           \
                 break;                                                                             \
@@ -38,7 +39,7 @@
                 *(u##size*) (&nds->wram7[addr % WRAM7SIZE]) = data;                                \
                 break;                                                                             \
             case R_IO:                                                                             \
-                io7_write##size(&nds->io, addr & 0xffffff, data);                                  \
+                io7_write##size(&nds->io7, addr & 0xffffff, data);                                  \
                 break;                                                                             \
             case R_VRAM:                                                                           \
                 break;                                                                             \

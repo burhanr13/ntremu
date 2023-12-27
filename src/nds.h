@@ -24,6 +24,9 @@
 #define OAMSIZE (1 << 10)
 #define OAMOBJS 128
 
+#define BIOS7SIZE (1 << 14)
+#define BIOS9SIZE (1 << 15)
+
 typedef enum { CPU9, CPU7 } CPUType;
 
 enum {
@@ -46,7 +49,8 @@ typedef struct _NDS {
     Arm7TDMI cpu7;
     Arm946E cpu9;
 
-    PPU ppu;
+    PPU ppuA;
+    PPU ppuB;
 
     u8 ram[RAMSIZE];
 
@@ -59,7 +63,8 @@ typedef struct _NDS {
     };
     u8 wram7[WRAM7SIZE];
 
-    IO io;
+    IO io7;
+    IO io9;
 
     union {
         struct {
@@ -99,10 +104,11 @@ typedef struct _NDS {
     GameCard* card;
 
     CPUType cur_cpu;
+    bool frame_complete;
 
 } NDS;
 
-void init_nds(NDS* nds, GameCard* card);
+void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9);
 
 bool nds_step(NDS* nds);
 
