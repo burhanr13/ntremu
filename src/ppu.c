@@ -52,7 +52,7 @@ void render_bg_line_text(PPU* ppu, int bg) {
         row >>= 8 * fx;
         for (int x = 0; x < NDS_SCREEN_W; x++) {
             u8 col_ind = row & 0xff;
-            if (col_ind) ppu->layerlines[bg][x] = ppu->master->palA[col_ind] & ~(1 << 15);
+            if (col_ind) ppu->layerlines[bg][x] = ppu->pal[col_ind] & ~(1 << 15);
             else ppu->layerlines[bg][x] = 1 << 15;
 
             row >>= 8;
@@ -97,7 +97,7 @@ void render_bg_line_text(PPU* ppu, int bg) {
             u8 col_ind = row & 0xf;
             if (col_ind) {
                 col_ind |= tile.palette << 4;
-                ppu->layerlines[bg][x] = ppu->master->palA[col_ind] & ~(1 << 15);
+                ppu->layerlines[bg][x] = ppu->pal[col_ind] & ~(1 << 15);
             } else ppu->layerlines[bg][x] = 1 << 15;
 
             row >>= 4;
@@ -165,7 +165,7 @@ void render_bg_line_aff(PPU* ppu, int bg) {
         col_ind =
             *(u8*) (&ppu->master->vram[(tile_start + 64 * tile + finey * 8 + finex) % 0x10000]);
 
-        if (col_ind) ppu->layerlines[bg][x] = ppu->master->palA[col_ind] & ~(1 << 15);
+        if (col_ind) ppu->layerlines[bg][x] = ppu->pal[col_ind] & ~(1 << 15);
         else ppu->layerlines[bg][x] = 1 << 15;
     }
 }
@@ -191,7 +191,7 @@ void render_bgs(PPU* ppu) {
 }
 
 void render_obj_line(PPU* ppu, int i) {
-    ObjAttr o = ppu->master->oamA[i];
+    ObjAttr o = ppu->oam[i];
     u8 w, h;
     switch (o.shape) {
         case OBJ_SHAPE_SQR:
@@ -238,10 +238,10 @@ void render_obj_line(PPU* ppu, int i) {
             oh /= 2;
         }
 
-        s16 pa = ppu->master->oamA[4 * o.affparamind + 0].affparam;
-        s16 pb = ppu->master->oamA[4 * o.affparamind + 1].affparam;
-        s16 pc = ppu->master->oamA[4 * o.affparamind + 2].affparam;
-        s16 pd = ppu->master->oamA[4 * o.affparamind + 3].affparam;
+        s16 pa = ppu->oam[4 * o.affparamind + 0].affparam;
+        s16 pb = ppu->oam[4 * o.affparamind + 1].affparam;
+        s16 pc = ppu->oam[4 * o.affparamind + 2].affparam;
+        s16 pd = ppu->oam[4 * o.affparamind + 3].affparam;
 
         s32 x0 = pa * (-w / 2) + pb * (yofs - h / 2) + ((ow / 2) << 8);
         s32 y0 = pc * (-w / 2) + pd * (yofs - h / 2) + ((oh / 2) << 8);
@@ -266,7 +266,7 @@ void render_obj_line(PPU* ppu, int i) {
                     tile_addr += 64 * tx + 8 * fy + fx;
                     u8 col_ind = *(u8*) (&ppu->master->vram[0x10000 + tile_addr % 0x8000]);
                     if (col_ind) {
-                        col = ppu->master->palA[0x100 + col_ind] & ~(1 << 15);
+                        col = ppu->pal[0x100 + col_ind] & ~(1 << 15);
                     } else col = 1 << 15;
                 } else {
                     u32 tile_addr =
@@ -277,7 +277,7 @@ void render_obj_line(PPU* ppu, int i) {
                     else col_ind &= 0b1111;
                     if (col_ind) {
                         col_ind |= o.palette << 4;
-                        col = ppu->master->palA[0x100 + col_ind] & ~(1 << 15);
+                        col = ppu->pal[0x100 + col_ind] & ~(1 << 15);
                     } else col = 1 << 15;
                 }
             }
@@ -337,7 +337,7 @@ void render_obj_line(PPU* ppu, int i) {
                     } else if (o.priority < ppu->objdotattrs[sx].priority ||
                                (ppu->layerlines[LOBJ][sx] & (1 << 15))) {
                         if (col_ind) {
-                            u16 col = ppu->master->palA[0x100 + col_ind];
+                            u16 col = ppu->pal[0x100 + col_ind];
                             ppu->draw_obj = true;
                             ppu->layerlines[LOBJ][sx] = col & ~(1 << 15);
                             ppu->objdotattrs[sx].semitrans = (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
@@ -390,7 +390,7 @@ void render_obj_line(PPU* ppu, int i) {
                                (ppu->layerlines[LOBJ][sx] & (1 << 15))) {
                         if (col_ind) {
                             col_ind |= o.palette << 4;
-                            u16 col = ppu->master->palA[0x100 + col_ind];
+                            u16 col = ppu->pal[0x100 + col_ind];
                             ppu->draw_obj = true;
                             ppu->layerlines[LOBJ][sx] = col & ~(1 << 15);
                             ppu->objdotattrs[sx].semitrans = (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
@@ -617,7 +617,7 @@ void compose_lines(PPU* ppu) {
 
 void draw_scanline_normal(PPU* ppu) {
     for (int x = 0; x < NDS_SCREEN_W; x++) {
-        ppu->layerlines[LBD][x] = ppu->master->palA[0];
+        ppu->layerlines[LBD][x] = ppu->pal[0];
     }
 
     ppu->draw_bg[0] = false;
@@ -711,8 +711,7 @@ void lcd_hdraw(NDS* nds) {
         draw_scanline(&nds->ppuB);
     }
 
-    add_event(&nds->sched, EVENT_LCD_HBLANK,
-              nds->sched.now + 6 * NDS_SCREEN_W + 70);
+    add_event(&nds->sched, EVENT_LCD_HBLANK, nds->sched.now + 6 * NDS_SCREEN_W + 70);
 
     add_event(&nds->sched, EVENT_LCD_HDRAW, nds->sched.now + 6 * DOTS_W);
 }

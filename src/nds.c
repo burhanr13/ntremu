@@ -7,10 +7,17 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
     nds->sched.master = nds;
     nds->cpu7.master = nds;
     nds->cpu9.master = nds;
+
     nds->ppuA.master = nds;
     nds->ppuA.io = &nds->io9.ppuA;
+    nds->ppuA.pal = nds->palA;
+    nds->ppuA.oam = nds->oamA;
+
     nds->ppuB.master = nds;
     nds->ppuB.io = &nds->io9.ppuB;
+    nds->ppuB.pal = nds->palB;
+    nds->ppuB.oam = nds->oamB;
+    
     nds->io7.master = nds;
     nds->io9.master = nds;
 
@@ -27,6 +34,11 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
     nds->card = card;
     nds->bios7 = bios7;
     nds->bios9 = bios9;
+
+    nds->io7.ipcfifocnt.sendempty = 1;
+    nds->io7.ipcfifocnt.recvempty = 1;
+    nds->io9.ipcfifocnt.sendempty = 1;
+    nds->io9.ipcfifocnt.recvempty = 1;
 
     CardHeader* header = (CardHeader*) card->rom;
 

@@ -72,6 +72,8 @@ typedef struct {
     NDS* master;
 
     PPUIO* io;
+    u16* pal;
+    ObjAttr* oam;
 
     u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
     u16 ly;
