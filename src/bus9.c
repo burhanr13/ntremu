@@ -9,6 +9,16 @@
                 return *(u##size*) (&nds->ram[addr % RAMSIZE]);                                    \
                 break;                                                                             \
             case R_WRAM:                                                                           \
+                switch (nds->io9.wramcnt) {                                                        \
+                    case 0:                                                                        \
+                        return *(u##size*) &nds->wram[addr % WRAMSIZE];                            \
+                    case 1:                                                                        \
+                        return *(u##size*) &nds->wram1[addr % (WRAMSIZE / 2)];                     \
+                    case 2:                                                                        \
+                        return *(u##size*) &nds->wram0[addr % (WRAMSIZE / 2)];                     \
+                    case 3:                                                                        \
+                        return -1;                                                                 \
+                }                                                                                  \
                 break;                                                                             \
             case R_IO:                                                                             \
                 return io9_read##size(&nds->io9, addr & 0xffffff);                                 \
@@ -42,6 +52,17 @@
                 *(u##size*) (&nds->ram[addr % RAMSIZE]) = data;                                    \
                 break;                                                                             \
             case R_WRAM:                                                                           \
+                switch (nds->io9.wramcnt) {                                                        \
+                    case 0:                                                                        \
+                        *(u##size*) &nds->wram[addr % WRAMSIZE] = data;                            \
+                        break;                                                                     \
+                    case 1:                                                                        \
+                        *(u##size*) &nds->wram1[addr % (WRAMSIZE / 2)] = data;                     \
+                        break;                                                                     \
+                    case 2:                                                                        \
+                        *(u##size*) &nds->wram0[addr % (WRAMSIZE / 2)] = data;                     \
+                        break;                                                                     \
+                }                                                                                  \
                 break;                                                                             \
             case R_IO:                                                                             \
                 io9_write##size(&nds->io9, addr & 0xffffff, data);                                 \
@@ -50,8 +71,10 @@
                 *(u##size*) (&nds->pal[addr % PALSIZE]) = data;                                    \
                 break;                                                                             \
             case R_VRAM:                                                                           \
-                if (addr >= 0x6800000 && addr < 0x68a4000) {                                       \
-                    *(u##size*) (&nds->vram[addr - 0x6800000]) = data;                             \
+                if (size != 8) {                                                                   \
+                    if (addr >= 0x6800000 && addr < 0x68a4000) {                                   \
+                        *(u##size*) (&nds->vram[addr - 0x6800000]) = data;                         \
+                    }                                                                              \
                 }                                                                                  \
                 break;                                                                             \
             case R_OAM:                                                                            \

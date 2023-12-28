@@ -12,6 +12,18 @@
                 return *(u##size*) (&nds->ram[addr % RAMSIZE]);                                    \
                 break;                                                                             \
             case R_WRAM:                                                                           \
+                if (addr < 0x3800000) {                                                            \
+                    switch (nds->io7.wramstat) {                                                   \
+                        case 0:                                                                    \
+                            break;                                                                 \
+                        case 1:                                                                    \
+                            return *(u##size*) &nds->wram0[addr % (WRAMSIZE / 2)];                 \
+                        case 2:                                                                    \
+                            return *(u##size*) &nds->wram1[addr % (WRAMSIZE / 2)];                 \
+                        case 3:                                                                    \
+                            return *(u##size*) &nds->wram[addr % WRAMSIZE];                        \
+                    }                                                                              \
+                }                                                                                  \
                 return *(u##size*) (&nds->wram7[addr % WRAM7SIZE]);                                \
                 break;                                                                             \
             case R_IO:                                                                             \
@@ -36,10 +48,25 @@
                 *(u##size*) (&nds->ram[addr % RAMSIZE]) = data;                                    \
                 break;                                                                             \
             case R_WRAM:                                                                           \
+                if (addr < 0x3800000) {                                                            \
+                    switch (nds->io7.wramstat) {                                                   \
+                        case 0:                                                                    \
+                            break;                                                                 \
+                        case 1:                                                                    \
+                            *(u##size*) &nds->wram0[addr % (WRAMSIZE / 2)] = data;                 \
+                            return;                                                                \
+                        case 2:                                                                    \
+                            *(u##size*) &nds->wram1[addr % (WRAMSIZE / 2)] = data;                 \
+                            return;                                                                \
+                        case 3:                                                                    \
+                            *(u##size*) &nds->wram[addr % WRAMSIZE] = data;                        \
+                            return;                                                                \
+                    }                                                                              \
+                }                                                                                  \
                 *(u##size*) (&nds->wram7[addr % WRAM7SIZE]) = data;                                \
                 break;                                                                             \
             case R_IO:                                                                             \
-                io7_write##size(&nds->io7, addr & 0xffffff, data);                                  \
+                io7_write##size(&nds->io7, addr & 0xffffff, data);                                 \
                 break;                                                                             \
             case R_VRAM:                                                                           \
                 break;                                                                             \

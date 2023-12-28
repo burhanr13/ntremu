@@ -94,7 +94,7 @@ typedef struct _NDS {
     union {
         struct {
             ObjAttr oamA[OAMOBJS];
-            u16 oamB[OAMOBJS];
+            ObjAttr oamB[OAMOBJS];
         };
         u8 oam[2 * OAMSIZE];
     };
@@ -102,6 +102,11 @@ typedef struct _NDS {
     u8* bios7;
     u8* bios9;
     GameCard* card;
+
+    u32 ipcfifo7to9[16];
+    u32 ipcfifo7to9_size;
+    u32 ipcfifo9to7[16];
+    u32 ipcfifo9to7_size;
 
     CPUType cur_cpu;
     bool frame_complete;
