@@ -174,29 +174,128 @@ u8 io9_read8(IO* io, u32 addr) {
     } else return h;
 }
 
+VRAMBank* get_vram_map(NDS* nds, VRAMBank bank, int mst, int ofs) {
+    if (mst == 0) {
+        return &nds->vramstate.lcdc[bank - 1];
+    }
+    switch (bank) {
+        case VRAMA:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgA.abcd[ofs];
+                case 2:
+                    return &nds->vramstate.objA.ab[ofs];
+            }
+            break;
+        case VRAMB:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgA.abcd[ofs];
+                case 2:
+                    return &nds->vramstate.objA.ab[ofs];
+            }
+            break;
+        case VRAMC:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgA.abcd[ofs];
+                case 2:
+                    return &nds->vramstate.arm7[ofs];
+                case 4:
+                    return &nds->vramstate.bgB.c;
+            }
+            break;
+        case VRAMD:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgA.abcd[ofs];
+                case 2:
+                    return &nds->vramstate.arm7[ofs];
+                case 4:
+                    return &nds->vramstate.objB.d;
+            }
+            break;
+        case VRAME:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgA.e;
+                case 2:
+                    return &nds->vramstate.objA.e;
+            }
+            break;
+        case VRAMF:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgA.fg[ofs];
+                case 2:
+                    return &nds->vramstate.objA.fg[ofs];
+            }
+            break;
+        case VRAMG:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgA.fg[ofs];
+                case 2:
+                    return &nds->vramstate.objA.fg[ofs];
+            }
+            break;
+        case VRAMH:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgB.h;
+            }
+            break;
+        case VRAMI:
+            switch (mst) {
+                case 1:
+                    return &nds->vramstate.bgB.i;
+                case 2:
+                    return &nds->vramstate.objB.i;
+            }
+            break;
+        default:
+            break;
+    }
+    return &nds->vramstate.lcdc[bank - 1];
+}
+
 void io9_write8(IO* io, u32 addr, u8 data) {
     switch (addr) {
         case VRAMCNT_A:
-            break;
         case VRAMCNT_B:
-            break;
         case VRAMCNT_C:
-            break;
         case VRAMCNT_D:
-            break;
         case VRAMCNT_E:
-            break;
         case VRAMCNT_F:
-            break;
         case VRAMCNT_G:
+        case VRAMCNT_H:
+        case VRAMCNT_I: {
+            int i = addr - VRAMCNT_A;
+            VRAMBank b = i + 1;
+            if (b > VRAMG) b--;
+            if (io->vramcnt[i].enable) {
+                VRAMBank* pre = get_vram_map(io->master, b, io->vramcnt[i].mst, io->vramcnt[i].ofs);
+                if (*pre == b) *pre = VRAMNULL;
+                if (b == VRAMC && io->vramcnt[i].mst == 2) {
+                    io->master->io7.vramstat &= ~1;
+                } else if (b == VRAMD && io->vramcnt[i].mst == 2) {
+                    io->master->io7.vramstat &= ~2;
+                }
+            }
+            io->vramcnt[i].b = data;
+            if (io->vramcnt[i].enable) {
+                *get_vram_map(io->master, b, io->vramcnt[i].mst, io->vramcnt[i].ofs) = b;
+                if (b == VRAMC && io->vramcnt[i].mst == 2) {
+                    io->master->io7.vramstat |= 1;
+                } else if (b == VRAMD && io->vramcnt[i].mst == 2) {
+                    io->master->io7.vramstat |= 2;
+                }
+            }
             break;
+        }
         case WRAMCNT:
             io->wramcnt = data & 3;
             io->master->io7.wramstat = io->wramcnt;
-            break;
-        case VRAMCNT_H:
-            break;
-        case VRAMCNT_I:
             break;
         default: {
             u16 h;
