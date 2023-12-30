@@ -17,8 +17,9 @@ void render_bg_line_text(PPU* ppu, int bg) {
     if (!(ppu->io->dispcnt.bg_enable & (1 << bg))) return;
     ppu->draw_bg[bg] = true;
 
-    u32 map_start = ppu->io->bgcnt[bg].tilemap_base * 0x800;
-    u32 tile_start = ppu->io->bgcnt[bg].tile_base * 0x4000;
+    u32 map_start =
+        ppu->io->dispcnt.tilemap_base * 0x10000 + ppu->io->bgcnt[bg].tilemap_base * 0x800;
+    u32 tile_start = ppu->io->dispcnt.tile_base * 0x10000 + ppu->io->bgcnt[bg].tile_base * 0x4000;
 
     u16 sy;
     if (ppu->io->bgcnt[bg].mosaic) {
@@ -128,8 +129,9 @@ void render_bg_line_aff(PPU* ppu, int bg) {
     if (!(ppu->io->dispcnt.bg_enable & (1 << bg))) return;
     ppu->draw_bg[bg] = true;
 
-    u32 map_start = ppu->io->bgcnt[bg].tilemap_base * 0x800;
-    u32 tile_start = ppu->io->bgcnt[bg].tile_base * 0x4000;
+    u32 map_start =
+        ppu->io->dispcnt.tilemap_base * 0x10000 + ppu->io->bgcnt[bg].tilemap_base * 0x800;
+    u32 tile_start = ppu->io->dispcnt.tile_base * 0x10000 + ppu->io->bgcnt[bg].tile_base * 0x4000;
 
     s32 x0, y0;
     if (ppu->io->bgcnt[bg].mosaic) {
@@ -655,6 +657,7 @@ void draw_scanline(PPU* ppu) {
             break;
         case 1:
             draw_scanline_normal(ppu);
+            break;
         case 2:
             memcpy(ppu->screen[ppu->ly],
                    &ppu->master->vrambanks[ppu->io->dispcnt.vram_block][2 * NDS_SCREEN_W * ppu->ly],
