@@ -27,18 +27,12 @@
                 return *(u##size*) (&nds->pal[addr % PALSIZE]);                                    \
                 break;                                                                             \
             case R_VRAM:                                                                           \
-                if (addr >= 0x6800000 && addr < 0x68a4000) {                                       \
-                    return *(u##size*) (&nds->vram[addr - 0x6800000]);                             \
-                }                                                                                  \
+                return vram_read##size(nds, (addr >> 21) & 7, addr & 0xfffff);                     \
                 break;                                                                             \
             case R_OAM:                                                                            \
                 return *(u##size*) (&nds->oam[addr % OAMSIZE]);                                    \
                 break;                                                                             \
-            case R_GBAROM:                                                                         \
-                break;                                                                             \
-            case R_GBASRAM:                                                                        \
-                break;                                                                             \
-            case 0xff:                                                                             \
+            default:                                                                               \
                 if (addr >= 0xffff0000 && addr < (0xffff0000 + BIOS9SIZE))                         \
                     return *(u##size*) (&nds->bios9[addr - 0xffff0000]);                           \
         }                                                                                          \
@@ -71,18 +65,10 @@
                 *(u##size*) (&nds->pal[addr % PALSIZE]) = data;                                    \
                 break;                                                                             \
             case R_VRAM:                                                                           \
-                if (size != 8) {                                                                   \
-                    if (addr >= 0x6800000 && addr < 0x68a4000) {                                   \
-                        *(u##size*) (&nds->vram[addr - 0x6800000]) = data;                         \
-                    }                                                                              \
-                }                                                                                  \
+                vram_write##size(nds, (addr >> 21) & 7, addr & 0xfffff, data);                     \
                 break;                                                                             \
             case R_OAM:                                                                            \
                 *(u##size*) (&nds->oam[addr % OAMSIZE]) = data;                                    \
-                break;                                                                             \
-            case R_GBAROM:                                                                         \
-                break;                                                                             \
-            case R_GBASRAM:                                                                        \
                 break;                                                                             \
         }                                                                                          \
     }

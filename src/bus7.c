@@ -29,12 +29,13 @@
             case R_IO:                                                                             \
                 return io7_read##size(&nds->io7, addr & 0xffffff);                                 \
                 break;                                                                             \
-            case R_VRAM:                                                                           \
+            case R_VRAM: {                                                                         \
+                int ofs = (addr & VRAMABCDSIZE) ? 1 : 0;                                           \
+                VRAMBank b = nds->vramstate.arm7[ofs];                                             \
+                if (b) return *(u##size*) &nds->vrambanks[b - 1][addr % VRAMABCDSIZE];             \
+                else return 0;                                                                     \
                 break;                                                                             \
-            case R_GBAROM:                                                                         \
-                break;                                                                             \
-            case R_GBASRAM:                                                                        \
-                break;                                                                             \
+            }                                                                                      \
         }                                                                                          \
         return -1;                                                                                 \
     }
@@ -68,12 +69,12 @@
             case R_IO:                                                                             \
                 io7_write##size(&nds->io7, addr & 0xffffff, data);                                 \
                 break;                                                                             \
-            case R_VRAM:                                                                           \
+            case R_VRAM: {                                                                         \
+                int ofs = (addr & VRAMABCDSIZE) ? 1 : 0;                                           \
+                VRAMBank b = nds->vramstate.arm7[ofs];                                             \
+                if (b) *(u##size*) &nds->vrambanks[b - 1][addr % VRAMABCDSIZE] = data;             \
                 break;                                                                             \
-            case R_GBAROM:                                                                         \
-                break;                                                                             \
-            case R_GBASRAM:                                                                        \
-                break;                                                                             \
+            }                                                                                      \
         }                                                                                          \
     }
 

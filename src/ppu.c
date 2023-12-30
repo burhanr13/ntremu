@@ -36,14 +36,13 @@ void render_bg_line_text(PPU* ppu, int bg) {
     u8 scs[2] = {SCLAYOUT[ppu->io->bgcnt[bg].size][scy & 1][0],
                  SCLAYOUT[ppu->io->bgcnt[bg].size][scy & 1][1]};
     u32 map_addr = map_start + 0x800 * scs[scx & 1] + 32 * 2 * ty + 2 * tx;
-    BgTile tile = {*(u16*) (&ppu->master->vram[(map_addr % 0x10000) >> 1])};
+    BgTile tile = {vram_read16(ppu->master, ppu->bgReg, map_addr)};
     if (ppu->io->bgcnt[bg].palmode) {
         u32 tile_addr = tile_start + 64 * tile.num;
         u16 tmpfy = fy;
         if (tile.vflip) tmpfy = 7 - fy;
-        u64 row = *(u32*) (&ppu->master->vram[((tile_addr + 8 * tmpfy) % 0x10000) >> 2]);
-        row |= (u64) * (u32*) (&ppu->master->vram[((tile_addr + 8 * tmpfy + 4) % 0x10000) >> 2])
-               << 32;
+        u64 row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * tmpfy);
+        row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * tmpfy + 4) << 32;
         if (tile.hflip) {
             row = (row & 0xffffffff00000000) >> 32 | (row & 0x00000000ffffffff) << 32;
             row = (row & 0xffff0000ffff0000) >> 16 | (row & 0x0000ffff0000ffff) << 16;
@@ -67,14 +66,12 @@ void render_bg_line_text(PPU* ppu, int bg) {
                 } else {
                     map_addr += 2;
                 }
-                tile.h = *(u16*) (&ppu->master->vram[(map_addr % 0x10000) >> 1]);
+                tile.h = vram_read16(ppu->master, ppu->bgReg, map_addr);
                 tile_addr = tile_start + 64 * tile.num;
                 tmpfy = fy;
                 if (tile.vflip) tmpfy = 7 - fy;
-                row = *(u32*) (&ppu->master->vram[((tile_addr + 8 * tmpfy) % 0x10000) >> 2]);
-                row |= (u64) *
-                           (u32*) (&ppu->master->vram[((tile_addr + 8 * tmpfy + 4) % 0x10000) >> 2])
-                       << 32;
+                row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * tmpfy);
+                row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * tmpfy + 4) << 32;
                 if (tile.hflip) {
                     row = (row & 0xffffffff00000000) >> 32 | (row & 0x00000000ffffffff) << 32;
                     row = (row & 0xffff0000ffff0000) >> 16 | (row & 0x0000ffff0000ffff) << 16;
@@ -86,7 +83,7 @@ void render_bg_line_text(PPU* ppu, int bg) {
         u32 tile_addr = tile_start + 32 * tile.num;
         u16 tmpfy = fy;
         if (tile.vflip) tmpfy = 7 - fy;
-        u32 row = *(u32*) (&ppu->master->vram[((tile_addr + 4 * tmpfy) % 0x10000) >> 2]);
+        u32 row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 4 * tmpfy);
         if (tile.hflip) {
             row = (row & 0xffff0000) >> 16 | (row & 0x0000ffff) << 16;
             row = (row & 0xff00ff00) >> 8 | (row & 0x00ff00ff) << 8;
@@ -112,11 +109,11 @@ void render_bg_line_text(PPU* ppu, int bg) {
                 } else {
                     map_addr += 2;
                 }
-                tile.h = *(u16*) (&ppu->master->vram[(map_addr % 0x10000) >> 1]);
+                tile.h = vram_read16(ppu->master, ppu->bgReg, map_addr);
                 tile_addr = tile_start + 32 * tile.num;
                 tmpfy = fy;
                 if (tile.vflip) tmpfy = 7 - fy;
-                row = *(u32*) (&ppu->master->vram[((tile_addr + 4 * tmpfy) % 0x10000) >> 2]);
+                row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 4 * tmpfy);
                 if (tile.hflip) {
                     row = (row & 0xffff0000) >> 16 | (row & 0x0000ffff) << 16;
                     row = (row & 0xff00ff00) >> 8 | (row & 0x00ff00ff) << 8;
@@ -161,9 +158,8 @@ void render_bg_line_aff(PPU* ppu, int bg) {
         u16 tiley = sy >> 3;
         u16 finex = sx & 0b111;
         u16 finey = sy & 0b111;
-        u8 tile = *(u8*) (&ppu->master->vram[(map_start + tiley * (size >> 3) + tilex) % 0x10000]);
-        col_ind =
-            *(u8*) (&ppu->master->vram[(tile_start + 64 * tile + finey * 8 + finex) % 0x10000]);
+        u8 tile = vram_read8(ppu->master, ppu->bgReg, map_start + tiley * (size >> 3) + tilex);
+        col_ind = vram_read8(ppu->master, ppu->bgReg, tile_start + 64 * tile + finey * 8 + finex);
 
         if (col_ind) ppu->layerlines[bg][x] = ppu->pal[col_ind] & ~(1 << 15);
         else ppu->layerlines[bg][x] = 1 << 15;
@@ -171,22 +167,32 @@ void render_bg_line_aff(PPU* ppu, int bg) {
 }
 
 void render_bgs(PPU* ppu) {
-    switch (ppu->io->dispcnt.bg_mode) {
-        case 0:
-            render_bg_line_text(ppu, 0);
-            render_bg_line_text(ppu, 1);
-            render_bg_line_text(ppu, 2);
-            render_bg_line_text(ppu, 3);
-            break;
-        case 1:
-            render_bg_line_text(ppu, 0);
-            render_bg_line_text(ppu, 1);
-            render_bg_line_aff(ppu, 2);
-            break;
-        case 2:
-            render_bg_line_aff(ppu, 2);
-            render_bg_line_aff(ppu, 3);
-            break;
+    int mode = ppu->io->dispcnt.bg_mode;
+    if (mode != 6) {
+        render_bg_line_text(ppu, 0);
+        render_bg_line_text(ppu, 1);
+        switch (mode) {
+            case 0:
+                render_bg_line_text(ppu, 2);
+                render_bg_line_text(ppu, 3);
+                break;
+            case 1:
+                render_bg_line_text(ppu, 2);
+                render_bg_line_aff(ppu, 3);
+                break;
+            case 2:
+                render_bg_line_aff(ppu, 2);
+                render_bg_line_aff(ppu, 3);
+                break;
+            case 3:
+                render_bg_line_text(ppu, 2);
+                break;
+            case 4:
+                render_bg_line_aff(ppu, 2);
+                break;
+            case 5:
+                break;
+        }
     }
 }
 
@@ -264,7 +270,7 @@ void render_obj_line(PPU* ppu, int i) {
                     u32 tile_addr =
                         tile_start + ty * 64 * (ppu->io->dispcnt.obj_mapmode ? ow / 8 : 16);
                     tile_addr += 64 * tx + 8 * fy + fx;
-                    u8 col_ind = *(u8*) (&ppu->master->vram[0x10000 + tile_addr % 0x8000]);
+                    u8 col_ind = vram_read8(ppu->master, ppu->objReg, tile_addr);
                     if (col_ind) {
                         col = ppu->pal[0x100 + col_ind] & ~(1 << 15);
                     } else col = 1 << 15;
@@ -272,7 +278,7 @@ void render_obj_line(PPU* ppu, int i) {
                     u32 tile_addr =
                         tile_start + ty * 32 * (ppu->io->dispcnt.obj_mapmode ? ow / 8 : 32);
                     tile_addr += 32 * tx + 4 * fy + fx / 2;
-                    u8 col_ind = *(u8*) (&ppu->master->vram[0x10000 + tile_addr % 0x8000]);
+                    u8 col_ind = vram_read8(ppu->master, ppu->objReg, tile_addr);
                     if (fx & 1) col_ind >>= 4;
                     else col_ind &= 0b1111;
                     if (col_ind) {
@@ -291,9 +297,9 @@ void render_obj_line(PPU* ppu, int i) {
                     ppu->draw_obj = true;
                     ppu->layerlines[LOBJ][sx] = col;
                     ppu->objdotattrs[sx].semitrans = (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
+                    ppu->objdotattrs[sx].mosaic = o.mosaic;
+                    ppu->objdotattrs[sx].priority = o.priority;
                 }
-                ppu->objdotattrs[sx].mosaic = o.mosaic;
-                ppu->objdotattrs[sx].priority = o.priority;
             }
         }
     } else {
@@ -311,20 +317,14 @@ void render_obj_line(PPU* ppu, int i) {
             u64 row;
             if (o.hflip) {
                 tile_addr += 64 * (w / 8 - 1);
-                row = *(u32*) (&ppu->master->vram[(0x10000 + (tile_addr + 8 * fy) % 0x8000) >> 2]);
-                row |=
-                    (u64) * (u32*) (&ppu->master
-                                         ->vram[(0x10000 + (tile_addr + 8 * fy + 4) % 0x8000) >> 2])
-                    << 32;
+                row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy);
+                row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy + 4) << 32;
                 row = (row & 0xffffffff00000000) >> 32 | (row & 0x00000000ffffffff) << 32;
                 row = (row & 0xffff0000ffff0000) >> 16 | (row & 0x0000ffff0000ffff) << 16;
                 row = (row & 0xff00ff00ff00ff00) >> 8 | (row & 0x00ff00ff00ff00ff) << 8;
             } else {
-                row = *(u32*) (&ppu->master->vram[(0x10000 + (tile_addr + 8 * fy) % 0x8000) >> 2]);
-                row |=
-                    (u64) * (u32*) (&ppu->master
-                                         ->vram[(0x10000 + (tile_addr + 8 * fy + 4) % 0x8000) >> 2])
-                    << 32;
+                row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy);
+                row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy + 4) << 32;
             }
             for (int x = 0; x < w; x++) {
                 int sx = (o.x + x) % 512;
@@ -341,9 +341,9 @@ void render_obj_line(PPU* ppu, int i) {
                             ppu->draw_obj = true;
                             ppu->layerlines[LOBJ][sx] = col & ~(1 << 15);
                             ppu->objdotattrs[sx].semitrans = (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
+                            ppu->objdotattrs[sx].mosaic = o.mosaic;
+                            ppu->objdotattrs[sx].priority = o.priority;
                         }
-                        ppu->objdotattrs[sx].mosaic = o.mosaic;
-                        ppu->objdotattrs[sx].priority = o.priority;
                     }
                 }
 
@@ -353,15 +353,17 @@ void render_obj_line(PPU* ppu, int i) {
                     fx = 0;
                     if (o.hflip) {
                         tile_addr -= 64;
-                        row = *(u64*) (&ppu->master
-                                            ->vram[(0x10000 + (tile_addr + 8 * fy) % 0x8000) >> 2]);
+                        row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy);
+                        row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy + 4)
+                               << 32;
                         row = (row & 0xffffffff00000000) >> 32 | (row & 0x00000000ffffffff) << 32;
                         row = (row & 0xffff0000ffff0000) >> 16 | (row & 0x0000ffff0000ffff) << 16;
                         row = (row & 0xff00ff00ff00ff00) >> 8 | (row & 0x00ff00ff00ff00ff) << 8;
                     } else {
                         tile_addr += 64;
-                        row = *(u64*) (&ppu->master
-                                            ->vram[(0x10000 + (tile_addr + 8 * fy) % 0x8000) >> 2]);
+                        row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy);
+                        row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy + 4)
+                               << 32;
                     }
                 }
             }
@@ -370,12 +372,12 @@ void render_obj_line(PPU* ppu, int i) {
             u32 row;
             if (o.hflip) {
                 tile_addr += 32 * (w / 8 - 1);
-                row = *(u32*) (&ppu->master->vram[(0x10000 + (tile_addr + 4 * fy) % 0x8000) >> 2]);
+                row = vram_read32(ppu->master, ppu->objReg, tile_addr + 4 * fy);
                 row = (row & 0xffff0000) >> 16 | (row & 0x0000ffff) << 16;
                 row = (row & 0xff00ff00) >> 8 | (row & 0x00ff00ff) << 8;
                 row = (row & 0xf0f0f0f0) >> 4 | (row & 0x0f0f0f0f) << 4;
             } else {
-                row = *(u32*) (&ppu->master->vram[(0x10000 + (tile_addr + 4 * fy) % 0x8000) >> 2]);
+                row = vram_read32(ppu->master, ppu->objReg, tile_addr + 4 * fy);
             }
             for (int x = 0; x < w; x++) {
                 int sx = (o.x + x) % 512;
@@ -394,9 +396,9 @@ void render_obj_line(PPU* ppu, int i) {
                             ppu->draw_obj = true;
                             ppu->layerlines[LOBJ][sx] = col & ~(1 << 15);
                             ppu->objdotattrs[sx].semitrans = (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
+                            ppu->objdotattrs[sx].mosaic = o.mosaic;
+                            ppu->objdotattrs[sx].priority = o.priority;
                         }
-                        ppu->objdotattrs[sx].mosaic = o.mosaic;
-                        ppu->objdotattrs[sx].priority = o.priority;
                     }
                 }
                 row >>= 4;
@@ -405,15 +407,13 @@ void render_obj_line(PPU* ppu, int i) {
                     fx = 0;
                     if (o.hflip) {
                         tile_addr -= 32;
-                        row = *(u32*) (&ppu->master
-                                            ->vram[(0x10000 + (tile_addr + 4 * fy) % 0x8000) >> 2]);
+                        row = vram_read32(ppu->master, ppu->objReg, tile_addr + 4 * fy);
                         row = (row & 0xffff0000) >> 16 | (row & 0x0000ffff) << 16;
                         row = (row & 0xff00ff00) >> 8 | (row & 0x00ff00ff) << 8;
                         row = (row & 0xf0f0f0f0) >> 4 | (row & 0x0f0f0f0f) << 4;
                     } else {
                         tile_addr += 32;
-                        row = *(u32*) (&ppu->master
-                                            ->vram[(0x10000 + (tile_addr + 4 * fy) % 0x8000) >> 2]);
+                        row = vram_read32(ppu->master, ppu->objReg, tile_addr + 4 * fy);
                     }
                 }
             }
@@ -428,7 +428,7 @@ void render_objs(PPU* ppu) {
         ppu->layerlines[LOBJ][x] = 1 << 15;
     }
 
-    ppu->obj_cycles = (ppu->io->dispcnt.hblank_free ? NDS_SCREEN_W : DOTS_W) * 4 - 6;
+    ppu->obj_cycles = (ppu->io->dispcnt.hblank_free ? NDS_SCREEN_W : DOTS_W) * 6;
 
     for (int i = 0; i < 128; i++) {
         render_obj_line(ppu, i);

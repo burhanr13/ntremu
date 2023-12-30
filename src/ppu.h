@@ -66,6 +66,8 @@ enum { LBG0, LBG1, LBG2, LBG3, LOBJ, LBD, LMAX };
 
 enum { EFF_NONE, EFF_ALPHA, EFF_BINC, EFF_BDEC };
 
+typedef enum { VRAMBGA, VRAMBGB, VRAMOBJA, VRAMOBJB } VRAMRegion;
+
 typedef struct _NDS NDS;
 
 typedef struct {
@@ -74,6 +76,8 @@ typedef struct {
     PPUIO* io;
     u16* pal;
     ObjAttr* oam;
+    VRAMRegion bgReg;
+    VRAMRegion objReg;
 
     u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
     u16 ly;
