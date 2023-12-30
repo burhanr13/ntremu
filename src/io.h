@@ -148,8 +148,7 @@ typedef struct {
         u16 h;
         struct {
             u16 priority : 2;
-            u16 tile_base : 2;
-            u16 unused : 2;
+            u16 tile_base : 4;
             u16 mosaic : 1;
             u16 palmode : 1;
             u16 tilemap_base : 5;

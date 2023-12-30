@@ -24,13 +24,13 @@
                 return io9_read##size(&nds->io9, addr & 0xffffff);                                 \
                 break;                                                                             \
             case R_PAL:                                                                            \
-                return *(u##size*) (&nds->pal[addr % PALSIZE]);                                    \
+                return *(u##size*) (&nds->pal[addr % (2 * PALSIZE)]);                              \
                 break;                                                                             \
             case R_VRAM:                                                                           \
                 return vram_read##size(nds, (addr >> 21) & 7, addr & 0xfffff);                     \
                 break;                                                                             \
             case R_OAM:                                                                            \
-                return *(u##size*) (&nds->oam[addr % OAMSIZE]);                                    \
+                return *(u##size*) (&nds->oam[addr % (2 * OAMSIZE)]);                              \
                 break;                                                                             \
             default:                                                                               \
                 if (addr >= 0xffff0000 && addr < (0xffff0000 + BIOS9SIZE))                         \
@@ -62,13 +62,13 @@
                 io9_write##size(&nds->io9, addr & 0xffffff, data);                                 \
                 break;                                                                             \
             case R_PAL:                                                                            \
-                *(u##size*) (&nds->pal[addr % PALSIZE]) = data;                                    \
+                *(u##size*) (&nds->pal[addr % (2 * PALSIZE)]) = data;                              \
                 break;                                                                             \
             case R_VRAM:                                                                           \
                 vram_write##size(nds, (addr >> 21) & 7, addr & 0xfffff, data);                     \
                 break;                                                                             \
             case R_OAM:                                                                            \
-                *(u##size*) (&nds->oam[addr % OAMSIZE]) = data;                                    \
+                *(u##size*) (&nds->oam[addr % (2 * OAMSIZE)]) = data;                              \
                 break;                                                                             \
         }                                                                                          \
     }
