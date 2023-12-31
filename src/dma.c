@@ -60,14 +60,14 @@ void dma7_run(DMAController* dmac, int i) {
             dma7_trans32(dmac, i, dmac->dma[i].dptr, dmac->dma[i].sptr);
             update_addr(&dmac->dma[i].sptr, dmac->master->io7.dma[i].cnt.sadcnt, 4);
             update_addr(&dmac->dma[i].dptr, dmac->master->io7.dma[i].cnt.dadcnt, 4);
-            dmac->master->sched.now += 10;
+            dmac->master->sched.now += 5;
         } while (--dmac->dma[i].len);
     } else {
         do {
             dma7_trans16(dmac, i, dmac->dma[i].dptr, dmac->dma[i].sptr);
             update_addr(&dmac->dma[i].sptr, dmac->master->io7.dma[i].cnt.sadcnt, 2);
             update_addr(&dmac->dma[i].dptr, dmac->master->io7.dma[i].cnt.dadcnt, 2);
-            dmac->master->sched.now += 10;
+            dmac->master->sched.now += 5;
         } while (--dmac->dma[i].len);
     }
 
@@ -122,14 +122,14 @@ void dma9_run(DMAController* dmac, int i) {
             dma9_trans32(dmac, i, dmac->dma[i].dptr, dmac->dma[i].sptr);
             update_addr(&dmac->dma[i].sptr, dmac->master->io9.dma[i].cnt.sadcnt, 4);
             update_addr(&dmac->dma[i].dptr, dmac->master->io9.dma[i].cnt.dadcnt, 4);
-            dmac->master->sched.now += 10;
+            dmac->master->sched.now += 5;
         } while (--dmac->dma[i].len);
     } else {
         do {
             dma9_trans16(dmac, i, dmac->dma[i].dptr, dmac->dma[i].sptr);
             update_addr(&dmac->dma[i].sptr, dmac->master->io9.dma[i].cnt.sadcnt, 2);
             update_addr(&dmac->dma[i].dptr, dmac->master->io9.dma[i].cnt.dadcnt, 2);
-            dmac->master->sched.now += 10;
+            dmac->master->sched.now += 5;
         } while (--dmac->dma[i].len);
     }
 

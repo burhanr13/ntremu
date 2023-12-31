@@ -43,6 +43,10 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
     nds->bios7 = bios7;
     nds->bios9 = bios9;
 
+    nds->io9.keyinput.h = 0x3ff;
+    nds->io7.keyinput.h = 0x3ff;
+    nds->io7.extkeyin.h = 0xff;
+
     nds->io7.ipcfifocnt.sendempty = 1;
     nds->io7.ipcfifocnt.recvempty = 1;
     nds->io9.ipcfifocnt.sendempty = 1;
@@ -93,7 +97,7 @@ bool nds_step(NDS* nds) {
         }
     } else {
         if (cpu9_step(&nds->cpu9)) {
-            nds->sched.now += 5;
+            nds->sched.now += 1;
         } else {
             nds->sched.now = nds->sched.event_queue[0].time;
         }

@@ -119,9 +119,13 @@ void update_input_keyboard(NDS* nds) {
     nds->io7.keyinput.right = ~keys[SDL_SCANCODE_RIGHT];
     nds->io7.keyinput.up = ~keys[SDL_SCANCODE_UP];
     nds->io7.keyinput.down = ~keys[SDL_SCANCODE_DOWN];
-    nds->io7.keyinput.l = ~keys[SDL_SCANCODE_A];
-    nds->io7.keyinput.r = ~keys[SDL_SCANCODE_S];
+    nds->io7.keyinput.l = ~keys[SDL_SCANCODE_Q];
+    nds->io7.keyinput.r = ~keys[SDL_SCANCODE_W];
     nds->io9.keyinput = nds->io7.keyinput;
+
+    nds->io7.extkeyin.x = ~keys[SDL_SCANCODE_A];
+    nds->io7.extkeyin.y = ~keys[SDL_SCANCODE_S];
+    nds->io7.extkeyin.hinge = 0;
 }
 
 void update_input_controller(NDS* nds, SDL_GameController* controller) {
