@@ -23,7 +23,7 @@ int emulator_init(int argc, char** argv) {
 
     ntremu.bios7 = malloc(BIOS7SIZE);
     FILE* f = fopen("bios7.bin", "rb");
-    if(!f) {
+    if (!f) {
         printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' exist.\n");
         return -1;
     }
@@ -37,6 +37,14 @@ int emulator_init(int argc, char** argv) {
     }
     fread(ntremu.bios9, 1, BIOS9SIZE, f);
     fclose(f);
+    ntremu.firmware = malloc(FIRMSIZE);
+    f = fopen("firmware.bin", "rb");
+    if (f) {
+        fread(ntremu.firmware, 1, FIRMSIZE, f);
+        fclose(f);
+    } else {
+        printf("Firmware not found.\n");
+    }
 
     ntremu.nds = malloc(sizeof *ntremu.nds);
     ntremu.card = create_card(ntremu.romfile);
@@ -50,7 +58,7 @@ int emulator_init(int argc, char** argv) {
     thumb1_generate_lookup();
     arm5_generate_lookup();
     thumb2_generate_lookup();
-    init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9);
+    init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9, ntremu.firmware);
 
     ntremu.romfilenodir = strrchr(ntremu.romfile, '/');
     if (ntremu.romfilenodir) ntremu.romfilenodir++;
@@ -98,7 +106,7 @@ void hotkey_press(SDL_KeyCode key) {
             ntremu.mute = !ntremu.mute;
             break;
         case SDLK_r:
-            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9);
+            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9, ntremu.firmware);
             ntremu.pause = false;
             break;
         case SDLK_TAB:
@@ -131,8 +139,10 @@ void update_input_keyboard(NDS* nds) {
 void update_input_controller(NDS* nds, SDL_GameController* controller) {
     nds->io7.keyinput.a &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
     nds->io7.keyinput.b &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
-    nds->io7.keyinput.start &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);
-    nds->io7.keyinput.select &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
+    nds->io7.keyinput.start &=
+        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);
+    nds->io7.keyinput.select &=
+        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
     nds->io7.keyinput.left &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
     nds->io7.keyinput.right &=

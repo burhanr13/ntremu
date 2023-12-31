@@ -4,7 +4,7 @@
 
 #include "ppu.h"
 
-void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
+void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     memset(nds, 0, sizeof *nds);
     nds->sched.master = nds;
     nds->cpu7.master = nds;
@@ -42,6 +42,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
     nds->card = card;
     nds->bios7 = bios7;
     nds->bios9 = bios9;
+    nds->firmware = firmware;
 
     nds->io9.keyinput.h = 0x3ff;
     nds->io7.keyinput.h = 0x3ff;

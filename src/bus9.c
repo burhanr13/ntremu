@@ -17,7 +17,7 @@
                     case 2:                                                                        \
                         return *(u##size*) &nds->wram0[addr % (WRAMSIZE / 2)];                     \
                     case 3:                                                                        \
-                        return -1;                                                                 \
+                        break;                                                                 \
                 }                                                                                  \
                 break;                                                                             \
             case R_IO:                                                                             \
@@ -36,6 +36,7 @@
                 if (addr >= 0xffff0000 && addr < (0xffff0000 + BIOS9SIZE))                         \
                     return *(u##size*) (&nds->bios9[addr - 0xffff0000]);                           \
         }                                                                                          \
+        printf("bus9 invalid read: %08x\n", addr);                                                      \
         return -1;                                                                                 \
     }
 

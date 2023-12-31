@@ -630,7 +630,7 @@ void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr) {
             cpu9_internal_cycle(cpu);
         } else {
             for (int i = 0; i < rcount; i++) {
-                cpu9_write32m(cpu, addr, i, *get_user_reg9(cpu,rlist[i]));
+                cpu9_write32m(cpu, addr, i, *get_user_reg9(cpu, rlist[i]));
             }
             if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         }
@@ -660,7 +660,6 @@ void exec_arm5_block_trans(Arm946E* cpu, Arm5Instr instr) {
             if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         }
     }
-
 }
 
 void exec_arm5_branch(Arm946E* cpu, Arm5Instr instr) {
@@ -669,13 +668,17 @@ void exec_arm5_branch(Arm946E* cpu, Arm5Instr instr) {
     if (cpu->cpsr.t) offset <<= 1;
     else offset <<= 2;
     u32 dest = cpu->pc + offset;
-    if (instr.branch.l) {
+    if (instr.branch.l || instr.cond == 0xf) {
         if (cpu->cpsr.t) {
             if (offset & (1 << 23)) {
                 offset %= 1 << 23;
                 cpu->lr += offset;
                 dest = cpu->lr;
                 cpu->lr = (cpu->pc - 2) | 1;
+                cpu9_fetch_instr(cpu);
+                if (instr.cond == 0xf) {
+                    cpu->cpsr.t = 0;
+                }
             } else {
                 if (offset & (1 << 22)) dest += 0xff800000;
                 cpu->lr = dest;
@@ -684,9 +687,13 @@ void exec_arm5_branch(Arm946E* cpu, Arm5Instr instr) {
             }
         } else {
             cpu->lr = (cpu->pc - 4) & ~0b11;
+            cpu9_fetch_instr(cpu);
+            if (instr.cond == 0xf) {
+                dest += instr.branch.l << 1;
+                cpu->cpsr.t = 1;
+            }
         }
     }
-    cpu9_fetch_instr(cpu);
     cpu->pc = dest;
     cpu9_flush(cpu);
 }
@@ -729,7 +736,11 @@ void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
 
         u32 off = instr.branch.offset;
         if (off & (1 << 23)) off |= 0xff000000;
-        fprintf(out, "b%s%s 0x%x", instr.branch.l ? "l" : "", cond, addr + 8 + (off << 2));
+        if (instr.cond == 0xf) {
+            fprintf(out, "blx 0x%x", addr + 8 * (off << 2) + (instr.branch.l << 1));
+        } else {
+            fprintf(out, "b%s%s 0x%x", instr.branch.l ? "l" : "", cond, addr + 8 + (off << 2));
+        }
 
     } else if (instr.cp_reg_trans.c1 == 0b1110 && instr.cp_reg_trans.c2 == 1) {
 
