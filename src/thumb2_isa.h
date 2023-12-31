@@ -132,7 +132,8 @@ typedef union {
     struct {
         u16 offset : 11;
         u16 h : 1;
-        u16 c1 : 4; // 1111
+        u16 h1 : 1;
+        u16 c1 : 3; // 111
     } branch_l;
 } Thumb2Instr;
 

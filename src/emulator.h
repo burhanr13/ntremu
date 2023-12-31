@@ -25,6 +25,7 @@ typedef struct {
     GameCard* card;
     u8* bios7;
     u8* bios9;
+    u8* firmware;
 
 } EmulatorState;
 

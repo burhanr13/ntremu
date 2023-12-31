@@ -150,7 +150,8 @@ void debugger_run() {
                         char ans[5];
                         fgets(ans, 5, stdin);
                         if (ans[0] == 'y') {
-                            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9);
+                            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
+                                     ntremu.firmware);
                             return;
                         }
                         break;

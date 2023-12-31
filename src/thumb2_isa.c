@@ -288,20 +288,22 @@ Arm5Instr thumb2_decode_instr(Thumb2Instr instr) {
             }
             break;
         case 14:
-            dec.branch.c1 = 0b101;
-            dec.branch.l = 0;
-            u32 offset = instr.branch.offset;
-            if (offset & (1 << 10)) offset |= 0xfffff800;
-            dec.branch.offset = offset;
-            break;
         case 15:
             dec.branch.c1 = 0b101;
-            dec.branch.l = 1;
-            if (instr.branch_l.h) {
-                dec.branch.offset = instr.branch_l.offset;
-                dec.branch.offset |= 1 << 22;
+            if (instr.branch.c1 == 0b11100) {
+                dec.branch.l = 0;
+                u32 offset = instr.branch.offset;
+                if (offset & (1 << 10)) offset |= 0xfffff800;
+                dec.branch.offset = offset;
             } else {
-                dec.branch.offset = instr.branch_l.offset << 11;
+                dec.branch.l = 1;
+                if (instr.branch_l.h) {
+                    dec.branch.offset = instr.branch_l.offset;
+                    dec.branch.offset |= 1 << 22;
+                    if (!instr.branch_l.h1) dec.cond = 0xf;
+                } else {
+                    dec.branch.offset = instr.branch_l.offset << 11;
+                }
             }
             break;
     }
