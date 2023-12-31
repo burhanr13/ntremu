@@ -232,7 +232,8 @@ void render_obj_line(PPU* ppu, int i) {
     }
     if (o.mode == OBJ_MODE_SEMITRANS) ppu->obj_semitrans = true;
 
-    u32 tile_start = o.tilenum * 32;
+    u32 tile_start =
+        o.tilenum * (32 << (ppu->io->dispcnt.obj_mapmode ? ppu->io->dispcnt.obj_boundary : 0));
 
     if (ppu->io->dispcnt.bg_mode > 2 && tile_start < 0x4000) return;
 
@@ -319,14 +320,14 @@ void render_obj_line(PPU* ppu, int i) {
             u64 row;
             if (o.hflip) {
                 tile_addr += 64 * (w / 8 - 1);
-                row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy);
-                row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy + 4) << 32;
+                row = vram_read32(ppu->master, ppu->objReg, tile_addr + 8 * fy);
+                row |= (u64) vram_read32(ppu->master, ppu->objReg, tile_addr + 8 * fy + 4) << 32;
                 row = (row & 0xffffffff00000000) >> 32 | (row & 0x00000000ffffffff) << 32;
                 row = (row & 0xffff0000ffff0000) >> 16 | (row & 0x0000ffff0000ffff) << 16;
                 row = (row & 0xff00ff00ff00ff00) >> 8 | (row & 0x00ff00ff00ff00ff) << 8;
             } else {
-                row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy);
-                row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy + 4) << 32;
+                row = vram_read32(ppu->master, ppu->objReg, tile_addr + 8 * fy);
+                row |= (u64) vram_read32(ppu->master, ppu->objReg, tile_addr + 8 * fy + 4) << 32;
             }
             for (int x = 0; x < w; x++) {
                 int sx = (o.x + x) % 512;
@@ -355,16 +356,16 @@ void render_obj_line(PPU* ppu, int i) {
                     fx = 0;
                     if (o.hflip) {
                         tile_addr -= 64;
-                        row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy);
-                        row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy + 4)
+                        row = vram_read32(ppu->master, ppu->objReg, tile_addr + 8 * fy);
+                        row |= (u64) vram_read32(ppu->master, ppu->objReg, tile_addr + 8 * fy + 4)
                                << 32;
                         row = (row & 0xffffffff00000000) >> 32 | (row & 0x00000000ffffffff) << 32;
                         row = (row & 0xffff0000ffff0000) >> 16 | (row & 0x0000ffff0000ffff) << 16;
                         row = (row & 0xff00ff00ff00ff00) >> 8 | (row & 0x00ff00ff00ff00ff) << 8;
                     } else {
                         tile_addr += 64;
-                        row = vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy);
-                        row |= (u64) vram_read32(ppu->master, ppu->bgReg, tile_addr + 8 * fy + 4)
+                        row = vram_read32(ppu->master, ppu->objReg, tile_addr + 8 * fy);
+                        row |= (u64) vram_read32(ppu->master, ppu->objReg, tile_addr + 8 * fy + 4)
                                << 32;
                     }
                 }
