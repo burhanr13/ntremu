@@ -3,11 +3,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "arm4_isa.h"
+#include "arm5_isa.h"
 #include "bus7.h"
 #include "bus9.h"
 #include "emulator.h"
 #include "nds.h"
 #include "scheduler.h"
+#include "thumb1_isa.h"
+#include "thumb2_isa.h"
 
 const char* help = "Debugger commands:\n"
                    "c -- continue emulation\n"
@@ -107,7 +111,11 @@ void debugger_run() {
                         if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
                             printf("Invalid address\n");
                         } else {
-                            printf("[%08x] = 0x%02x\n", addr, bus9_read8(ntremu.nds, addr));
+                            if (ntremu.nds->cur_cpu) {
+                                printf("[%08x] = 0x%02x\n", addr, bus7_read8(ntremu.nds, addr));
+                            } else {
+                                printf("[%08x] = 0x%02x\n", addr, bus9_read8(ntremu.nds, addr));
+                            }
                         }
                         break;
                     }
@@ -116,7 +124,11 @@ void debugger_run() {
                         if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
                             printf("Invalid address\n");
                         } else {
-                            printf("[%08x] = 0x%04x\n", addr, bus9_read16(ntremu.nds, addr));
+                            if (ntremu.nds->cur_cpu) {
+                                printf("[%08x] = 0x%04x\n", addr, bus7_read16(ntremu.nds, addr));
+                            } else {
+                                printf("[%08x] = 0x%04x\n", addr, bus9_read16(ntremu.nds, addr));
+                            }
                         }
                         break;
                     }
@@ -125,7 +137,11 @@ void debugger_run() {
                         if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
                             printf("Invalid address\n");
                         } else {
-                            printf("[%08x] = 0x%08x\n", addr, bus9_read32(ntremu.nds, addr));
+                            if (ntremu.nds->cur_cpu) {
+                                printf("[%08x] = 0x%08x\n", addr, bus7_read32(ntremu.nds, addr));
+                            } else {
+                                printf("[%08x] = 0x%08x\n", addr, bus9_read32(ntremu.nds, addr));
+                            }
                         }
                         break;
                     }
@@ -155,12 +171,38 @@ void debugger_run() {
             case 'l':
                 u32 lines;
                 if (read_num(strtok(NULL, " \t\n"), &lines) < 0) lines = 5;
-                for (int i = 0; i < 2 * lines; i++) {
-                    if (i == lines) printf("-> ");
-                    else printf("   ");
-                    u32 addr = ntremu.nds->cpu9.cur_instr_addr + ((i - lines) << 2);
-                    arm5_disassemble((Arm5Instr){bus9_read32(ntremu.nds, addr)}, addr, stdout);
-                    printf("\n");
+                if (ntremu.nds->cur_cpu) {
+                    for (int i = 0; i < 2 * lines; i++) {
+                        if (i == lines) printf("-> ");
+                        else printf("   ");
+                        if (ntremu.nds->cpu7.cpsr.t) {
+                            u32 addr = ntremu.nds->cpu7.cur_instr_addr + ((i - lines) << 1);
+                            thumb1_disassemble((Thumb1Instr){bus7_read16(ntremu.nds, addr)}, addr,
+                                               stdout);
+                            printf("\n");
+                        } else {
+                            u32 addr = ntremu.nds->cpu7.cur_instr_addr + ((i - lines) << 2);
+                            arm4_disassemble((Arm4Instr){bus7_read32(ntremu.nds, addr)}, addr,
+                                             stdout);
+                            printf("\n");
+                        }
+                    }
+                } else {
+                    for (int i = 0; i < 2 * lines; i++) {
+                        if (i == lines) printf("-> ");
+                        else printf("   ");
+                        if (ntremu.nds->cpu9.cpsr.t) {
+                            u32 addr = ntremu.nds->cpu9.cur_instr_addr + ((i - lines) << 1);
+                            thumb2_disassemble((Thumb2Instr){bus9_read16(ntremu.nds, addr)}, addr,
+                                               stdout);
+                            printf("\n");
+                        } else {
+                            u32 addr = ntremu.nds->cpu9.cur_instr_addr + ((i - lines) << 2);
+                            arm5_disassemble((Arm5Instr){bus9_read32(ntremu.nds, addr)}, addr,
+                                             stdout);
+                            printf("\n");
+                        }
+                    }
                 }
                 break;
             default:
