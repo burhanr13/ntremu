@@ -12,6 +12,16 @@ u8 io7_read8(IO* io, u32 addr) {
 }
 
 void io7_write8(IO* io, u32 addr, u8 data) {
+    if (addr == POSTFLG) {
+        io->postflg = data;
+        return;
+    }
+    if (addr == HALTCNT) {
+        io->haltcnt = data;
+        if ((data >> 6) == 2) io->master->halt7 = true;
+        return;
+    }
+
     u16 h;
     if (addr & 1) {
         h = data << 8;
@@ -37,6 +47,10 @@ u16 io7_read16(IO* io, u32 addr) {
 
 void io7_write16(IO* io, u32 addr, u16 data) {
     if (addr >= IO_SIZE) return;
+    if (addr == POSTFLG) {
+        io7_write8(io, addr, data);
+        io7_write8(io, addr | 1, data >> 8);
+    }
     switch (addr) {
         case DISPSTAT:
             data &= ~0b111;
@@ -44,6 +58,15 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             io->dispstat.h |= data;
             break;
         case VCOUNT:
+            break;
+        case DMA0CNT + 2:
+        case DMA1CNT + 2:
+        case DMA2CNT + 2:
+        case DMA3CNT + 2:
+            io->h[addr >> 1] = data;
+            int i = (addr - DMA0CNT - 2) / (DMA1CNT - DMA0CNT);
+            io->dma[i].cnt.mode &= 6;
+            if (io->dma[i].cnt.enable) dma7_enable(&io->master->dma7, i);
             break;
         case KEYINPUT:
             break;
@@ -338,6 +361,14 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             break;
         case VCOUNT:
             break;
+        case DMA0CNT + 2:
+        case DMA1CNT + 2:
+        case DMA2CNT + 2:
+        case DMA3CNT + 2:
+            io->h[addr >> 1] = data;
+            int i = (addr - DMA0CNT - 2) / (DMA1CNT - DMA0CNT);
+            if (io->dma[i].cnt.enable) dma9_enable(&io->master->dma9, i);
+            break;
         case KEYINPUT:
             break;
         case IPCSYNC:
@@ -426,8 +457,6 @@ u32 io9_read32(IO* io, u32 addr) {
 
 void io9_write32(IO* io, u32 addr, u32 data) {
     switch (addr) {
-        case DMA3CNT:
-            break;
         case IPCFIFOSEND:
             io->ipcfifosend = data;
             if (io->ipcfifocnt.fifo_enable) {

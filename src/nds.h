@@ -3,6 +3,7 @@
 
 #include "arm7tdmi.h"
 #include "arm946e.h"
+#include "dma.h"
 #include "gamecard.h"
 #include "io.h"
 #include "ppu.h"
@@ -49,7 +50,9 @@ typedef struct _NDS {
     Scheduler sched;
 
     Arm7TDMI cpu7;
+    DMAController dma7;
     Arm946E cpu9;
+    DMAController dma9;
 
     PPU ppuA;
     PPU ppuB;
@@ -133,6 +136,8 @@ typedef struct _NDS {
     u32 ipcfifo7to9_size;
     u32 ipcfifo9to7[16];
     u32 ipcfifo9to7_size;
+
+    bool halt7;
 
     CPUType cur_cpu;
     bool frame_complete;

@@ -71,14 +71,10 @@ enum {
     DMA3FILL = 0x0ec,
 
     // timer control
-    TM0CNT_L = 0x100,
-    TM0CNT_H = 0x102,
-    TM1CNT_L = 0x104,
-    TM1CNT_H = 0x106,
-    TM2CNT_L = 0x108,
-    TM2CNT_H = 0x10a,
-    TM3CNT_L = 0x10c,
-    TM3CNT_H = 0x10e,
+    TM0CNT = 0x100,
+    TM1CNT = 0x104,
+    TM2CNT = 0x108,
+    TM3CNT = 0x10c,
 
     // key control
     KEYINPUT = 0x130,
@@ -273,15 +269,14 @@ typedef struct _IO {
                         u32 sadcnt : 2;
                         u32 repeat : 1;
                         u32 wsize : 1;
-                        u32 drq : 1;
-                        u32 start : 2;
+                        u32 mode : 3;
                         u32 irq : 1;
                         u32 enable : 1;
                     };
                 } cnt;
             } dma[4];
             u32 dmafill[4];
-            u8 unused_0ex[TM0CNT_L - DMA3FILL - 4];
+            u8 unused_0ex[TM0CNT - DMA3FILL - 4];
             struct {
                 u16 reload;
                 union {
@@ -296,7 +291,7 @@ typedef struct _IO {
                     };
                 } cnt;
             } tm[4];
-            u8 gap11x[KEYINPUT - TM3CNT_H - 2];
+            u8 gap11x[KEYINPUT - TM3CNT - 4];
             union {
                 u16 h;
                 struct {
@@ -394,7 +389,7 @@ typedef struct _IO {
                     u32 ipcrecv : 1;
                     u32 gamecardtrans : 1;
                     u32 gamecard : 1;
-                    u32 geofifo : 1;
+                    u32 gxfifo : 1;
                     u32 unfold : 1;
                     u32 spi : 1;
                     u32 wifi : 1;
@@ -418,7 +413,7 @@ typedef struct _IO {
                     u32 ipcrecv : 1;
                     u32 gamecardtrans : 1;
                     u32 gamecard : 1;
-                    u32 geofifo : 1;
+                    u32 gxfifo : 1;
                     u32 unfold : 1;
                     u32 spi : 1;
                     u32 wifi : 1;
@@ -447,7 +442,10 @@ typedef struct _IO {
                     u8 pad_vramstat[8];
                 };
             };
-            u8 gap_2xx[PPUB_OFF - VRAMCNT_I - 1];
+            u8 gap_2xx[POSTFLG - VRAMCNT_I - 1];
+            u8 postflg;
+            u8 haltcnt;
+            u8 gap_3xx[PPUB_OFF - HALTCNT - 1];
             PPUIO ppuB;
         };
     };

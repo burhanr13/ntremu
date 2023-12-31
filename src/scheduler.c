@@ -21,6 +21,7 @@ void run_next_event(Scheduler* sched) {
     for (int i = 0; i < sched->n_events; i++) {
         sched->event_queue[i] = sched->event_queue[i + 1];
     }
+    u64 run_time = sched->now;
     sched->now = e.time;
 
     if (e.type == EVENT_LCD_HDRAW) {
@@ -28,6 +29,8 @@ void run_next_event(Scheduler* sched) {
     } else if (e.type == EVENT_LCD_HBLANK) {
         lcd_hblank(sched->master);
     }
+
+    if (run_time > sched->now) sched->now = run_time;
 }
 
 void add_event(Scheduler* sched, EventType t, u64 time) {

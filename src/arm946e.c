@@ -8,13 +8,14 @@
 #include "thumb2_isa.h"
 #include "types.h"
 
-void cpu9_step(Arm946E* cpu) {
+bool cpu9_step(Arm946E* cpu) {
     if (cpu->irq && (cpu->halt || !cpu->cpsr.i)) {
         cpu->halt = false;
         cpu9_handle_interrupt(cpu, I_IRQ);
-        return;
-    } else if (cpu->halt) return;
+        return true;
+    } else if (cpu->halt) return false;
     arm5_exec_instr(cpu);
+    return true;
 }
 
 void cpu9_fetch_instr(Arm946E* cpu) {
