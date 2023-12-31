@@ -47,6 +47,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
     nds->io7.ipcfifocnt.recvempty = 1;
     nds->io9.ipcfifocnt.sendempty = 1;
     nds->io9.ipcfifocnt.recvempty = 1;
+    nds->io7.wramstat = 3;
+    nds->io9.wramcnt = 3;
 
     CardHeader* header = (CardHeader*) card->rom;
 
