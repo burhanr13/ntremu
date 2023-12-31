@@ -61,7 +61,7 @@ typedef struct _Arm946E {
 
 } Arm946E;
 
-void cpu9_step(Arm946E* cpu);
+bool cpu9_step(Arm946E* cpu);
 
 void cpu9_fetch_instr(Arm946E* cpu);
 void cpu9_flush(Arm946E* cpu);

@@ -8,7 +8,9 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
     memset(nds, 0, sizeof *nds);
     nds->sched.master = nds;
     nds->cpu7.master = nds;
+    nds->dma7.master = nds;
     nds->cpu9.master = nds;
+    nds->dma9.master = nds;
 
     nds->ppuA.master = nds;
     nds->ppuA.io = &nds->io9.ppuA;
@@ -75,11 +77,24 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9) {
 
 bool nds_step(NDS* nds) {
     if (nds->cur_cpu) {
-        cpu7_step(&nds->cpu7);
-        nds->sched.now += 2;
+        if (nds->halt7) {
+            if (nds->io7.ie.w & nds->io7.ifl.w) {
+                nds->halt7 = false;
+                nds->io7.haltcnt = 0;
+                nds->cpu7.irq = true;
+            } else {
+                nds->sched.now = nds->sched.event_queue[0].time;
+            }
+        } else {
+            cpu7_step(&nds->cpu7);
+            nds->sched.now += 5;
+        }
     } else {
-        cpu9_step(&nds->cpu9);
-        nds->sched.now += 1;
+        if (cpu9_step(&nds->cpu9)) {
+            nds->sched.now += 5;
+        } else {
+            nds->sched.now = nds->sched.event_queue[0].time;
+        }
     }
     if (event_pending(&nds->sched)) {
         nds->cur_cpu = !nds->cur_cpu;

@@ -696,22 +696,24 @@ void lcd_hdraw(NDS* nds) {
         if (nds->io9.dispstat.vcount_irq) nds->io9.ifl.vcounteq = 1;
     } else nds->io9.dispstat.vcounteq = 0;
 
-    if (nds->io7.vcount == NDS_SCREEN_H) {
-        nds->io7.dispstat.vblank = 1;
-        nds->io9.dispstat.vblank = 1;
-        lcd_vblank(nds);
-    } else if (nds->io7.vcount == LINES_H - 1) {
-        nds->io7.dispstat.vblank = 0;
-        nds->io9.dispstat.vblank = 0;
-        nds->frame_complete = true;
-    }
-
     ppu_check_window(&nds->ppuA);
     ppu_check_window(&nds->ppuB);
 
     if (nds->io7.vcount < NDS_SCREEN_H) {
         draw_scanline(&nds->ppuA);
         draw_scanline(&nds->ppuB);
+
+        for (int i = 0; i < 4; i++) {
+            if (nds->io9.dma[i].cnt.mode == DMA9_DISPLAY) {
+                dma9_activate(&nds->dma9, i);
+            }
+        }
+    } else if (nds->io7.vcount == NDS_SCREEN_H) {
+        lcd_vblank(nds);
+    } else if (nds->io7.vcount == LINES_H - 1) {
+        nds->io7.dispstat.vblank = 0;
+        nds->io9.dispstat.vblank = 0;
+        nds->frame_complete = true;
     }
 
     add_event(&nds->sched, EVENT_LCD_HBLANK, nds->sched.now + 6 * NDS_SCREEN_W + 70);
@@ -736,11 +738,24 @@ void ppu_vblank(PPU* ppu) {
 }
 
 void lcd_vblank(NDS* nds) {
+    nds->io7.dispstat.vblank = 1;
+    nds->io9.dispstat.vblank = 1;
     if (nds->io7.dispstat.vblank_irq) nds->io7.ifl.vblank = 1;
     if (nds->io9.dispstat.vblank_irq) nds->io9.ifl.vblank = 1;
 
     ppu_vblank(&nds->ppuA);
     ppu_vblank(&nds->ppuB);
+
+    for (int i = 0; i < 4; i++) {
+        if (nds->io7.dma[i].cnt.mode == DMA7_VBLANK) {
+            dma9_activate(&nds->dma7, i);
+        }
+    }
+    for (int i = 0; i < 4; i++) {
+        if (nds->io9.dma[i].cnt.mode == DMA9_VBLANK) {
+            dma9_activate(&nds->dma9, i);
+        }
+    }
 }
 
 void ppu_hblank(PPU* ppu) {
@@ -764,13 +779,18 @@ void ppu_hblank(PPU* ppu) {
 }
 
 void lcd_hblank(NDS* nds) {
-    if (nds->io7.vcount < NDS_SCREEN_H) {
-        ppu_hblank(&nds->ppuA);
-        ppu_hblank(&nds->ppuB);
-    }
-
     nds->io7.dispstat.hblank = 1;
     nds->io9.dispstat.hblank = 1;
     if (nds->io7.dispstat.hblank_irq) nds->io7.ifl.hblank = 1;
     if (nds->io9.dispstat.hblank_irq) nds->io9.ifl.hblank = 1;
+
+    if (nds->io7.vcount < NDS_SCREEN_H) {
+        ppu_hblank(&nds->ppuA);
+        ppu_hblank(&nds->ppuB);
+        for (int i = 0; i < 4; i++) {
+            if (nds->io9.dma[i].cnt.mode == DMA9_HBLANK) {
+                dma9_activate(&nds->dma9, i);
+            }
+        }
+    }
 }
