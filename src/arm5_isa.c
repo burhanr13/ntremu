@@ -26,6 +26,8 @@ Arm5ExecFunc arm5_decode_instr(Arm5Instr instr) {
         return exec_arm5_undefined;
     } else if (instr.single_trans.c1 == 0b01) {
         return exec_arm5_single_trans;
+    } else if (instr.clz.c1 == 0b00010110 && instr.clz.c4 == 0b0001) {
+        return exec_arm5_clz;
     } else if (instr.branch_ex.c1 == 0b00010010 && instr.branch_ex.c3 == 0b00 &&
                instr.branch_ex.c4 == 1) {
         return exec_arm5_branch_ex;
@@ -476,6 +478,19 @@ void exec_arm5_branch_ex(Arm946E* cpu, Arm5Instr instr) {
     cpu9_flush(cpu);
 }
 
+void exec_arm5_clz(Arm946E* cpu, Arm5Instr instr) {
+    u32 op = cpu->r[instr.clz.rm];
+    u32 ct = 0;
+    if (op == 0) ct = 32;
+    else
+        while (!(op & (1 << 31))) {
+            op <<= 1;
+            ct++;
+        }
+    cpu->r[instr.clz.rd] = ct;
+    cpu9_fetch_instr(cpu);
+}
+
 void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr) {
     u32 addr = cpu->r[instr.half_trans.rn];
     u32 offset;
@@ -817,6 +832,10 @@ void arm5_disassemble(Arm5Instr instr, u32 addr, FILE* out) {
                 fprintf(out, "]%s", instr.single_trans.w ? "!" : "");
             }
         }
+
+    } else if (instr.clz.c1 == 0b00010110 && instr.clz.c4 == 0b0001) {
+
+        fprintf(out, "clz %s, %s", reg_names[instr.clz.rd], reg_names[instr.clz.rm]);
 
     } else if (instr.branch_ex.c1 == 0b00010010 && instr.branch_ex.c3 == 0b00 &&
                instr.branch_ex.c4 == 1) {
