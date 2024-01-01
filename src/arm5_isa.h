@@ -83,6 +83,15 @@ typedef union {
         u32 cond : 4;
     } branch_ex;
     struct {
+        u32 rm : 4;
+        u32 c4 : 4; // 0001
+        u32 c3 : 4;
+        u32 rd : 4;
+        u32 c2 : 4;
+        u32 c1 : 8; // 00010110
+        u32 cond : 4;
+    } clz;
+    struct {
         u32 offlo : 4;
         u32 c3 : 1; // 1
         u32 h : 1;
@@ -170,6 +179,7 @@ void exec_arm5_multiply(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_multiply_long(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_swap(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_branch_ex(Arm946E* cpu, Arm5Instr instr);
+void exec_arm5_clz(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_single_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_undefined(Arm946E* cpu, Arm5Instr instr);

@@ -711,10 +711,10 @@ void lcd_hdraw(NDS* nds) {
         }
     } else if (nds->io7.vcount == NDS_SCREEN_H) {
         lcd_vblank(nds);
+        nds->frame_complete = true;
     } else if (nds->io7.vcount == LINES_H - 1) {
         nds->io7.dispstat.vblank = 0;
         nds->io9.dispstat.vblank = 0;
-        nds->frame_complete = true;
     }
 
     add_event(&nds->sched, EVENT_LCD_HBLANK, nds->sched.now + 6 * NDS_SCREEN_W + 70);
