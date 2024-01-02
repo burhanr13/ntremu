@@ -87,6 +87,12 @@ enum {
     IPCFIFOSEND = 0x188,
     IPCFIFORECV = 0x100000,
 
+    // system/interrupt control
+    EXMEMCNT = 0x204,
+    IME = 0x208,
+    IE = 0x210,
+    IF = 0x214,
+
     // memory control
     VRAMCNT_A = 0x240,
     VRAMCNT_B = 0x241,
@@ -101,13 +107,20 @@ enum {
     VRAMSTAT = 0x240,
     WRAMSTAT = 0x241,
 
-    // system/interrupt control
-    EXMEMCNT = 0x204,
-    IME = 0x208,
-    IE = 0x210,
-    IF = 0x214,
+    // math control
+    DIVCNT = 0x280,
+    DIV_NUMER = 0x290,
+    DIV_DENOM = 0x298,
+    DIV_RESULT = 0x2a0,
+    DIVREM_RESULT = 0x2a8,
+    SQRTCNT = 0x2b0,
+    SQRT_RESULT = 0x2b4,
+    SQRT_PARAM = 0x2b8,
+
+    // power control
     POSTFLG = 0x300,
     HALTCNT = 0x301,
+    POWCNT = 0x304,
 
     PPUB_OFF = 0x1000
 };
@@ -323,7 +336,7 @@ typedef struct _IO {
                 };
             } keycnt;
             u16 unused_134;
-            union{
+            union {
                 u16 h;
                 struct {
                     u16 x : 1;
@@ -458,7 +471,34 @@ typedef struct _IO {
                     u8 pad_vramstat[8];
                 };
             };
-            u8 gap_2xx[POSTFLG - VRAMCNT_I - 1];
+            u8 gap_25x[DIVCNT - VRAMCNT_I - 1];
+            union {
+                u32 w;
+                struct {
+                    u32 mode : 2;
+                    u32 unused : 12;
+                    u32 error : 1;
+                    u32 busy : 1;
+                    u32 unused2 : 16;
+                };
+            } divcnt;
+            u32 pad_div[3];
+            s64 div_numer;
+            s64 div_denom;
+            s64 div_result;
+            s64 divrem_result;
+            union {
+                u32 w;
+                struct {
+                    u32 mode : 1;
+                    u32 unused : 14;
+                    u32 busy : 1;
+                    u32 unused2 : 16;
+                };
+            } sqrtcnt;
+            u32 sqrt_result;
+            u64 sqrt_param;
+            u8 gap_2cx[POSTFLG - SQRT_PARAM - 8];
             u8 postflg;
             u8 haltcnt;
             u8 gap_3xx[PPUB_OFF - HALTCNT - 1];

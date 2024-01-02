@@ -37,7 +37,6 @@
                 break;                                                                             \
             }                                                                                      \
         }                                                                                          \
-        printf("bus7 invalid read: %08x\n", addr);                                                 \
         return -1;                                                                                 \
     }
 
