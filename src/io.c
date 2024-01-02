@@ -1,5 +1,6 @@
 #include "io.h"
 
+#include <math.h>
 #include <stdio.h>
 
 #include "nds.h"
@@ -151,6 +152,8 @@ u32 io7_read32(IO* io, u32 addr) {
                 return io->master->ipcfifo9to7[0];
             }
             break;
+        case 0x100010:
+            printf("card read\n");
         default:
             return io7_read16(io, addr) | (io7_read16(io, addr | 2) << 16);
     }
@@ -353,6 +356,53 @@ void io9_write16(IO* io, u32 addr, u16 data) {
         io9_write8(io, addr | 1, data >> 8);
         return;
     }
+    if (addr == DIVCNT || (DIV_NUMER <= addr && addr < DIV_DENOM + 8)) {
+        io->h[addr >> 1] = data;
+
+        if (io->div_denom == 0) {
+            io->divcnt.error = 1;
+        } else {
+            io->divcnt.error = 0;
+        }
+
+        s64 op1 = io->div_numer, op2 = io->div_denom;
+
+        switch (io->divcnt.mode) {
+            case 0:
+                op1 = (s32) op1;
+                op2 = (s32) op2;
+                break;
+            case 1:
+                op2 = (s32) op2;
+                break;
+        }
+
+        if (op2 == 0) {
+            io->div_result = (op1 < 0) ? 1 : -1;
+            io->divrem_result = op1;
+        } else if (op1 == (1UL << 63) && op2 == -1) {
+            io->div_result = op1;
+            io->divrem_result = 0;
+        } else {
+            io->div_result = op1 / op2;
+            io->divrem_result = op1 % op2;
+        }
+
+        io->divcnt.busy = 0;
+        return;
+    }
+    if (addr == SQRTCNT || (SQRT_PARAM <= addr && addr < SQRT_PARAM + 8)) {
+        io->h[addr >> 1] = data;
+
+        if (io->sqrtcnt.mode) {
+            io->sqrt_result = sqrtl(io->sqrt_param);
+        } else {
+            io->sqrt_result = sqrt((u32) io->sqrt_param);
+        }
+
+        io->sqrtcnt.busy = 0;
+        return;
+    }
     switch (addr) {
         case DISPSTAT:
             data &= ~0b111;
@@ -450,6 +500,8 @@ u32 io9_read32(IO* io, u32 addr) {
                 return io->master->ipcfifo7to9[0];
             }
             break;
+        case 0x100010:
+            printf("card read\n");
         default:
             return io9_read16(io, addr) | (io9_read16(io, addr | 2) << 16);
     }
