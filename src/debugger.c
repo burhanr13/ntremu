@@ -194,11 +194,13 @@ void debugger_run() {
                         else printf("   ");
                         if (ntremu.nds->cpu7.cpsr.t) {
                             u32 addr = ntremu.nds->cpu7.cur_instr_addr + ((i - lines) << 1);
+                            printf("%03x: ", addr & 0xfff);
                             thumb1_disassemble((Thumb1Instr){bus7_read16(ntremu.nds, addr)}, addr,
                                                stdout);
                             printf("\n");
                         } else {
                             u32 addr = ntremu.nds->cpu7.cur_instr_addr + ((i - lines) << 2);
+                            printf("%03x: ", addr & 0xfff);
                             arm4_disassemble((Arm4Instr){bus7_read32(ntremu.nds, addr)}, addr,
                                              stdout);
                             printf("\n");
@@ -210,17 +212,24 @@ void debugger_run() {
                         else printf("   ");
                         if (ntremu.nds->cpu9.cpsr.t) {
                             u32 addr = ntremu.nds->cpu9.cur_instr_addr + ((i - lines) << 1);
+                            printf("%03x: ", addr & 0xfff);
                             thumb2_disassemble((Thumb2Instr){bus9_read16(ntremu.nds, addr)}, addr,
                                                stdout);
                             printf("\n");
                         } else {
                             u32 addr = ntremu.nds->cpu9.cur_instr_addr + ((i - lines) << 2);
+                            printf("%03x: ", addr & 0xfff);
                             arm5_disassemble((Arm5Instr){bus9_read32(ntremu.nds, addr)}, addr,
                                              stdout);
                             printf("\n");
                         }
                     }
                 }
+                break;
+            case 't':
+                printf("ITCM: base=%08x, size=%08x\n", 0, ntremu.nds->cpu9.itcm_virtsize);
+                printf("DTCM: base=%08x, size=%08x\n", ntremu.nds->cpu9.dtcm_base,
+                       ntremu.nds->cpu9.dtcm_virtsize);
                 break;
             default:
                 printf("Invalid command\n");

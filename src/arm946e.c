@@ -9,12 +9,18 @@
 #include "types.h"
 
 bool cpu9_step(Arm946E* cpu) {
-    if (cpu->irq && (cpu->halt || !cpu->cpsr.i)) {
-        cpu->halt = false;
+    if (cpu->halt) {
+        if (cpu->irq) {
+            cpu->halt = false;
+        } else {
+            return false;
+        }
+    }
+    if (!cpu->cpsr.i && cpu->irq) {
         cpu9_handle_interrupt(cpu, I_IRQ);
-        return true;
-    } else if (cpu->halt) return false;
-    arm5_exec_instr(cpu);
+    } else {
+        arm5_exec_instr(cpu);
+    }
     return true;
 }
 
@@ -186,7 +192,6 @@ u32 cpu9_fetch32(Arm946E* cpu, u32 addr) {
     if (addr < cpu->itcm_virtsize) return *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE];
     else return bus9_read32(cpu->master, addr & ~3);
 }
-
 
 u32 cp15_read(Arm946E* cpu, u32 cn, u32 cm, u32 cp) {
     if (cn == 9 && cm == 1) {
