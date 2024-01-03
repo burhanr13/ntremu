@@ -64,6 +64,19 @@ typedef union {
     } multiply_long;
     struct {
         u32 rm : 4;
+        u32 c4 : 1; // 0
+        u32 x : 1;
+        u32 y : 1;
+        u32 c3 : 1; // 1
+        u32 rs : 4;
+        u32 rn : 4;
+        u32 rd : 4;
+        u32 c2 : 1; // 0
+        u32 op : 2;
+        u32 c1 : 5; // 00010
+    } multiply_short;
+    struct {
+        u32 rm : 4;
         u32 c4 : 4; // 1001
         u32 c3 : 4;
         u32 rd : 4;
@@ -91,6 +104,18 @@ typedef union {
         u32 c1 : 8; // 00010110
         u32 cond : 4;
     } clz;
+    struct {
+        u32 rm : 4;
+        u32 c4 : 4; // 0101
+        u32 c3 : 4;
+        u32 rd : 4;
+        u32 rn : 4;
+        u32 c2 : 1; // 0
+        u32 op : 1;
+        u32 d : 1;
+        u32 c1 : 5; // 00010
+        u32 cond : 4;
+    } sat_arith;
     struct {
         u32 offlo : 4;
         u32 c3 : 1; // 1
@@ -177,9 +202,11 @@ void exec_arm5_data_proc(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_psr_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_multiply(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_multiply_long(Arm946E* cpu, Arm5Instr instr);
+void exec_arm5_multiply_short(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_swap(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_branch_ex(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_clz(Arm946E* cpu, Arm5Instr instr);
+void exec_arm5_sat_arith(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_single_trans(Arm946E* cpu, Arm5Instr instr);
 void exec_arm5_undefined(Arm946E* cpu, Arm5Instr instr);

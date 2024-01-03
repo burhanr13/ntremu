@@ -98,10 +98,26 @@ void debugger_run() {
                 }
                 break;
             case 'i':
-                if (ntremu.nds->cur_cpu) {
-                    print_cpu7_state(&ntremu.nds->cpu7);
-                } else {
-                    print_cpu9_state(&ntremu.nds->cpu9);
+                switch (com[1]) {
+                    case 'p':
+                        printf("fifo 7to9: {");
+                        for (int i = 0; i < ntremu.nds->ipcfifo7to9_size; i++) {
+                            printf("%x ", ntremu.nds->ipcfifo7to9[i]);
+                        }
+                        printf("}\n");
+                        printf("fifo 9to7: {");
+                        for (int i = 0; i < ntremu.nds->ipcfifo9to7_size; i++) {
+                            printf("%x ", ntremu.nds->ipcfifo9to7[i]);
+                        }
+                        printf("}\n");
+                        break;
+                    default:
+                        if (ntremu.nds->cur_cpu) {
+                            print_cpu7_state(&ntremu.nds->cpu7);
+                        } else {
+                            print_cpu9_state(&ntremu.nds->cpu9);
+                        }
+                        break;
                 }
                 break;
             case 'r':

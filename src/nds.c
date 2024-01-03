@@ -46,12 +46,13 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
 
     nds->io9.keyinput.h = 0x3ff;
     nds->io7.keyinput.h = 0x3ff;
-    nds->io7.extkeyin.h = 0xff;
+    nds->io7.extkeyin.h = 0x7f;
 
     nds->io7.ipcfifocnt.sendempty = 1;
     nds->io7.ipcfifocnt.recvempty = 1;
     nds->io9.ipcfifocnt.sendempty = 1;
     nds->io9.ipcfifocnt.recvempty = 1;
+
     nds->io7.wramstat = 3;
     nds->io9.wramcnt = 3;
 

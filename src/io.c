@@ -36,7 +36,8 @@ void io7_write8(IO* io, u32 addr, u8 data) {
 
 u16 io7_read16(IO* io, u32 addr) {
     if (addr >= IO_SIZE) {
-        if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2) {
+        if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2 || addr == GAMECARDIN ||
+            addr == GAMECARDIN + 2) {
             u32 w = io7_read32(io, addr & ~3);
             if (addr & 2) return w >> 16;
             else return w;
@@ -51,6 +52,18 @@ void io7_write16(IO* io, u32 addr, u16 data) {
     if (addr == POSTFLG) {
         io7_write8(io, addr, data);
         io7_write8(io, addr | 1, data >> 8);
+        return;
+    }
+    if (ROMCOMMAND <= addr && addr < ROMCOMMAND + 8) {
+        io->h[addr >> 1] = data;
+        if (card_write_command(io->master->card, io->romcommand)) {
+            io->romctrl.busy = 1;
+            io->romctrl.drq = 1;
+        } else {
+            io->romctrl.busy = 0;
+            io->romctrl.drq = 0;
+        }
+        return;
     }
     switch (addr) {
         case DISPSTAT:
@@ -98,12 +111,31 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                 io->master->io9.ipcfifocnt.recvempty = 1;
                 io->master->io9.ipcfifocnt.recvfull = 0;
             }
+            if (io->ipcfifocnt.send_irq && io->ipcfifocnt.sendempty) {
+                io->ifl.ipcsend = 1;
+            }
+            if (io->ipcfifocnt.recv_irq && !io->ipcfifocnt.recvempty) {
+                io->ifl.ipcrecv = 1;
+            }
+            io->master->cpu7.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
             break;
         }
         case IPCFIFOSEND:
         case IPCFIFOSEND + 2:
             io->h[addr >> 1] = data;
             io7_write32(io, addr & ~3, io->ipcfifosend);
+            break;
+        case ROMCTRL + 2:
+            io->h[addr >> 1] &= 0x8080;
+            io->h[addr >> 1] |= data & 0x7f7f;
+            u32 len = 0x100 << io->romctrl.blocksize;
+            if (len == 0x100) len = 0;
+            if (len == 0x8000) len = 4;
+            io->master->card->len = len;
+            break;
+        case EXMEMCNT:
+            io->exmemcnt.w &= 0xff80;
+            io->exmemcnt.w |= data & 0x7f;
             break;
         case IME:
         case IE:
@@ -152,8 +184,17 @@ u32 io7_read32(IO* io, u32 addr) {
                 return io->master->ipcfifo9to7[0];
             }
             break;
-        case 0x100010:
-            printf("card read\n");
+        case GAMECARDIN: {
+            u32 data;
+            if (card_read_data(io->master->card, &data)) {
+                io->romctrl.drq = 1;
+                io->romctrl.busy = 1;
+            } else {
+                io->romctrl.drq = 0;
+                io->romctrl.busy = 0;
+            }
+            return data;
+        }
         default:
             return io7_read16(io, addr) | (io7_read16(io, addr | 2) << 16);
     }
@@ -339,7 +380,8 @@ void io9_write8(IO* io, u32 addr, u8 data) {
 
 u16 io9_read16(IO* io, u32 addr) {
     if (addr >= IO_SIZE) {
-        if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2) {
+        if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2 || addr == GAMECARDIN ||
+            addr == GAMECARDIN + 2) {
             u32 w = io9_read32(io, addr & ~3);
             if (addr & 2) return w >> 16;
             else return w;
@@ -403,6 +445,17 @@ void io9_write16(IO* io, u32 addr, u16 data) {
         io->sqrtcnt.busy = 0;
         return;
     }
+    if (ROMCOMMAND <= addr && addr < ROMCOMMAND + 8) {
+        io->h[addr >> 1] = data;
+        if (card_write_command(io->master->card, io->romcommand)) {
+            io->romctrl.busy = 1;
+            io->romctrl.drq = 1;
+        } else {
+            io->romctrl.busy = 0;
+            io->romctrl.drq = 0;
+        }
+        return;
+    }
     switch (addr) {
         case DISPSTAT:
             data &= ~0b111;
@@ -448,12 +501,32 @@ void io9_write16(IO* io, u32 addr, u16 data) {
                 io->master->io7.ipcfifocnt.recvempty = 1;
                 io->master->io7.ipcfifocnt.recvfull = 0;
             }
+            if (io->ipcfifocnt.send_irq && io->ipcfifocnt.sendempty) {
+                io->ifl.ipcsend = 1;
+            }
+            if (io->ipcfifocnt.recv_irq && !io->ipcfifocnt.recvempty) {
+                io->ifl.ipcrecv = 1;
+            }
+            io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
             break;
         }
         case IPCFIFOSEND:
         case IPCFIFOSEND + 2:
             io->h[addr >> 1] = data;
             io9_write32(io, addr & ~3, io->ipcfifosend);
+            break;
+        case ROMCTRL + 2:
+            io->h[addr >> 1] &= 0x8080;
+            io->h[addr >> 1] |= data & 0x7f7f;
+            u32 len = 0x100 << io->romctrl.blocksize;
+            if (len == 0x100) len = 0;
+            if (len == 0x8000) len = 4;
+            io->master->card->len = len;
+            break;
+        case EXMEMCNT:
+            io->exmemcnt.w = data;
+            io->master->io7.exmemcnt.w &= 0x7f;
+            io->master->io7.exmemcnt.w |= data & 0xff80;
             break;
         case IME:
         case IE:
@@ -500,8 +573,17 @@ u32 io9_read32(IO* io, u32 addr) {
                 return io->master->ipcfifo7to9[0];
             }
             break;
-        case 0x100010:
-            printf("card read\n");
+        case GAMECARDIN: {
+            u32 data;
+            if (card_read_data(io->master->card, &data)) {
+                io->romctrl.drq = 1;
+                io->romctrl.busy = 1;
+            } else {
+                io->romctrl.drq = 0;
+                io->romctrl.busy = 0;
+            }
+            return data;
+        }
         default:
             return io9_read16(io, addr) | (io9_read16(io, addr | 2) << 16);
     }

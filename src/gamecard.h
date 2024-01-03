@@ -26,12 +26,24 @@ typedef struct {
     u8 rest[0x1c0];
 } CardHeader;
 
+typedef enum { CARD_IDLE, CARD_CHIPID, CARD_DATA } CardState;
+
 typedef struct {
     u8* rom;
-    int rom_size;
+    u32 rom_size;
+
+    CardState state;
+    
+    u32 addr;
+    u32 i;
+    u32 len;
+
 } GameCard;
 
 GameCard* create_card(char* filename);
 void destroy_card(GameCard* card);
+
+bool card_write_command(GameCard* card, u8* command);
+bool card_read_data(GameCard* card, u32* data);
 
 #endif

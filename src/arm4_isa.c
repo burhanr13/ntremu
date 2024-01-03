@@ -154,7 +154,6 @@ void exec_arm4_data_proc(Arm7TDMI* cpu, Arm4Instr instr) {
 
         if (shift & 1) {
             cpu7_fetch_instr(cpu);
-            cpu7_internal_cycle(cpu);
             op2 = cpu->r[rm];
 
             u32 rs = shift >> 4;
@@ -394,15 +393,8 @@ void exec_arm4_psr_trans(Arm7TDMI* cpu, Arm4Instr instr) {
 
 void exec_arm4_multiply(Arm7TDMI* cpu, Arm4Instr instr) {
     cpu7_fetch_instr(cpu);
-    s32 op = cpu->r[instr.multiply.rs];
-    for (int i = 0; i < 4; i++) {
-        cpu7_internal_cycle(cpu);
-        op >>= 8;
-        if (op == 0 || op == -1) break;
-    }
     u32 res = cpu->r[instr.multiply.rm] * cpu->r[instr.multiply.rs];
     if (instr.multiply.a) {
-        cpu7_internal_cycle(cpu);
         res += cpu->r[instr.multiply.rn];
     }
     cpu->r[instr.multiply.rd] = res;
@@ -414,13 +406,6 @@ void exec_arm4_multiply(Arm7TDMI* cpu, Arm4Instr instr) {
 
 void exec_arm4_multiply_long(Arm7TDMI* cpu, Arm4Instr instr) {
     cpu7_fetch_instr(cpu);
-    cpu7_internal_cycle(cpu);
-    s32 op = cpu->r[instr.multiply_long.rs];
-    for (int i = 1; i <= 4; i++) {
-        cpu7_internal_cycle(cpu);
-        op >>= 8;
-        if (op == 0 || (op == -1 && instr.multiply_long.u)) break;
-    }
     u64 res;
     if (instr.multiply_long.u) {
         s64 sres;
@@ -431,7 +416,6 @@ void exec_arm4_multiply_long(Arm7TDMI* cpu, Arm4Instr instr) {
         res = (u64) cpu->r[instr.multiply_long.rm] * (u64) cpu->r[instr.multiply_long.rs];
     }
     if (instr.multiply_long.a) {
-        cpu7_internal_cycle(cpu);
         res +=
             (u64) cpu->r[instr.multiply_long.rdlo] | ((u64) cpu->r[instr.multiply_long.rdhi] << 32);
     }
@@ -448,12 +432,10 @@ void exec_arm4_swap(Arm7TDMI* cpu, Arm4Instr instr) {
     cpu7_fetch_instr(cpu);
     if (instr.swap.b) {
         u8 data = cpu7_read8(cpu, addr, false);
-        cpu7_internal_cycle(cpu);
         cpu7_write8(cpu, addr, cpu->r[instr.swap.rm]);
         cpu->r[instr.swap.rd] = data;
     } else {
         u32 data = cpu7_read32(cpu, addr);
-        cpu7_internal_cycle(cpu);
         cpu7_write32(cpu, addr, cpu->r[instr.swap.rm]);
         cpu->r[instr.swap.rd] = data;
     }
@@ -490,7 +472,6 @@ void exec_arm4_half_trans(Arm7TDMI* cpu, Arm4Instr instr) {
             } else {
                 cpu->r[instr.half_trans.rd] = cpu7_read8(cpu, addr, true);
             }
-            cpu7_internal_cycle(cpu);
             if (instr.half_trans.rd == 15) cpu7_flush(cpu);
         }
     } else if (instr.half_trans.h) {
@@ -499,7 +480,6 @@ void exec_arm4_half_trans(Arm7TDMI* cpu, Arm4Instr instr) {
                 cpu->r[instr.half_trans.rn] = wback;
             }
             cpu->r[instr.half_trans.rd] = cpu7_read16(cpu, addr, false);
-            cpu7_internal_cycle(cpu);
             if (instr.half_trans.rd == 15) cpu7_flush(cpu);
         } else {
             cpu7_write16(cpu, addr, cpu->r[instr.half_trans.rd]);
@@ -536,7 +516,6 @@ void exec_arm4_single_trans(Arm7TDMI* cpu, Arm4Instr instr) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
             cpu->r[instr.single_trans.rd] = cpu7_read8(cpu, addr, false);
-            cpu7_internal_cycle(cpu);
             if (instr.single_trans.rd == 15) cpu7_flush(cpu);
         } else {
             cpu7_write8(cpu, addr, cpu->r[instr.single_trans.rd]);
@@ -550,7 +529,6 @@ void exec_arm4_single_trans(Arm7TDMI* cpu, Arm4Instr instr) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
             cpu->r[instr.single_trans.rd] = cpu7_read32(cpu, addr);
-            cpu7_internal_cycle(cpu);
             if (instr.single_trans.rd == 15) cpu7_flush(cpu);
         } else {
             cpu7_write32(cpu, addr, cpu->r[instr.single_trans.rd]);
@@ -611,7 +589,6 @@ void exec_arm4_block_trans(Arm7TDMI* cpu, Arm4Instr instr) {
             for (int i = 0; i < rcount; i++) {
                 *get_user_reg7(cpu, rlist[i]) = cpu7_read32m(cpu, addr, i);
             }
-            cpu7_internal_cycle(cpu);
         } else {
             for (int i = 0; i < rcount; i++) {
                 cpu7_write32m(cpu, addr, i, *get_user_reg7(cpu, rlist[i]));
@@ -624,7 +601,6 @@ void exec_arm4_block_trans(Arm7TDMI* cpu, Arm4Instr instr) {
             for (int i = 0; i < rcount; i++) {
                 cpu->r[rlist[i]] = cpu7_read32m(cpu, addr, i);
             }
-            cpu7_internal_cycle(cpu);
             if ((instr.block_trans.rlist & (1 << 15)) || !instr.block_trans.rlist) {
                 if (instr.block_trans.s) {
                     CpuMode mode = cpu->cpsr.m;
@@ -734,6 +710,12 @@ void arm4_disassemble(Arm4Instr instr, u32 addr, FILE* out) {
             if (!instr.single_trans.u) offset = -offset;
             fprintf(out, "0x%x", addr + 8 + offset);
             fprintf(out, "]%s", instr.single_trans.w ? "!" : "");
+        } else if (instr.single_trans.rn == 13 && instr.single_trans.offset == 4 &&
+                   (!instr.single_trans.p || instr.single_trans.w) && !instr.single_trans.b &&
+                   !instr.single_trans.i && instr.single_trans.l == instr.single_trans.u &&
+                   instr.single_trans.u != instr.single_trans.p) {
+            fprintf(out, "%s%s %s", instr.single_trans.l ? "pop" : "push", cond,
+                    reg_names[instr.single_trans.rd]);
         } else {
             fprintf(out, "%s%s%s %s, [%s", instr.single_trans.l ? "ldr" : "str",
                     instr.single_trans.b ? "b" : "", cond, reg_names[instr.single_trans.rd],

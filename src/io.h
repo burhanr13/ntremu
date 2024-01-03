@@ -81,14 +81,26 @@ enum {
     KEYCNT = 0x132,
     EXTKEYIN = 0x136,
 
-    // ipc
+    // ipc control
     IPCSYNC = 0x180,
     IPCFIFOCNT = 0x184,
     IPCFIFOSEND = 0x188,
     IPCFIFORECV = 0x100000,
 
+    // card control
+    AUXSPICNT = 0x1a0,
+    AUXSPIDATA = 0x1a2,
+    ROMCTRL = 0x1a4,
+    ROMCOMMAND = 0x1a8,
+    SEED0LO = 0x1b0,
+    SEED1LO = 0x1b4,
+    SEED0HI = 0x1b8,
+    SEED1HI = 0x1ba,
+    GAMECARDIN = 0x100010,
+
     // system/interrupt control
     EXMEMCNT = 0x204,
+    EXMEMSTAT = 0x204,
     IME = 0x208,
     IE = 0x210,
     IF = 0x214,
@@ -381,22 +393,58 @@ typedef struct _IO {
                 };
             } ipcfifocnt;
             u32 ipcfifosend;
-            u8 gap19x[EXMEMCNT - IPCFIFOSEND - 4];
+            u8 gap19x[AUXSPICNT - IPCFIFOSEND - 4];
+            union {
+                u16 h;
+                struct {
+                    u16 rate : 2;
+                    u16 unused : 4;
+                    u16 hold : 1;
+                    u16 busy : 1;
+                    u16 unused1 : 5;
+                    u16 mode : 1;
+                    u16 irq : 1;
+                    u16 enable : 1;
+                };
+            } auxspicnt;
+            u16 auxspidata;
             union {
                 u32 w;
                 struct {
-                    u32 sram : 2;
-                    u32 rom0 : 2;
-                    u32 rom0s : 1;
-                    u32 rom1 : 2;
-                    u32 rom1s : 1;
-                    u32 rom2 : 2;
-                    u32 rom2s : 1;
+                    u32 key1gap1 : 13;
+                    u32 key2data : 1;
+                    u32 se : 1;
+                    u32 key2seed : 1;
+                    u32 key1gap2 : 6;
+                    u32 key2cmd : 1;
+                    u32 drq : 1;
+                    u32 blocksize : 3;
+                    u32 clkrate : 1;
+                    u32 key1clk : 1;
+                    u32 resb : 1;
+                    u32 wr : 1;
+                    u32 busy : 1;
+                };
+            } romctrl;
+            u8 romcommand[8];
+            u32 seed0lo;
+            u32 seed1lo;
+            u16 seed0hi;
+            u16 seed1hi;
+            u8 gap1dx[EXMEMCNT - SEED1HI - 2];
+            union {
+                u32 w;
+                struct {
+                    u32 gbasramtime : 2;
+                    u32 gbaromtime : 2;
+                    u32 gbaromstime : 1;
                     u32 phi : 2;
-                    u32 unused : 1;
-                    u32 prefetch : 1;
-                    u32 gamepaktype : 1;
-                    u32 unused1 : 16;
+                    u32 gbacartrights : 1;
+                    u32 unused : 3;
+                    u32 ndscardrights : 1;
+                    u32 unused1 : 3;
+                    u32 ramprio : 1;
+                    u32 unused2 : 16;
                 };
             } exmemcnt;
             u32 ime;
