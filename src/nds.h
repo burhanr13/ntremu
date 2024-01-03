@@ -8,6 +8,7 @@
 #include "io.h"
 #include "ppu.h"
 #include "scheduler.h"
+#include "timer.h"
 
 #define RAMSIZE (1 << 22)
 
@@ -52,8 +53,11 @@ typedef struct _NDS {
 
     Arm7TDMI cpu7;
     DMAController dma7;
+    TimerController tmc7;
+
     Arm946E cpu9;
     DMAController dma9;
+    TimerController tmc9;
 
     PPU ppuA;
     PPU ppuB;

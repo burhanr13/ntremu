@@ -4,6 +4,7 @@
 
 #include "nds.h"
 #include "ppu.h"
+#include "timer.h"
 
 void run_scheduler(Scheduler* sched, int cycles) {
     u64 end_time = sched->now + cycles;
@@ -28,6 +29,10 @@ void run_next_event(Scheduler* sched) {
         lcd_hdraw(sched->master);
     } else if (e.type == EVENT_LCD_HBLANK) {
         lcd_hblank(sched->master);
+    } else if(e.type < EVENT_TM09_RELOAD) {
+        reload_timer(&sched->master->tmc7, e.type - EVENT_TM07_RELOAD);
+    } else if (e.type < EVENT_MAX) {
+        reload_timer(&sched->master->tmc9, e.type - EVENT_TM09_RELOAD);
     }
 
     if (run_time > sched->now) sched->now = run_time;
@@ -62,7 +67,10 @@ void remove_event(Scheduler* sched, EventType t) {
 }
 
 void print_scheduled_events(Scheduler* sched) {
-    static char* event_names[EVENT_MAX] = {"LCD HDraw", "LCD HBlank"};
+    static char* event_names[EVENT_MAX] = {
+        "LCD HDraw",    "LCD HBlank",   "TM0-7 Reload", "TM1-7 Reload", "TM2-7 Reload",
+        "TM3-7 Reload", "TM0-9 Reload", "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload",
+    };
 
     printf("Now: %ld\n", sched->now);
     for (int i = 0; i < sched->n_events; i++) {
