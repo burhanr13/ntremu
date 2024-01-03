@@ -55,6 +55,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
 
     nds->io7.wramstat = 3;
     nds->io9.wramcnt = 3;
+    nds->io7.postflg = 1;
+    nds->io9.postflg = 1;
 
     CardHeader* header = (CardHeader*) card->rom;
 
@@ -63,7 +65,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     memcpy(&nds->ram[header->arm9_ram_offset & 0xffffff], &card->rom[header->arm9_rom_offset],
            header->arm9_size);
     nds->cpu9.itcm_virtsize = 0x2000000;
-    nds->cpu9.dtcm_base = 0x27c0000;
+    nds->cpu9.dtcm_base = 0x3000000;
     nds->cpu9.dtcm_virtsize = DTCMSIZE;
     nds->cpu9.pc = header->arm9_entry;
     nds->cpu9.cpsr.m = M_SYSTEM;
@@ -98,6 +100,7 @@ bool nds_step(NDS* nds) {
             nds->sched.now += 5;
         }
     } else {
+        //print_cur_instr9(&nds->cpu9);
         if (cpu9_step(&nds->cpu9)) {
             nds->sched.now += 1;
         } else {

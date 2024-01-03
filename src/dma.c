@@ -98,7 +98,7 @@ void dma9_enable(DMAController* dmac, int i) {
 
     if (dmac->master->io9.dma[i].cnt.mode == DMA9_IMM) {
         dma9_run(dmac, i);
-    } else printf("dma %d\n", dmac->master->io9.dma[i].cnt.mode);
+    }
 }
 
 void dma9_activate(DMAController* dmac, int i) {
