@@ -2,12 +2,13 @@
 
 #include <string.h>
 
+#include "bus7.h"
 #include "ppu.h"
 
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     memset(nds, 0, sizeof *nds);
     nds->sched.master = nds;
-    
+
     nds->cpu7.master = nds;
     nds->dma7.master = nds;
     nds->tmc7.master = nds;
@@ -87,8 +88,10 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     cpu9_flush(&nds->cpu9);
 
     if (header->arm7_ram_offset >> 24 == 3) {
-        memcpy(&nds->wram7[header->arm7_ram_offset % WRAM7SIZE],
-               &card->rom[header->arm7_rom_offset], header->arm7_size);
+        for (int i = 0; i < header->arm7_size;i+=4){
+            bus7_write32(nds, header->arm7_ram_offset + i,
+                         *(u32*) &card->rom[header->arm7_rom_offset + i]);
+        }
     } else {
         memcpy(&nds->ram[header->arm7_ram_offset % RAMSIZE], &card->rom[header->arm7_rom_offset],
                header->arm7_size);
@@ -115,7 +118,7 @@ bool nds_step(NDS* nds) {
             nds->sched.now += 5;
         }
     } else {
-        //print_cur_instr9(&nds->cpu9);
+        // print_cur_instr9(&nds->cpu9);
         if (cpu9_step(&nds->cpu9)) {
             nds->sched.now += 1;
         } else {
