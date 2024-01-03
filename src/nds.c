@@ -7,10 +7,18 @@
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     memset(nds, 0, sizeof *nds);
     nds->sched.master = nds;
+    
     nds->cpu7.master = nds;
     nds->dma7.master = nds;
+    nds->tmc7.master = nds;
+    nds->tmc7.io = &nds->io7;
+    nds->tmc7.tm0_event = EVENT_TM07_RELOAD;
+
     nds->cpu9.master = nds;
     nds->dma9.master = nds;
+    nds->tmc9.master = nds;
+    nds->tmc9.io = &nds->io9;
+    nds->tmc9.tm0_event = EVENT_TM09_RELOAD;
 
     nds->ppuA.master = nds;
     nds->ppuA.io = &nds->io9.ppuA;
@@ -57,6 +65,13 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     nds->io9.wramcnt = 3;
     nds->io7.postflg = 1;
     nds->io9.postflg = 1;
+
+    *(u32*) &nds->ram[0x3ff800] = 0x00001fc2;
+    *(u32*) &nds->ram[0x3ff804] = 0x00001fc2;
+    *(u32*) &nds->ram[0x3ffc00] = 0x00001fc2;
+    *(u32*) &nds->ram[0x3ffc04] = 0x00001fc2;
+    *(u16*) &nds->ram[0x3ff850] = 0x5835;
+    *(u16*) &nds->ram[0x3ffc10] = 0x5835;
 
     CardHeader* header = (CardHeader*) card->rom;
 

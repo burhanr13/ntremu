@@ -44,7 +44,19 @@ u16 io7_read16(IO* io, u32 addr) {
         }
         return 0;
     }
-    return io->h[addr >> 1];
+    switch (addr) {
+        case TM0CNT:
+        case TM1CNT:
+        case TM2CNT:
+        case TM3CNT: {
+            int i = (addr - TM0CNT) / (TM1CNT - TM0CNT);
+            update_timer_count(&io->master->tmc7, i);
+            return io->master->tmc7.counter[i];
+            break;
+        }
+        default:
+            return io->h[addr >> 1];
+    }
 }
 
 void io7_write16(IO* io, u32 addr, u16 data) {
@@ -82,6 +94,17 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             io->dma[i].cnt.mode &= 6;
             if (io->dma[i].cnt.enable) dma7_enable(&io->master->dma7, i);
             break;
+        case TM0CNT + 2:
+        case TM1CNT + 2:
+        case TM2CNT + 2:
+        case TM3CNT + 2: {
+            io->h[addr >> 1] = data;
+            int i = (addr - TM0CNT - 2) / (TM1CNT - TM0CNT);
+            if (i == 0) io->tm[0].cnt.countup = 0;
+            update_timer_count(&io->master->tmc7, i);
+            update_timer_reload(&io->master->tmc7, i);
+            break;
+        }
         case KEYINPUT:
             break;
         case IPCSYNC:
@@ -192,6 +215,10 @@ u32 io7_read32(IO* io, u32 addr) {
             } else {
                 io->romctrl.drq = 0;
                 io->romctrl.busy = 0;
+                if (io->auxspicnt.irq) {
+                    io->ifl.gamecardtrans = 1;
+                    io->master->cpu7.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+                }
             }
             return data;
         }
@@ -388,7 +415,19 @@ u16 io9_read16(IO* io, u32 addr) {
         }
         return 0;
     }
-    return io->h[addr >> 1];
+    switch (addr) {
+        case TM0CNT:
+        case TM1CNT:
+        case TM2CNT:
+        case TM3CNT: {
+            int i = (addr - TM0CNT) / (TM1CNT - TM0CNT);
+            update_timer_count(&io->master->tmc9, i);
+            return io->master->tmc9.counter[i];
+            break;
+        }
+        default:
+            return io->h[addr >> 1];
+    }
 }
 
 void io9_write16(IO* io, u32 addr, u16 data) {
@@ -472,6 +511,17 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             int i = (addr - DMA0CNT - 2) / (DMA1CNT - DMA0CNT);
             if (io->dma[i].cnt.enable) dma9_enable(&io->master->dma9, i);
             break;
+        case TM0CNT + 2:
+        case TM1CNT + 2:
+        case TM2CNT + 2:
+        case TM3CNT + 2: {
+            io->h[addr >> 1] = data;
+            int i = (addr - TM0CNT - 2) / (TM1CNT - TM0CNT);
+            if (i == 0) io->tm[0].cnt.countup = 0;
+            update_timer_count(&io->master->tmc9, i);
+            update_timer_reload(&io->master->tmc9, i);
+            break;
+        }
         case KEYINPUT:
             break;
         case IPCSYNC:
@@ -581,6 +631,10 @@ u32 io9_read32(IO* io, u32 addr) {
             } else {
                 io->romctrl.drq = 0;
                 io->romctrl.busy = 0;
+                if (io->auxspicnt.irq) {
+                    io->ifl.gamecardtrans = 1;
+                    io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+                }
             }
             return data;
         }
