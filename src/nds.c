@@ -88,7 +88,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     cpu9_flush(&nds->cpu9);
 
     if (header->arm7_ram_offset >> 24 == 3) {
-        for (int i = 0; i < header->arm7_size;i+=4){
+        for (int i = 0; i < header->arm7_size; i += 4) {
             bus7_write32(nds, header->arm7_ram_offset + i,
                          *(u32*) &card->rom[header->arm7_rom_offset + i]);
         }
@@ -118,9 +118,9 @@ bool nds_step(NDS* nds) {
             nds->sched.now += 5;
         }
     } else {
-        // print_cur_instr9(&nds->cpu9);
         if (cpu9_step(&nds->cpu9)) {
-            nds->sched.now += 1;
+            nds->half_tick = !nds->half_tick;
+            if (nds->half_tick) nds->sched.now += 1;
         } else {
             nds->sched.now = nds->sched.event_queue[0].time;
         }
