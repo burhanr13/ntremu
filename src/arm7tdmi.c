@@ -159,8 +159,6 @@ u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr) {
     return bus7_read32(cpu->master, addr & ~3);
 }
 
-void cpu7_internal_cycle(Arm7TDMI* cpu) {}
-
 void print_cpu7_state(Arm7TDMI* cpu) {
     static char* reg_names[16] = {"r0", "r1", "r2",  "r3",  "r4", "r5", "r6", "r7",
                                   "r8", "r9", "r10", "r11", "ip", "sp", "lr", "pc"};

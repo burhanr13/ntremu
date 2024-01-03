@@ -5,8 +5,8 @@
 #include "arm_common.h"
 #include "types.h"
 
-#define ITCMSIZE (1<<15)
-#define DTCMSIZE (1<<14)
+#define ITCMSIZE (1 << 15)
+#define DTCMSIZE (1 << 14)
 
 typedef struct _NDS NDS;
 
@@ -81,8 +81,6 @@ void cpu9_write32m(Arm946E* cpu, u32 addr, int i, u32 w);
 
 u16 cpu9_fetch16(Arm946E* cpu, u32 addr);
 u32 cpu9_fetch32(Arm946E* cpu, u32 addr);
-
-void cpu9_internal_cycle(Arm946E* cpu);
 
 u32 cp15_read(Arm946E* cpu, u32 cn, u32 cm, u32 cp);
 void cp15_write(Arm946E* cpu, u32 cn, u32 cm, u32 cp, u32 data);

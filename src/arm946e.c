@@ -187,7 +187,6 @@ u32 cpu9_fetch32(Arm946E* cpu, u32 addr) {
     else return bus9_read32(cpu->master, addr & ~3);
 }
 
-void cpu9_internal_cycle(Arm946E* cpu) {}
 
 u32 cp15_read(Arm946E* cpu, u32 cn, u32 cm, u32 cp) {
     if (cn == 9 && cm == 1) {
