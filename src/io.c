@@ -55,7 +55,9 @@ u16 io7_read16(IO* io, u32 addr) {
             break;
         }
         case AUXSPIDATA:
-            return card_spi_read(io->master->card);
+            u8 data = io->master->card->spidata;
+            io->master->card->spidata = 0;
+            return data;
             break;
         default:
             return io->h[addr >> 1];
@@ -436,7 +438,9 @@ u16 io9_read16(IO* io, u32 addr) {
             break;
         }
         case AUXSPIDATA:
-            return card_spi_read(io->master->card);
+            u8 data = io->master->card->spidata;
+            io->master->card->spidata = 0;
+            return data;
             break;
         default:
             return io->h[addr >> 1];

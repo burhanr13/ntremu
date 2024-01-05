@@ -19,7 +19,7 @@ GameCard* create_card(char* filename) {
 
     card->eeprom = calloc(1 << 16, 1);
     card->eeprom_size = 1 << 16;
-    card->addr_bytes = 2;
+    card->addrtype = 2;
 
     return card;
 }
@@ -67,43 +67,41 @@ bool card_read_data(GameCard* card, u32* data) {
 }
 
 void card_spi_write(GameCard* card, u8 data, bool hold) {
+    //printf("%02x/", data);
     switch (card->spi_state) {
         case CARDSPI_IDLE:
             switch (data) {
-                case 0:
-                    card->spidata = card->eeprom[card->eeprom_addr++];
-                    break;
                 case 0x06:
-                    card->write_enable = true;
+                    card->eepromst.write_enable = true;
                     break;
                 case 0x04:
-                    card->write_enable = false;
+                    card->eepromst.write_enable = false;
                     break;
                 case 0x05:
                     card->spi_state = CARDSPI_STAT;
                     break;
                 case 0x03:
-                    card->eeprom_read = true;
-                    card->eeprom_addr = 0;
-                    card->addr_cur_bytes = 0;
+                    card->eepromst.read = true;
+                    card->eepromst.addr = 0;
+                    card->eepromst.i = 0;
                     card->spi_state = CARDSPI_ADDR;
                     break;
                 case 0x02:
-                    card->eeprom_read = false;
-                    card->eeprom_addr = 0;
-                    card->addr_cur_bytes = 0;
+                    card->eepromst.read = false;
+                    card->eepromst.addr = 0;
+                    card->eepromst.i = 0;
                     card->spi_state = CARDSPI_ADDR;
                     break;
                 case 0x0b:
-                    card->eeprom_read = true;
-                    card->eeprom_addr = (card->addr_bytes == 1) ? 1 : 0;
-                    card->addr_cur_bytes = 0;
+                    card->eepromst.read = true;
+                    card->eepromst.addr = (card->addrtype == 1) ? 1 : 0;
+                    card->eepromst.i = 0;
                     card->spi_state = CARDSPI_ADDR;
                     break;
                 case 0x0a:
-                    card->eeprom_read = false;
-                    card->eeprom_addr = (card->addr_bytes == 1) ? 1 : 0;
-                    card->addr_cur_bytes = 0;
+                    card->eepromst.read = false;
+                    card->eepromst.addr = (card->addrtype == 1) ? 1 : 0;
+                    card->eepromst.i = 0;
                     card->spi_state = CARDSPI_ADDR;
                     break;
                 case 0x9f:
@@ -112,30 +110,29 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
             }
             break;
         case CARDSPI_ADDR:
-            card->eeprom_addr <<= 8;
-            card->eeprom_addr |= data;
-            if (++card->addr_cur_bytes == card->addr_bytes) {
-                card->spi_state = card->eeprom_read ? CARDSPI_READ : CARDSPI_WRITE;
+            card->eepromst.addr <<= 8;
+            card->eepromst.addr |= data;
+            if (++card->eepromst.i == card->addrtype) {
+                card->eepromst.i = 0;
+                card->spi_state = card->eepromst.read ? CARDSPI_READ : CARDSPI_WRITE;
             }
             break;
         case CARDSPI_READ:
-            card->spidata = card->eeprom[card->eeprom_addr++];
+            card->spidata = card->eeprom[card->eepromst.addr++];
             break;
         case CARDSPI_WRITE:
-            card->eeprom[card->eeprom_addr++] = data;
+            card->eeprom[card->eepromst.addr++] = data;
             break;
         case CARDSPI_STAT:
-            card->spidata = card->write_enable ? 2 : 0;
+            card->spidata = card->eepromst.write_enable ? 2 : 0;
             break;
         case CARDSPI_ID:
             card->spidata = 0xff;
             break;
     }
+    //printf("%02x ", card->spidata);
     if (!hold) {
         card->spi_state = CARDSPI_IDLE;
+        //printf("\n");
     }
-}
-
-u8 card_spi_read(GameCard* card) {
-    return card->spidata;
 }
