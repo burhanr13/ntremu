@@ -54,6 +54,9 @@ u16 io7_read16(IO* io, u32 addr) {
             return io->master->tmc7.counter[i];
             break;
         }
+        case AUXSPIDATA:
+            return card_spi_read(io->master->card);
+            break;
         default:
             return io->h[addr >> 1];
     }
@@ -147,6 +150,13 @@ void io7_write16(IO* io, u32 addr, u16 data) {
         case IPCFIFOSEND + 2:
             io->h[addr >> 1] = data;
             io7_write32(io, addr & ~3, io->ipcfifosend);
+            break;
+        case AUXSPICNT:
+            io->auxspicnt.h = data;
+            io->auxspicnt.busy = 0;
+            break;
+        case AUXSPIDATA:
+            card_spi_write(io->master->card, data, io->auxspicnt.hold);
             break;
         case ROMCTRL + 2:
             io->h[addr >> 1] &= 0x8080;
@@ -425,6 +435,9 @@ u16 io9_read16(IO* io, u32 addr) {
             return io->master->tmc9.counter[i];
             break;
         }
+        case AUXSPIDATA:
+            return card_spi_read(io->master->card);
+            break;
         default:
             return io->h[addr >> 1];
     }
@@ -564,6 +577,13 @@ void io9_write16(IO* io, u32 addr, u16 data) {
         case IPCFIFOSEND + 2:
             io->h[addr >> 1] = data;
             io9_write32(io, addr & ~3, io->ipcfifosend);
+            break;
+        case AUXSPICNT:
+            io->auxspicnt.h = data;
+            io->auxspicnt.busy = 0;
+            break;
+        case AUXSPIDATA:
+            card_spi_write(io->master->card, data, io->auxspicnt.hold);
             break;
         case ROMCTRL + 2:
             io->h[addr >> 1] &= 0x8080;

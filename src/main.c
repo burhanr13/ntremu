@@ -1,5 +1,4 @@
 #include <SDL2/SDL.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -96,7 +95,8 @@ int main(int argc, char** argv) {
             int pitch;
             SDL_LockTexture(texture, NULL, &pixels, &pitch);
             memcpy(pixels, ntremu.nds->ppuA.screen, sizeof ntremu.nds->ppuA.screen);
-            memcpy(pixels + sizeof ntremu.nds->ppuA.screen, ntremu.nds->ppuB.screen, sizeof ntremu.nds->ppuB.screen);
+            memcpy(pixels + sizeof ntremu.nds->ppuA.screen, ntremu.nds->ppuB.screen,
+                   sizeof ntremu.nds->ppuB.screen);
             SDL_UnlockTexture(texture);
 
             int windowW, windowH;
@@ -118,9 +118,9 @@ int main(int argc, char** argv) {
             cur_time = SDL_GetPerformanceCounter();
             elapsed = cur_time - prev_time;
             Sint64 wait = frame_ticks - elapsed;
-
-            if (wait > 0 && !ntremu.uncap) {
-                SDL_Delay(wait * 1000 / SDL_GetPerformanceFrequency());
+            Sint64 waitMS = wait * 1000 / (Sint64) SDL_GetPerformanceFrequency();
+            if (waitMS > 1 && !ntremu.uncap) {
+                SDL_Delay(waitMS - 1);
             }
             cur_time = SDL_GetPerformanceCounter();
             elapsed = cur_time - prev_fps_update;
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
             }
             prev_time = cur_time;
 
-            if(ntremu.frame_adv) {
+            if (ntremu.frame_adv) {
                 ntremu.running = false;
                 ntremu.frame_adv = false;
             }
