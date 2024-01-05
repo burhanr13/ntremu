@@ -49,6 +49,14 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     nds->vrambanks[8] = nds->vramI;
 
     nds->card = card;
+    card->state = 0;
+    card->addr = 0;
+    card->i = 0;
+    card->len = 0;
+    card->spi_state = 0;
+    card->spidata = 0;
+    memset(&card->eepromst, 0, sizeof card->eepromst);
+
     nds->bios7 = bios7;
     nds->bios9 = bios9;
     nds->firmware = firmware;

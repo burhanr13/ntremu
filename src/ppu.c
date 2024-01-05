@@ -168,6 +168,10 @@ void render_bg_line_aff(PPU* ppu, int bg) {
     }
 }
 
+void render_bg_line_aff_ext(PPU* ppu, int bg) {
+    render_bg_line_text(ppu, bg);
+}
+
 void render_bgs(PPU* ppu) {
     int mode = ppu->io->dispcnt.bg_mode;
     if (mode != 6) {
@@ -188,11 +192,15 @@ void render_bgs(PPU* ppu) {
                 break;
             case 3:
                 render_bg_line_text(ppu, 2);
+                render_bg_line_aff_ext(ppu, 3);
                 break;
             case 4:
                 render_bg_line_aff(ppu, 2);
+                render_bg_line_aff_ext(ppu, 3);
                 break;
             case 5:
+                render_bg_line_aff_ext(ppu, 2);
+                render_bg_line_aff_ext(ppu, 3);
                 break;
         }
     }

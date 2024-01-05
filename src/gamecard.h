@@ -48,16 +48,18 @@ typedef struct {
 
     u8* eeprom;
     u32 eeprom_size;
-    int addr_bytes;
+    int addrtype;
 
     CardSPIState spi_state;
-    u32 eeprom_addr;
-    int addr_cur_bytes;
-    bool write_enable;
-    bool size_detected;
-    bool eeprom_read;
-
     u8 spidata;
+
+    struct {
+        u32 addr;
+        int i;
+        bool write_enable;
+        bool read;
+        bool size_detected;
+    } eepromst;
 
 } GameCard;
 
@@ -68,6 +70,5 @@ bool card_write_command(GameCard* card, u8* command);
 bool card_read_data(GameCard* card, u32* data);
 
 void card_spi_write(GameCard* card, u8 data, bool hold);
-u8 card_spi_read(GameCard* card);
 
 #endif
