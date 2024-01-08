@@ -22,6 +22,7 @@ const char* help = "Debugger commands:\n"
                    "i -- cpu state info\n"
                    "e -- scheduler events info\n"
                    "r<b/h/w> <addr> -- read from memory\n"
+                   "w<b/h/w> <addr> <data> -- write to memory\n"
                    "l -- show code\n"
                    "r -- reset\n"
                    "q -- quit debugger\n"
@@ -120,59 +121,102 @@ void debugger_run() {
                         break;
                 }
                 break;
-            case 'r':
+            case 'r': {
+                if (com[1] == 'e' || com[1] == '\0') {
+                    printf("Reset emulation? ");
+                    char ans[5];
+                    fgets(ans, 5, stdin);
+                    if (ans[0] == 'y') {
+                        init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
+                                 ntremu.firmware);
+                        return;
+                    }
+                    break;
+                }
+                u32 addr;
+                if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
+                    printf("Invalid address\n");
+                    break;
+                }
                 switch (com[1]) {
-                    case 'b': {
-                        u32 addr;
-                        if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
-                            printf("Invalid address\n");
+                    case 'b':
+                    case '8':
+                        if (ntremu.nds->cur_cpu) {
+                            printf("[%08x] = 0x%02x\n", addr, bus7_read8(ntremu.nds, addr));
                         } else {
-                            if (ntremu.nds->cur_cpu) {
-                                printf("[%08x] = 0x%02x\n", addr, bus7_read8(ntremu.nds, addr));
-                            } else {
-                                printf("[%08x] = 0x%02x\n", addr, bus9_read8(ntremu.nds, addr));
-                            }
+                            printf("[%08x] = 0x%02x\n", addr, bus9_read8(ntremu.nds, addr));
                         }
                         break;
-                    }
-                    case 'h': {
-                        u32 addr;
-                        if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
-                            printf("Invalid address\n");
+                    case 'h':
+                    case '1':
+                        if (ntremu.nds->cur_cpu) {
+                            printf("[%08x] = 0x%04x\n", addr, bus7_read16(ntremu.nds, addr));
                         } else {
-                            if (ntremu.nds->cur_cpu) {
-                                printf("[%08x] = 0x%04x\n", addr, bus7_read16(ntremu.nds, addr));
-                            } else {
-                                printf("[%08x] = 0x%04x\n", addr, bus9_read16(ntremu.nds, addr));
-                            }
+                            printf("[%08x] = 0x%04x\n", addr, bus9_read16(ntremu.nds, addr));
                         }
                         break;
-                    }
-                    case 'w': {
-                        u32 addr;
-                        if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
-                            printf("Invalid address\n");
+                    case 'w':
+                    case '3':
+                        if (ntremu.nds->cur_cpu) {
+                            printf("[%08x] = 0x%08x\n", addr, bus7_read32(ntremu.nds, addr));
                         } else {
-                            if (ntremu.nds->cur_cpu) {
-                                printf("[%08x] = 0x%08x\n", addr, bus7_read32(ntremu.nds, addr));
-                            } else {
-                                printf("[%08x] = 0x%08x\n", addr, bus9_read32(ntremu.nds, addr));
-                            }
+                            printf("[%08x] = 0x%08x\n", addr, bus9_read32(ntremu.nds, addr));
                         }
                         break;
-                    }
                     default:
-                        printf("Reset emulation? ");
-                        char ans[5];
-                        fgets(ans, 5, stdin);
-                        if (ans[0] == 'y') {
-                            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
-                                     ntremu.firmware);
-                            return;
-                        }
+                        printf("Invalid read command.\n");
                         break;
                 }
                 break;
+            }
+            case 'w': {
+                u32 addr;
+                if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
+                    printf("Invalid address\n");
+                    break;
+                }
+                u32 data;
+                if (read_num(strtok(NULL, " \t\n"), &data) < 0) {
+                    printf("Invalid data\n");
+                    break;
+                }
+                switch (com[1]) {
+                    case 'b':
+                    case '8':
+                        if (ntremu.nds->cur_cpu) {
+                            bus7_write8(ntremu.nds, addr, data);
+                            printf("[%08x] = 0x%02x\n", addr, bus7_read8(ntremu.nds, addr));
+                        } else {
+                            bus9_write8(ntremu.nds, addr, data);
+                            printf("[%08x] = 0x%02x\n", addr, bus9_read8(ntremu.nds, addr));
+                        }
+                        break;
+                    case 'h':
+                    case '1':
+                        if (ntremu.nds->cur_cpu) {
+                            bus7_write16(ntremu.nds, addr, data);
+                            printf("[%08x] = 0x%04x\n", addr, bus7_read16(ntremu.nds, addr));
+                        } else {
+                            bus9_write16(ntremu.nds, addr, data);
+                            printf("[%08x] = 0x%04x\n", addr, bus9_read16(ntremu.nds, addr));
+                        }
+                        break;
+                    case 'w':
+                    case '3':
+                        if (ntremu.nds->cur_cpu) {
+                            bus7_write32(ntremu.nds, addr, data);
+                            printf("[%08x] = 0x%08x\n", addr, bus7_read32(ntremu.nds, addr));
+                        } else {
+                            bus9_write32(ntremu.nds, addr, data);
+                            printf("[%08x] = 0x%08x\n", addr, bus9_read32(ntremu.nds, addr));
+                        }
+                        break;
+                    default:
+                        printf("Invalid write command.\n");
+                        break;
+                }
+                break;
+            }
             case 'e':
                 print_scheduled_events(&ntremu.nds->sched);
                 break;

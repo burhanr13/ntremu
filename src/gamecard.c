@@ -17,9 +17,9 @@ GameCard* create_card(char* filename) {
     fread(card->rom, 1, card->rom_size, fp);
     fclose(fp);
 
-    card->eeprom = calloc(1 << 16, 1);
+    card->eeprom = calloc(1 << 20, 1);
     card->eeprom_size = 1 << 16;
-    card->addrtype = 2;
+    card->addrtype = 3;
 
     return card;
 }
@@ -67,9 +67,9 @@ bool card_read_data(GameCard* card, u32* data) {
 }
 
 void card_spi_write(GameCard* card, u8 data, bool hold) {
-    //printf("%02x/", data);
-    switch (card->spi_state) {
-        case CARDSPI_IDLE:
+    // printf("%02x/", data);
+    switch (card->eeprom_state) {
+        case CARDEEPROM_IDLE:
             switch (data) {
                 case 0x06:
                     card->eepromst.write_enable = true;
@@ -78,61 +78,61 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
                     card->eepromst.write_enable = false;
                     break;
                 case 0x05:
-                    card->spi_state = CARDSPI_STAT;
+                    card->eeprom_state = CARDEEPROM_STAT;
                     break;
                 case 0x03:
                     card->eepromst.read = true;
                     card->eepromst.addr = 0;
                     card->eepromst.i = 0;
-                    card->spi_state = CARDSPI_ADDR;
+                    card->eeprom_state = CARDEEPROM_ADDR;
                     break;
                 case 0x02:
                     card->eepromst.read = false;
                     card->eepromst.addr = 0;
                     card->eepromst.i = 0;
-                    card->spi_state = CARDSPI_ADDR;
+                    card->eeprom_state = CARDEEPROM_ADDR;
                     break;
                 case 0x0b:
                     card->eepromst.read = true;
                     card->eepromst.addr = (card->addrtype == 1) ? 1 : 0;
                     card->eepromst.i = 0;
-                    card->spi_state = CARDSPI_ADDR;
+                    card->eeprom_state = CARDEEPROM_ADDR;
                     break;
                 case 0x0a:
                     card->eepromst.read = false;
                     card->eepromst.addr = (card->addrtype == 1) ? 1 : 0;
                     card->eepromst.i = 0;
-                    card->spi_state = CARDSPI_ADDR;
+                    card->eeprom_state = CARDEEPROM_ADDR;
                     break;
                 case 0x9f:
-                    card->spi_state = CARDSPI_ID;
+                    card->eeprom_state = CARDEEPROM_ID;
                     break;
             }
             break;
-        case CARDSPI_ADDR:
+        case CARDEEPROM_ADDR:
             card->eepromst.addr <<= 8;
             card->eepromst.addr |= data;
             if (++card->eepromst.i == card->addrtype) {
                 card->eepromst.i = 0;
-                card->spi_state = card->eepromst.read ? CARDSPI_READ : CARDSPI_WRITE;
+                card->eeprom_state = card->eepromst.read ? CARDEEPROM_READ : CARDEEPROM_WRITE;
             }
             break;
-        case CARDSPI_READ:
+        case CARDEEPROM_READ:
             card->spidata = card->eeprom[card->eepromst.addr++];
             break;
-        case CARDSPI_WRITE:
+        case CARDEEPROM_WRITE:
             card->eeprom[card->eepromst.addr++] = data;
             break;
-        case CARDSPI_STAT:
+        case CARDEEPROM_STAT:
             card->spidata = card->eepromst.write_enable ? 2 : 0;
             break;
-        case CARDSPI_ID:
+        case CARDEEPROM_ID:
             card->spidata = 0xff;
             break;
     }
-    //printf("%02x ", card->spidata);
+    // printf("%02x ", card->spidata);
     if (!hold) {
-        card->spi_state = CARDSPI_IDLE;
-        //printf("\n");
+        card->eeprom_state = CARDEEPROM_IDLE;
+        // printf("\n");
     }
 }

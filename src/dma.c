@@ -31,6 +31,7 @@ void dma7_enable(DMAController* dmac, int i) {
     if (dmac->master->io7.dma[i].cnt.mode == DMA7_IMM) {
         dma7_run(dmac, i);
     }
+
 }
 
 void dma7_activate(DMAController* dmac, int i) {
@@ -99,6 +100,7 @@ void dma9_enable(DMAController* dmac, int i) {
     if (dmac->master->io9.dma[i].cnt.mode == DMA9_IMM) {
         dma9_run(dmac, i);
     }
+
 }
 
 void dma9_activate(DMAController* dmac, int i) {

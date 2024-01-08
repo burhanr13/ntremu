@@ -25,11 +25,13 @@ void run_next_event(Scheduler* sched) {
     u64 run_time = sched->now;
     sched->now = e.time;
 
-    if (e.type == EVENT_LCD_HDRAW) {
+    if (e.type == EVENT_DUMMY) {
+        add_event(sched, EVENT_DUMMY, sched->now + 32);
+    } else if (e.type == EVENT_LCD_HDRAW) {
         lcd_hdraw(sched->master);
     } else if (e.type == EVENT_LCD_HBLANK) {
         lcd_hblank(sched->master);
-    } else if(e.type < EVENT_TM09_RELOAD) {
+    } else if (e.type < EVENT_TM09_RELOAD) {
         reload_timer(&sched->master->tmc7, e.type - EVENT_TM07_RELOAD);
     } else if (e.type < EVENT_MAX) {
         reload_timer(&sched->master->tmc9, e.type - EVENT_TM09_RELOAD);

@@ -97,6 +97,8 @@ enum {
     SEED0HI = 0x1b8,
     SEED1HI = 0x1ba,
     GAMECARDIN = 0x100010,
+    SPICNT = 0x1c0,
+    SPIDATA = 0x1c2,
 
     // system/interrupt control
     EXMEMCNT = 0x204,
@@ -133,6 +135,10 @@ enum {
     POSTFLG = 0x300,
     HALTCNT = 0x301,
     POWCNT = 0x304,
+
+    // 3d control
+    GXFIFO = 0x400,
+    GXSTAT = 0x600,
 
     PPUB_OFF = 0x1000
 };
@@ -431,7 +437,23 @@ typedef struct _IO {
             u32 seed1lo;
             u16 seed0hi;
             u16 seed1hi;
-            u8 gap1dx[EXMEMCNT - SEED1HI - 2];
+            u32 unused_1bc;
+            union {
+                u16 h;
+                struct {
+                    u16 rate : 2;
+                    u16 unused : 5;
+                    u16 busy : 1;
+                    u16 dev : 2;
+                    u16 size : 1;
+                    u16 hold : 1;
+                    u16 unused2 : 2;
+                    u16 irq : 1;
+                    u16 enable : 1;
+                };
+            } spicnt;
+            u16 spidata;
+            u8 gap1dx[EXMEMCNT - SPIDATA - 2];
             union {
                 u32 w;
                 struct {
