@@ -28,13 +28,13 @@ typedef struct {
 
 typedef enum { CARD_IDLE, CARD_CHIPID, CARD_DATA } CardState;
 typedef enum {
-    CARDSPI_IDLE,
-    CARDSPI_ADDR,
-    CARDSPI_READ,
-    CARDSPI_WRITE,
-    CARDSPI_STAT,
-    CARDSPI_ID
-} CardSPIState;
+    CARDEEPROM_IDLE,
+    CARDEEPROM_ADDR,
+    CARDEEPROM_READ,
+    CARDEEPROM_WRITE,
+    CARDEEPROM_STAT,
+    CARDEEPROM_ID
+} CardEepromState;
 
 typedef struct {
     u8* rom;
@@ -50,7 +50,7 @@ typedef struct {
     u32 eeprom_size;
     int addrtype;
 
-    CardSPIState spi_state;
+    CardEepromState eeprom_state;
     u8 spidata;
 
     struct {

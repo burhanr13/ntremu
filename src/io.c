@@ -54,11 +54,12 @@ u16 io7_read16(IO* io, u32 addr) {
             return io->master->tmc7.counter[i];
             break;
         }
-        case AUXSPIDATA:
+        case AUXSPIDATA: {
             u8 data = io->master->card->spidata;
             io->master->card->spidata = 0;
             return data;
             break;
+        }
         default:
             return io->h[addr >> 1];
     }
@@ -167,6 +168,18 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             if (len == 0x100) len = 0;
             if (len == 0x8000) len = 4;
             io->master->card->len = len;
+            break;
+        case SPICNT:
+            io->spicnt.h = data;
+            io->spicnt.busy = 0;
+            break;
+        case SPIDATA:
+            switch(io->spicnt.dev) {
+                case 1:
+                    break;
+                case 2:
+                    break;
+            }
             break;
         case EXMEMCNT:
             io->exmemcnt.w &= 0xff80;
@@ -437,11 +450,12 @@ u16 io9_read16(IO* io, u32 addr) {
             return io->master->tmc9.counter[i];
             break;
         }
-        case AUXSPIDATA:
+        case AUXSPIDATA: {
             u8 data = io->master->card->spidata;
             io->master->card->spidata = 0;
             return data;
             break;
+        }
         default:
             return io->h[addr >> 1];
     }
@@ -477,8 +491,9 @@ void io9_write16(IO* io, u32 addr, u16 data) {
 
         if (op2 == 0) {
             io->div_result = (op1 < 0) ? 1 : -1;
+            if (!io->divcnt.mode) io->div_result ^= 0xffffffff00000000;
             io->divrem_result = op1;
-        } else if (op1 == (1UL << 63) && op2 == -1) {
+        } else if (op1 == (1l << 63) && op2 == -1) {
             io->div_result = op1;
             io->divrem_result = 0;
         } else {
@@ -613,6 +628,13 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             break;
         case IF + 2:
             io9_write32(io, addr & ~3, data << 16);
+            break;
+        case GXFIFO:
+            io->ifl.gxfifo = 1;
+            io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+            break;
+        case GXSTAT + 2:
+            io->h[addr >> 1] = data | 0x0600;
             break;
         default:
             io->h[addr >> 1] = data;

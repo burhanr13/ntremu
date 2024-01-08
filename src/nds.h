@@ -146,6 +146,7 @@ typedef struct _NDS {
     bool halt7;
 
     CPUType cur_cpu;
+    u64 last_event;
     bool half_tick;
     bool frame_complete;
 
