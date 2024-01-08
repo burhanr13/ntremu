@@ -19,7 +19,7 @@ GameCard* create_card(char* filename) {
 
     card->eeprom = calloc(1 << 20, 1);
     card->eeprom_size = 1 << 16;
-    card->addrtype = 3;
+    card->addrtype = 2;
 
     return card;
 }
