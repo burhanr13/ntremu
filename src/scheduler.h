@@ -4,7 +4,7 @@
 #include "types.h"
 
 typedef enum {
-    EVENT_DUMMY,
+    EVENT_FORCESYNC,
     EVENT_LCD_HDRAW,
     EVENT_LCD_HBLANK,
     EVENT_TM07_RELOAD,

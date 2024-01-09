@@ -108,8 +108,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     nds->cpu7.cpsr.m = M_SYSTEM;
     cpu7_flush(&nds->cpu7);
 
-    add_event(&nds->sched, EVENT_LCD_HDRAW, 0);
-    add_event(&nds->sched, EVENT_DUMMY, 1);
+    lcd_hdraw(nds);
+    add_event(&nds->sched, EVENT_FORCESYNC, 32);
 }
 
 bool nds_step(NDS* nds) {
@@ -135,10 +135,11 @@ bool nds_step(NDS* nds) {
         }
     }
     if (event_pending(&nds->sched)) {
-        run_next_event(&nds->sched);
-        nds->cpu7.irq = (nds->io7.ime & 1) && (nds->io7.ie.w & nds->io7.ifl.w);
-        nds->cpu9.irq = (nds->io9.ime & 1) && (nds->io9.ie.w & nds->io9.ifl.w);
         if (nds->cur_cpu) {
+            run_next_event(&nds->sched);
+            nds->cpu7.irq = (nds->io7.ime & 1) && (nds->io7.ie.w & nds->io7.ifl.w);
+            nds->cpu9.irq = (nds->io9.ime & 1) && (nds->io9.ie.w & nds->io9.ifl.w);
+
             nds->cur_cpu = CPU9;
             nds->last_event = nds->sched.now;
         } else {
