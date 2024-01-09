@@ -169,7 +169,7 @@ void render_bg_line_aff(PPU* ppu, int bg) {
 }
 
 void render_bg_line_aff_ext(PPU* ppu, int bg) {
-    render_bg_line_text(ppu, bg);
+    // render_bg_line_text(ppu, bg);
 }
 
 void render_bgs(PPU* ppu) {
