@@ -53,8 +53,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     card->addr = 0;
     card->i = 0;
     card->len = 0;
-    nds->firmflashst.state = 0;
-    nds->io7.spidata = 0;
+    nds->card->eeprom_state = 0;
+    nds->card->spidata = 0;
     memset(&nds->firmflashst, 0, sizeof nds->firmflashst);
 
     nds->bios7 = bios7;
