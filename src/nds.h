@@ -48,6 +48,15 @@ enum {
     R_GBASRAM
 };
 
+typedef enum {
+    FIRMFLASH_IDLE,
+    FIRMFLASH_ADDR,
+    FIRMFLASH_READ,
+    FIRMFLASH_WRITE,
+    FIRMFLASH_STAT,
+    FIRMFLASH_ID
+} firmflashstate;
+
 typedef struct _NDS {
     Scheduler sched;
 
@@ -136,6 +145,14 @@ typedef struct _NDS {
     u8* bios7;
     u8* bios9;
     u8* firmware;
+    struct {
+        firmflashstate state;
+        u32 addr;
+        int i;
+        bool write_enable;
+        bool read;
+    } firmflashst;
+
     GameCard* card;
 
     u32 ipcfifo7to9[16];
@@ -155,6 +172,8 @@ typedef struct _NDS {
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware);
 
 bool nds_step(NDS* nds);
+
+void firmware_spi_write(NDS* nds, u8 data, bool hold);
 
 u8 vram_read8(NDS* nds, VRAMRegion region, u32 addr);
 u16 vram_read16(NDS* nds, VRAMRegion region, u32 addr);

@@ -53,9 +53,9 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     card->addr = 0;
     card->i = 0;
     card->len = 0;
-    card->eeprom_state = 0;
-    card->spidata = 0;
-    memset(&card->eepromst, 0, sizeof card->eepromst);
+    nds->firmflashst.state = 0;
+    nds->io7.spidata = 0;
+    memset(&nds->firmflashst, 0, sizeof nds->firmflashst);
 
     nds->bios7 = bios7;
     nds->bios9 = bios9;
@@ -149,6 +149,74 @@ bool nds_step(NDS* nds) {
         return true;
     }
     return false;
+}
+
+void firmware_spi_write(NDS* nds, u8 data, bool hold) {
+    switch (nds->firmflashst.state) {
+        case FIRMFLASH_IDLE:
+            switch (data) {
+                case 0x06:
+                    nds->firmflashst.write_enable = true;
+                    break;
+                case 0x04:
+                    nds->firmflashst.write_enable = false;
+                    break;
+                case 0x05:
+                    nds->firmflashst.state = FIRMFLASH_STAT;
+                    break;
+                case 0x03:
+                    nds->firmflashst.read = true;
+                    nds->firmflashst.addr = 0;
+                    nds->firmflashst.i = 0;
+                    nds->firmflashst.state = FIRMFLASH_ADDR;
+                    break;
+                case 0x02:
+                    nds->firmflashst.read = false;
+                    nds->firmflashst.addr = 0;
+                    nds->firmflashst.i = 0;
+                    nds->firmflashst.state = FIRMFLASH_ADDR;
+                    break;
+                case 0x0b:
+                    nds->firmflashst.read = true;
+                    nds->firmflashst.addr = 0;
+                    nds->firmflashst.i = 0;
+                    nds->firmflashst.state = FIRMFLASH_ADDR;
+                    break;
+                case 0x0a:
+                    nds->firmflashst.read = false;
+                    nds->firmflashst.addr = 0;
+                    nds->firmflashst.i = 0;
+                    nds->firmflashst.state = FIRMFLASH_ADDR;
+                    break;
+                case 0x9f:
+                    nds->firmflashst.state = FIRMFLASH_ID;
+                    break;
+            }
+            break;
+        case FIRMFLASH_ADDR:
+            nds->firmflashst.addr <<= 8;
+            nds->firmflashst.addr |= data;
+            if (++nds->firmflashst.i == 3) {
+                nds->firmflashst.i = 0;
+                nds->firmflashst.state = nds->firmflashst.read ? FIRMFLASH_READ : FIRMFLASH_WRITE;
+            }
+            break;
+        case FIRMFLASH_READ:
+            nds->io7.spidata = nds->firmware[nds->firmflashst.addr++];
+            break;
+        case FIRMFLASH_WRITE:
+            nds->firmware[nds->firmflashst.addr++] = data;
+            break;
+        case FIRMFLASH_STAT:
+            nds->io7.spidata = nds->firmflashst.write_enable ? 2 : 0;
+            break;
+        case FIRMFLASH_ID:
+            nds->io7.spidata = 0xff;
+            break;
+    }
+    if (!hold) {
+        nds->firmflashst.state = FIRMFLASH_IDLE;
+    }
 }
 
 void* get_vram(NDS* nds, VRAMRegion region, u32 addr) {

@@ -67,7 +67,6 @@ bool card_read_data(GameCard* card, u32* data) {
 }
 
 void card_spi_write(GameCard* card, u8 data, bool hold) {
-    // printf("%02x/", data);
     switch (card->eeprom_state) {
         case CARDEEPROM_IDLE:
             switch (data) {
@@ -130,9 +129,7 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
             card->spidata = 0xff;
             break;
     }
-    // printf("%02x ", card->spidata);
     if (!hold) {
         card->eeprom_state = CARDEEPROM_IDLE;
-        // printf("\n");
     }
 }

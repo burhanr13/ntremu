@@ -60,6 +60,12 @@ u16 io7_read16(IO* io, u32 addr) {
             return data;
             break;
         }
+        case SPIDATA: {
+            u8 data = io->spidata;
+            io->spidata = 0;
+            return data;
+            break;
+        }
         default:
             return io->h[addr >> 1];
     }
@@ -174,8 +180,9 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             io->spicnt.busy = 0;
             break;
         case SPIDATA:
-            switch(io->spicnt.dev) {
+            switch (io->spicnt.dev) {
                 case 1:
+                    firmware_spi_write(io->master, data, io->spicnt.hold);
                     break;
                 case 2:
                     break;
