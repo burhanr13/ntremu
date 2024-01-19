@@ -114,6 +114,9 @@ int main(int argc, char** argv) {
             }
             update_input_keyboard(ntremu.nds);
             if (controller) update_input_controller(ntremu.nds, controller);
+            dst.h /= 2;
+            dst.y += dst.h;
+            update_input_touch(ntremu.nds, &dst);
 
             cur_time = SDL_GetPerformanceCounter();
             elapsed = cur_time - prev_time;

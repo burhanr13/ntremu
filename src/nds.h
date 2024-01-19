@@ -57,6 +57,17 @@ typedef enum {
     FIRMFLASH_ID
 } firmflashstate;
 
+typedef union {
+    u8 b;
+    struct {
+        u8 powerst : 2;
+        u8 refmode : 1;
+        u8 size : 1;
+        u8 channel : 3;
+        u8 start : 1;
+    };
+} TSCCom;
+
 typedef struct _NDS {
     Scheduler sched;
 
@@ -153,6 +164,12 @@ typedef struct _NDS {
         bool read;
     } firmflashst;
 
+    struct {
+        u8 x;
+        u8 y;
+        u16 data;
+    } tsc;
+
     GameCard* card;
 
     u32 ipcfifo7to9[16];
@@ -174,6 +191,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware);
 bool nds_step(NDS* nds);
 
 void firmware_spi_write(NDS* nds, u8 data, bool hold);
+void tsc_spi_write(NDS* nds, u8 data);
 
 u8 vram_read8(NDS* nds, VRAMRegion region, u32 addr);
 u16 vram_read16(NDS* nds, VRAMRegion region, u32 addr);

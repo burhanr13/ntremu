@@ -82,12 +82,14 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     *(u16*) &nds->ram[0x3ff850] = 0x5835;
     *(u16*) &nds->ram[0x3ffc10] = 0x5835;
 
+    memcpy(&nds->ram[0x3ffc80], &nds->firmware[0x3ff00], 0x70);
+
     CardHeader* header = (CardHeader*) card->rom;
 
     memcpy(&nds->ram[0x3ffe00], header, sizeof *header);
 
-    memcpy(&nds->ram[header->arm9_ram_offset & 0xffffff], &card->rom[header->arm9_rom_offset],
-           header->arm9_size);
+    memcpy(&nds->ram[header->arm9_ram_offset & 0xffffff],
+           &card->rom[header->arm9_rom_offset], header->arm9_size);
     nds->cpu9.itcm_virtsize = 0x2000000;
     nds->cpu9.dtcm_base = 0x3000000;
     nds->cpu9.dtcm_virtsize = DTCMSIZE;
@@ -101,8 +103,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
                          *(u32*) &card->rom[header->arm7_rom_offset + i]);
         }
     } else {
-        memcpy(&nds->ram[header->arm7_ram_offset % RAMSIZE], &card->rom[header->arm7_rom_offset],
-               header->arm7_size);
+        memcpy(&nds->ram[header->arm7_ram_offset % RAMSIZE],
+               &card->rom[header->arm7_rom_offset], header->arm7_size);
     }
     nds->cpu7.pc = header->arm7_entry;
     nds->cpu7.cpsr.m = M_SYSTEM;
@@ -137,8 +139,10 @@ bool nds_step(NDS* nds) {
     if (event_pending(&nds->sched)) {
         if (nds->cur_cpu) {
             run_next_event(&nds->sched);
-            nds->cpu7.irq = (nds->io7.ime & 1) && (nds->io7.ie.w & nds->io7.ifl.w);
-            nds->cpu9.irq = (nds->io9.ime & 1) && (nds->io9.ie.w & nds->io9.ifl.w);
+            nds->cpu7.irq =
+                (nds->io7.ime & 1) && (nds->io7.ie.w & nds->io7.ifl.w);
+            nds->cpu9.irq =
+                (nds->io9.ime & 1) && (nds->io9.ie.w & nds->io9.ifl.w);
 
             nds->cur_cpu = CPU9;
             nds->last_event = nds->sched.now;
@@ -198,7 +202,8 @@ void firmware_spi_write(NDS* nds, u8 data, bool hold) {
             nds->firmflashst.addr |= data;
             if (++nds->firmflashst.i == 3) {
                 nds->firmflashst.i = 0;
-                nds->firmflashst.state = nds->firmflashst.read ? FIRMFLASH_READ : FIRMFLASH_WRITE;
+                nds->firmflashst.state =
+                    nds->firmflashst.read ? FIRMFLASH_READ : FIRMFLASH_WRITE;
             }
             break;
         case FIRMFLASH_READ:
@@ -219,29 +224,54 @@ void firmware_spi_write(NDS* nds, u8 data, bool hold) {
     }
 }
 
+void tsc_spi_write(NDS* nds, u8 data) {
+    TSCCom com = {data};
+    if (com.start) {
+        switch (com.channel) {
+            case 1:
+                nds->tsc.data = nds->tsc.y << 7;
+                break;
+            case 5:
+                nds->tsc.data = nds->tsc.x << 7;
+                break;
+            default:
+                nds->tsc.data = 0;
+                break;
+        }
+    } else {
+        nds->io7.spidata = nds->tsc.data >> 8;
+        nds->tsc.data <<= 8;
+    }
+}
+
 void* get_vram(NDS* nds, VRAMRegion region, u32 addr) {
     switch (region) {
         case VRAMBGA: {
-            if (nds->vramstate.bgA.e && addr < VRAMESIZE) return &nds->vramE[addr];
+            if (nds->vramstate.bgA.e && addr < VRAMESIZE)
+                return &nds->vramE[addr];
             VRAMBank abcd = nds->vramstate.bgA.abcd[(addr >> 17) & 3];
             if (abcd) return &nds->vrambanks[abcd - 1][addr % VRAMABCDSIZE];
-            VRAMBank fg = nds->vramstate.bgA.fg[((addr >> 14) & 1) | ((addr >> 15) & 2)];
+            VRAMBank fg =
+                nds->vramstate.bgA.fg[((addr >> 14) & 1) | ((addr >> 15) & 2)];
             if (fg) return &nds->vrambanks[fg - 1][addr % VRAMFGISIZE];
             break;
         }
         case VRAMBGB:
             if (nds->vramstate.bgB.c) return &nds->vramC[addr % VRAMABCDSIZE];
             if ((addr >> 15) & 1) {
-                if (nds->vramstate.bgB.i) return &nds->vramI[addr % VRAMFGISIZE];
+                if (nds->vramstate.bgB.i)
+                    return &nds->vramI[addr % VRAMFGISIZE];
             } else {
                 if (nds->vramstate.bgB.h) return &nds->vramH[addr % VRAMHSIZE];
             }
             break;
         case VRAMOBJA: {
-            if (nds->vramstate.objA.e && addr < VRAMESIZE) return &nds->vramE[addr];
+            if (nds->vramstate.objA.e && addr < VRAMESIZE)
+                return &nds->vramE[addr];
             VRAMBank ab = nds->vramstate.objA.ab[(addr >> 17) & 1];
             if (ab) return &nds->vrambanks[ab - 1][addr % VRAMABCDSIZE];
-            VRAMBank fg = nds->vramstate.objA.fg[((addr >> 14) & 1) | ((addr >> 15) & 2)];
+            VRAMBank fg =
+                nds->vramstate.objA.fg[((addr >> 14) & 1) | ((addr >> 15) & 2)];
             if (fg) return &nds->vrambanks[fg - 1][addr % VRAMFGISIZE];
             break;
         }
@@ -276,16 +306,17 @@ void* get_vram(NDS* nds, VRAMRegion region, u32 addr) {
     return NULL;
 }
 
-#define VRAMREADDECL(size)                                                                         \
-    u##size vram_read##size(NDS* nds, VRAMRegion region, u32 addr) {                               \
-        u##size* p = get_vram(nds, region, addr);                                                  \
-        return p ? *p : 0;                                                                         \
+#define VRAMREADDECL(size)                                                     \
+    u##size vram_read##size(NDS* nds, VRAMRegion region, u32 addr) {           \
+        u##size* p = get_vram(nds, region, addr);                              \
+        return p ? *p : 0;                                                     \
     }
 
-#define VRAMWRITEDECL(size)                                                                        \
-    void vram_write##size(NDS* nds, VRAMRegion region, u32 addr, u##size data) {                   \
-        u##size* p = get_vram(nds, region, addr);                                                  \
-        if (p) *p = data;                                                                          \
+#define VRAMWRITEDECL(size)                                                    \
+    void vram_write##size(NDS* nds, VRAMRegion region, u32 addr,               \
+                          u##size data) {                                      \
+        u##size* p = get_vram(nds, region, addr);                              \
+        if (p) *p = data;                                                      \
     }
 
 VRAMREADDECL(8)

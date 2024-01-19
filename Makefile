@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -g -Wall
+CFLAGS := -g -Wall -Wimplicit-fallthrough
 CPPFLAGS := -I/opt/homebrew/include -MP -MMD
 LDFLAGS := $(shell sdl2-config --libs) -lm -lz
 

@@ -38,5 +38,6 @@ void read_args(int argc, char** argv);
 void hotkey_press(SDL_KeyCode key);
 void update_input_keyboard(NDS* nds);
 void update_input_controller(NDS* nds, SDL_GameController* controller);
+void update_input_touch(NDS* nds, SDL_Rect* ts_bounds);
 
 #endif

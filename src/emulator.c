@@ -24,7 +24,8 @@ int emulator_init(int argc, char** argv) {
     ntremu.bios7 = malloc(BIOS7SIZE);
     FILE* f = fopen("bios7.bin", "rb");
     if (!f) {
-        printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' exist.\n");
+        printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' "
+               "exist.\n");
         return -1;
     }
     fread(ntremu.bios7, 1, BIOS7SIZE, f);
@@ -32,7 +33,8 @@ int emulator_init(int argc, char** argv) {
     ntremu.bios9 = malloc(BIOS9SIZE);
     f = fopen("bios9.bin", "rb");
     if (!f) {
-        printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' exist.\n");
+        printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' "
+               "exist.\n");
         return -1;
     }
     fread(ntremu.bios9, 1, BIOS9SIZE, f);
@@ -58,7 +60,8 @@ int emulator_init(int argc, char** argv) {
     thumb1_generate_lookup();
     arm5_generate_lookup();
     thumb2_generate_lookup();
-    init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9, ntremu.firmware);
+    init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
+             ntremu.firmware);
 
     ntremu.romfilenodir = strrchr(ntremu.romfile, '/');
     if (ntremu.romfilenodir) ntremu.romfilenodir++;
@@ -106,7 +109,8 @@ void hotkey_press(SDL_KeyCode key) {
             ntremu.mute = !ntremu.mute;
             break;
         case SDLK_r:
-            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9, ntremu.firmware);
+            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
+                     ntremu.firmware);
             ntremu.pause = false;
             break;
         case SDLK_TAB:
@@ -137,22 +141,47 @@ void update_input_keyboard(NDS* nds) {
 }
 
 void update_input_controller(NDS* nds, SDL_GameController* controller) {
-    nds->io7.keyinput.a &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
-    nds->io7.keyinput.b &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
+    nds->io7.keyinput.a &=
+        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_B);
+    nds->io7.keyinput.b &=
+        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_A);
     nds->io7.keyinput.start &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_START);
     nds->io7.keyinput.select &=
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_BACK);
-    nds->io7.keyinput.left &=
-        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-    nds->io7.keyinput.right &=
-        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-    nds->io7.keyinput.up &= ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
-    nds->io7.keyinput.down &=
-        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-    nds->io7.keyinput.l &=
-        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
-    nds->io7.keyinput.r &=
-        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+    nds->io7.keyinput.left &= ~SDL_GameControllerGetButton(
+        controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+    nds->io7.keyinput.right &= ~SDL_GameControllerGetButton(
+        controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+    nds->io7.keyinput.up &=
+        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
+    nds->io7.keyinput.down &= ~SDL_GameControllerGetButton(
+        controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+    nds->io7.keyinput.l &= ~SDL_GameControllerGetButton(
+        controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
+    nds->io7.keyinput.r &= ~SDL_GameControllerGetButton(
+        controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
     nds->io9.keyinput = nds->io7.keyinput;
+
+    nds->io7.extkeyin.x &=
+        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_Y);
+    nds->io7.extkeyin.y &=
+        ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
+}
+
+void update_input_touch(NDS* nds, SDL_Rect* ts_bounds) {
+    int x, y;
+    bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
+    x = (x - ts_bounds->x) * NDS_SCREEN_W / ts_bounds->w;
+    y = (y - ts_bounds->y) * NDS_SCREEN_H / ts_bounds->h;
+    if (x < 0 || x >= NDS_SCREEN_W || y < 0 || y >= NDS_SCREEN_H)
+        pressed = false;
+    if (!pressed) {
+        x = 0;
+        y = 0xff;
+    }
+
+    nds->io7.extkeyin.pen = ~pressed;
+    nds->tsc.x = x;
+    nds->tsc.y = y;
 }

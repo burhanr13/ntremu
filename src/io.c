@@ -185,6 +185,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                     firmware_spi_write(io->master, data, io->spicnt.hold);
                     break;
                 case 2:
+                    tsc_spi_write(io->master, data);
                     break;
             }
             break;
