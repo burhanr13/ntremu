@@ -31,7 +31,9 @@ void destroy_card(GameCard* card) {
 }
 
 bool card_write_command(GameCard* card, u8* command) {
+    //printf("%02x\n", command[0]);
     if (card->key1mode) {
+        // TODO: decrypt the command
         switch (command[0] >> 4) {
             case 1:
                 card->state = CARD_CHIPID;
@@ -56,6 +58,7 @@ bool card_write_command(GameCard* card, u8* command) {
     } else {
         switch (command[0]) {
             case 0x00:
+                return false;
                 card->state = CARD_DATA;
                 card->addr = 0;
                 card->len = 0x200;

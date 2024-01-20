@@ -60,8 +60,8 @@ int emulator_init(int argc, char** argv) {
     thumb1_generate_lookup();
     arm5_generate_lookup();
     thumb2_generate_lookup();
-    init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
-             ntremu.firmware);
+
+    emulator_reset();
 
     ntremu.romfilenodir = strrchr(ntremu.romfile, '/');
     if (ntremu.romfilenodir) ntremu.romfilenodir++;
@@ -76,6 +76,11 @@ void emulator_quit() {
     free(ntremu.bios9);
 }
 
+void emulator_reset() {
+    init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
+             ntremu.firmware, ntremu.bootbios);
+}
+
 void read_args(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
@@ -86,6 +91,9 @@ void read_args(int argc, char** argv) {
                         break;
                     case 'd':
                         ntremu.debugger = true;
+                        break;
+                    case 'b':
+                        ntremu.bootbios = true;
                         break;
                     default:
                         printf("Invalid flag\n");
@@ -109,8 +117,7 @@ void hotkey_press(SDL_KeyCode key) {
             ntremu.mute = !ntremu.mute;
             break;
         case SDLK_r:
-            init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
-                     ntremu.firmware);
+            emulator_reset();
             ntremu.pause = false;
             break;
         case SDLK_TAB:

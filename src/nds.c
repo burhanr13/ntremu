@@ -5,7 +5,8 @@
 #include "bus7.h"
 #include "ppu.h"
 
-void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
+void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
+              bool bootbios) {
     memset(nds, 0, sizeof *nds);
     nds->sched.master = nds;
 
@@ -71,54 +72,56 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     nds->io9.ipcfifocnt.sendempty = 1;
     nds->io9.ipcfifocnt.recvempty = 1;
 
-    cpu7_handle_interrupt(&nds->cpu7, I_RESET);
-    cpu9_handle_interrupt(&nds->cpu9, I_RESET);
-
-    nds->io7.wramstat = 3;
-    nds->io9.wramcnt = 3;
-    nds->io7.postflg = 1;
-    nds->io9.postflg = 1;
-
-    CardHeader* header = (CardHeader*) card->rom;
-
-    *(u32*) &nds->ram[0x3ff800] = 0x00001fc2;
-    *(u32*) &nds->ram[0x3ff804] = 0x00001fc2;
-    *(u16*) &nds->ram[0x3ff808] = header->header_crc;
-    *(u16*) &nds->ram[0x3ff80a] = header->secure_crc;
-    *(u16*) &nds->ram[0x3ff850] = 0x5835;
-    *(u32*) &nds->ram[0x3ff868] = (*(u32*) &firmware[0x20]) << 3;
-    *(u16*) &nds->ram[0x3ff874] = 0x359a;
-    *(u32*) &nds->ram[0x3ffc00] = 0x00001fc2;
-    *(u32*) &nds->ram[0x3ffc04] = 0x00001fc2;
-    *(u16*) &nds->ram[0x3ffc08] = header->header_crc;
-    *(u16*) &nds->ram[0x3ffc0a] = header->secure_crc;
-    *(u16*) &nds->ram[0x3ffc10] = 0x5835;
-
-    memcpy(&nds->ram[0x3ffc80], &firmware[0x3ff00], 0x70);
-
-    memcpy(&nds->ram[0x3ffe00], header, sizeof *header);
-
-    memcpy(&nds->ram[header->arm9_ram_offset & 0xffffff],
-           &card->rom[header->arm9_rom_offset], header->arm9_size);
-    nds->cpu9.itcm_virtsize = 0x2000000;
-    nds->cpu9.dtcm_base = 0x3000000;
-    nds->cpu9.dtcm_virtsize = DTCMSIZE;
-    nds->cpu9.pc = header->arm9_entry;
-    nds->cpu9.cpsr.m = M_SYSTEM;
-    cpu9_flush(&nds->cpu9);
-
-    if (header->arm7_ram_offset >> 24 == 3) {
-        for (int i = 0; i < header->arm7_size; i += 4) {
-            bus7_write32(nds, header->arm7_ram_offset + i,
-                         *(u32*) &card->rom[header->arm7_rom_offset + i]);
-        }
+    if (bootbios) {
+        cpu7_handle_interrupt(&nds->cpu7, I_RESET);
+        cpu9_handle_interrupt(&nds->cpu9, I_RESET);
     } else {
-        memcpy(&nds->ram[header->arm7_ram_offset % RAMSIZE],
-               &card->rom[header->arm7_rom_offset], header->arm7_size);
+        nds->io7.wramstat = 3;
+        nds->io9.wramcnt = 3;
+        nds->io7.postflg = 1;
+        nds->io9.postflg = 1;
+
+        CardHeader* header = (CardHeader*) card->rom;
+
+        *(u32*) &nds->ram[0x3ff800] = 0x00001fc2;
+        *(u32*) &nds->ram[0x3ff804] = 0x00001fc2;
+        *(u16*) &nds->ram[0x3ff808] = header->header_crc;
+        *(u16*) &nds->ram[0x3ff80a] = header->secure_crc;
+        *(u16*) &nds->ram[0x3ff850] = 0x5835;
+        *(u32*) &nds->ram[0x3ff868] = (*(u16*) &firmware[0x20]) << 3;
+        *(u16*) &nds->ram[0x3ff874] = 0x359a;
+        *(u32*) &nds->ram[0x3ffc00] = 0x00001fc2;
+        *(u32*) &nds->ram[0x3ffc04] = 0x00001fc2;
+        *(u16*) &nds->ram[0x3ffc08] = header->header_crc;
+        *(u16*) &nds->ram[0x3ffc0a] = header->secure_crc;
+        *(u16*) &nds->ram[0x3ffc10] = 0x5835;
+
+        memcpy(&nds->ram[0x3ffc80], &firmware[0x3ff00], 0x70);
+
+        memcpy(&nds->ram[0x3ffe00], header, sizeof *header);
+
+        memcpy(&nds->ram[header->arm9_ram_offset & 0xffffff],
+               &card->rom[header->arm9_rom_offset], header->arm9_size);
+        nds->cpu9.itcm_virtsize = 0x2000000;
+        nds->cpu9.dtcm_base = 0x3000000;
+        nds->cpu9.dtcm_virtsize = DTCMSIZE;
+        nds->cpu9.pc = header->arm9_entry;
+        nds->cpu9.cpsr.m = M_SYSTEM;
+        cpu9_flush(&nds->cpu9);
+
+        if (header->arm7_ram_offset >> 24 == 3) {
+            for (int i = 0; i < header->arm7_size; i += 4) {
+                bus7_write32(nds, header->arm7_ram_offset + i,
+                             *(u32*) &card->rom[header->arm7_rom_offset + i]);
+            }
+        } else {
+            memcpy(&nds->ram[header->arm7_ram_offset % RAMSIZE],
+                   &card->rom[header->arm7_rom_offset], header->arm7_size);
+        }
+        nds->cpu7.pc = header->arm7_entry;
+        nds->cpu7.cpsr.m = M_SYSTEM;
+        cpu7_flush(&nds->cpu7);
     }
-    nds->cpu7.pc = header->arm7_entry;
-    nds->cpu7.cpsr.m = M_SYSTEM;
-    cpu7_flush(&nds->cpu7);
 
     lcd_hdraw(nds);
     add_event(&nds->sched, EVENT_FORCESYNC, 32);
