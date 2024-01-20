@@ -9,7 +9,8 @@
 
 char wintitle[200];
 
-static inline void center_screen_in_window(int windowW, int windowH, SDL_Rect* dst) {
+static inline void center_screen_in_window(int windowW, int windowH,
+                                           SDL_Rect* dst) {
     if (windowW * (2 * NDS_SCREEN_H) / NDS_SCREEN_W > windowH) {
         dst->h = windowH;
         dst->y = 0;
@@ -36,16 +37,17 @@ int main(int argc, char** argv) {
 
     SDL_Window* window;
     SDL_Renderer* renderer;
-    SDL_CreateWindowAndRenderer(NDS_SCREEN_W * 2, NDS_SCREEN_H * 4, SDL_WINDOW_RESIZABLE, &window,
-                                &renderer);
-    snprintf(wintitle, 199, "ntremu | %s | %.2lf FPS", ntremu.romfilenodir, 0.0);
+    SDL_CreateWindowAndRenderer(NDS_SCREEN_W * 2, NDS_SCREEN_H * 4,
+                                SDL_WINDOW_RESIZABLE, &window, &renderer);
+    snprintf(wintitle, 199, "ntremu | %s | %.2lf FPS", ntremu.romfilenodir,
+             0.0);
     SDL_SetWindowTitle(window, wintitle);
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
 
-    SDL_Texture* texture =
-        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR555, SDL_TEXTUREACCESS_STREAMING,
-                          NDS_SCREEN_W, 2 * NDS_SCREEN_H);
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR555,
+                                             SDL_TEXTUREACCESS_STREAMING,
+                                             NDS_SCREEN_W, 2 * NDS_SCREEN_H);
 
     Uint64 prev_time = SDL_GetPerformanceCounter();
     Uint64 prev_fps_update = prev_time;
@@ -68,12 +70,14 @@ int main(int argc, char** argv) {
                     while (!ntremu.nds->frame_complete) {
                         if (ntremu.debugger) {
                             if (ntremu.nds->cur_cpu) {
-                                if (ntremu.nds->cpu7.cur_instr_addr == ntremu.breakpoint) {
+                                if (ntremu.nds->cpu7.cur_instr_addr ==
+                                    ntremu.breakpoint) {
                                     bkpthit = true;
                                     break;
                                 }
                             } else {
-                                if (ntremu.nds->cpu9.cur_instr_addr == ntremu.breakpoint) {
+                                if (ntremu.nds->cpu9.cur_instr_addr ==
+                                    ntremu.breakpoint) {
                                     bkpthit = true;
                                     break;
                                 }
@@ -94,9 +98,17 @@ int main(int argc, char** argv) {
             void* pixels;
             int pitch;
             SDL_LockTexture(texture, NULL, &pixels, &pitch);
-            memcpy(pixels, ntremu.nds->ppuA.screen, sizeof ntremu.nds->ppuA.screen);
-            memcpy(pixels + sizeof ntremu.nds->ppuA.screen, ntremu.nds->ppuB.screen,
-                   sizeof ntremu.nds->ppuB.screen);
+            if (ntremu.nds->io9.powcnt.screenswap) {
+                memcpy(pixels, ntremu.nds->ppuA.screen,
+                       sizeof ntremu.nds->ppuA.screen);
+                memcpy(pixels + sizeof ntremu.nds->ppuA.screen,
+                       ntremu.nds->ppuB.screen, sizeof ntremu.nds->ppuB.screen);
+            } else {
+                memcpy(pixels, ntremu.nds->ppuB.screen,
+                       sizeof ntremu.nds->ppuB.screen);
+                memcpy(pixels + sizeof ntremu.nds->ppuB.screen,
+                       ntremu.nds->ppuA.screen, sizeof ntremu.nds->ppuA.screen);
+            }
             SDL_UnlockTexture(texture);
 
             int windowW, windowH;
@@ -121,16 +133,18 @@ int main(int argc, char** argv) {
             cur_time = SDL_GetPerformanceCounter();
             elapsed = cur_time - prev_time;
             Sint64 wait = frame_ticks - elapsed;
-            Sint64 waitMS = wait * 1000 / (Sint64) SDL_GetPerformanceFrequency();
+            Sint64 waitMS =
+                wait * 1000 / (Sint64) SDL_GetPerformanceFrequency();
             if (waitMS > 1 && !ntremu.uncap) {
                 SDL_Delay(waitMS - 1);
             }
             cur_time = SDL_GetPerformanceCounter();
             elapsed = cur_time - prev_fps_update;
             if (elapsed >= SDL_GetPerformanceFrequency() / 2) {
-                double fps =
-                    (double) SDL_GetPerformanceFrequency() * (frame - prev_fps_frame) / elapsed;
-                snprintf(wintitle, 199, "ntremu | %s | %.2lf FPS", ntremu.romfilenodir, fps);
+                double fps = (double) SDL_GetPerformanceFrequency() *
+                             (frame - prev_fps_frame) / elapsed;
+                snprintf(wintitle, 199, "ntremu | %s | %.2lf FPS",
+                         ntremu.romfilenodir, fps);
                 SDL_SetWindowTitle(window, wintitle);
                 prev_fps_update = cur_time;
                 prev_fps_frame = frame;

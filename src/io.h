@@ -571,7 +571,22 @@ typedef struct _IO {
             u8 gap_2cx[POSTFLG - SQRT_PARAM - 8];
             u8 postflg;
             u8 haltcnt;
-            u8 gap_3xx[PPUB_OFF - HALTCNT - 1];
+            u16 unused_302;
+            union {
+                u32 w;
+                struct {
+                    u32 lcd : 1;
+                    u32 ppuA : 1;
+                    u32 gpu : 1;
+                    u32 gx : 1;
+                    u32 unused : 5;
+                    u32 ppuB : 1;
+                    u32 unused2 : 5;
+                    u32 screenswap : 1;
+                    u32 unusedhi : 16;
+                };
+            } powcnt;
+            u8 gap_3xx[PPUB_OFF - POWCNT - 4];
             PPUIO ppuB;
         };
     };
