@@ -10,6 +10,8 @@
 const int SCLAYOUT[4][2][2] = {
     {{0, 0}, {0, 0}}, {{0, 1}, {0, 1}}, {{0, 0}, {1, 1}}, {{0, 1}, {2, 3}}};
 
+const int BMLAYOUT[4][2] = {{128, 128}, {256, 256}, {512, 256}, {512, 512}};
+
 // size: sqr, short, long
 const int OBJLAYOUT[4][3] = {
     {8, 8, 16}, {16, 8, 32}, {32, 16, 32}, {64, 32, 64}};
@@ -196,13 +198,92 @@ void render_bg_line_aff(PPU* ppu, int bg) {
 void render_bg_line_aff_ext(PPU* ppu, int bg) {
     if (!(ppu->io->dispcnt.bg_enable & (1 << bg))) return;
     ppu->draw_bg[bg] = true;
+
+    u16* bpp8Pal = ppu->pal;
+    bool extPal = ppu->io->dispcnt.bg_extpal;
+    if (extPal) {
+        int slot = bg;
+        bpp8Pal = ppu->extPalBg[slot];
+    }
+
+    u32 map_start = ppu->io->dispcnt.tilemap_base * 0x10000 +
+                    ppu->io->bgcnt[bg].tilemap_base * 0x800;
+    u32 tile_start = ppu->io->dispcnt.tile_base * 0x10000 +
+                     ppu->io->bgcnt[bg].tile_base * 0x4000;
+    u32 bm_start = ppu->io->bgcnt[bg].tilemap_base * 0x800;
+
+    s32 x0, y0;
+    if (ppu->io->bgcnt[bg].mosaic) {
+        x0 = ppu->bgaffintr[bg - 2].mosx;
+        y0 = ppu->bgaffintr[bg - 2].mosy;
+    } else {
+        x0 = ppu->bgaffintr[bg - 2].x;
+        y0 = ppu->bgaffintr[bg - 2].y;
+    }
+
+    bool bitmap = ppu->io->bgcnt[bg].palmode;
+    u32 w, h;
+    if (bitmap) {
+        w = BMLAYOUT[ppu->io->bgcnt[bg].size][0];
+        h = BMLAYOUT[ppu->io->bgcnt[bg].size][1];
+    } else {
+        w = (ppu->io->bgcnt[bg].size & 1) ? 512 : 256;
+        h = (ppu->io->bgcnt[bg].size & 2) ? 512 : 256;
+    }
+
+    for (int x = 0; x < NDS_SCREEN_W; x++, x0 += ppu->io->bgaff[bg - 2].pa,
+             y0 += ppu->io->bgaff[bg - 2].pc) {
+        u32 sx = x0 >> 8;
+        u32 sy = y0 >> 8;
+        if ((sx >= w || sy >= h) && !ppu->io->bgcnt[bg].overflow) {
+            continue;
+        }
+
+        sx &= w - 1;
+        sy &= h - 1;
+
+        if (bitmap) {
+            u32 offset = w * sy + sx;
+            if (ppu->io->bgcnt[bg].tile_base & 1) {
+                ppu->layerlines[bg][x] =
+                    vram_read16(ppu->master, ppu->bgReg, bm_start + 2 * offset);
+            } else {
+                u8 col_ind =
+                    vram_read8(ppu->master, ppu->bgReg, bm_start + offset);
+                if (col_ind) {
+                    ppu->layerlines[bg][x] = ppu->pal[col_ind] | (1 << 15);
+                }
+            }
+        } else {
+            u16 scx = sx >> 8;
+            u16 scy = sy >> 8;
+            int sc = SCLAYOUT[ppu->io->bgcnt[bg].size][scx][scy];
+            u16 tilex = (sx >> 3) & 0x1f;
+            u16 tiley = (sy >> 3) & 0x1f;
+            u16 finex = sx & 0b111;
+            u16 finey = sy & 0b111;
+            BgTile tile = {vram_read16(ppu->master, ppu->bgReg,
+                                       map_start + 0x800 * sc + tiley * 2 * 32 +
+                                           2 * tilex)};
+            if (tile.hflip) finex = 7 - finex;
+            if (tile.vflip) finey = 7 - finey;
+
+            u16 col_ind =
+                vram_read8(ppu->master, ppu->bgReg,
+                           tile_start + 64 * tile.num + finey * 8 + finex);
+
+            if (col_ind) {
+                if (extPal) col_ind |= tile.palette << 8;
+                ppu->layerlines[bg][x] = bpp8Pal[col_ind] | (1 << 15);
+            }
+        }
+    }
 }
 
 void render_bgs(PPU* ppu) {
     int mode = ppu->io->dispcnt.bg_mode;
     if (mode != 6) {
-        if(!ppu->io->dispcnt.enable_3d)
-            render_bg_line_text(ppu, 0);
+        if (!ppu->io->dispcnt.enable_3d) render_bg_line_text(ppu, 0);
         render_bg_line_text(ppu, 1);
         switch (mode) {
             case 0:

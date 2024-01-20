@@ -111,8 +111,6 @@ typedef struct {
     bool obj_semitrans;
     bool obj_mos;
 
-    int obj_cycles;
-
 } PPU;
 
 void draw_scanline(PPU* ppu);
