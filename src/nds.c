@@ -53,9 +53,10 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     card->addr = 0;
     card->i = 0;
     card->len = 0;
-    nds->card->eeprom_state = 0;
-    nds->card->spidata = 0;
-    memset(&nds->firmflashst, 0, sizeof nds->firmflashst);
+    card->key1mode = false;
+    card->eeprom_state = 0;
+    card->spidata = 0;
+    memset(&card->eepromst, 0, sizeof card->eepromst);
 
     nds->bios7 = bios7;
     nds->bios9 = bios9;
@@ -70,21 +71,30 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware) {
     nds->io9.ipcfifocnt.sendempty = 1;
     nds->io9.ipcfifocnt.recvempty = 1;
 
+    cpu7_handle_interrupt(&nds->cpu7, I_RESET);
+    cpu9_handle_interrupt(&nds->cpu9, I_RESET);
+
     nds->io7.wramstat = 3;
     nds->io9.wramcnt = 3;
     nds->io7.postflg = 1;
     nds->io9.postflg = 1;
 
+    CardHeader* header = (CardHeader*) card->rom;
+
     *(u32*) &nds->ram[0x3ff800] = 0x00001fc2;
     *(u32*) &nds->ram[0x3ff804] = 0x00001fc2;
+    *(u16*) &nds->ram[0x3ff808] = header->header_crc;
+    *(u16*) &nds->ram[0x3ff80a] = header->secure_crc;
+    *(u16*) &nds->ram[0x3ff850] = 0x5835;
+    *(u32*) &nds->ram[0x3ff868] = (*(u32*) &firmware[0x20]) << 3;
+    *(u16*) &nds->ram[0x3ff874] = 0x359a;
     *(u32*) &nds->ram[0x3ffc00] = 0x00001fc2;
     *(u32*) &nds->ram[0x3ffc04] = 0x00001fc2;
-    *(u16*) &nds->ram[0x3ff850] = 0x5835;
+    *(u16*) &nds->ram[0x3ffc08] = header->header_crc;
+    *(u16*) &nds->ram[0x3ffc0a] = header->secure_crc;
     *(u16*) &nds->ram[0x3ffc10] = 0x5835;
 
-    memcpy(&nds->ram[0x3ffc80], &nds->firmware[0x3ff00], 0x70);
-
-    CardHeader* header = (CardHeader*) card->rom;
+    memcpy(&nds->ram[0x3ffc80], &firmware[0x3ff00], 0x70);
 
     memcpy(&nds->ram[0x3ffe00], header, sizeof *header);
 

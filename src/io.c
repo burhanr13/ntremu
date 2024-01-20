@@ -36,8 +36,8 @@ void io7_write8(IO* io, u32 addr, u8 data) {
 
 u16 io7_read16(IO* io, u32 addr) {
     if (addr >= IO_SIZE) {
-        if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2 || addr == GAMECARDIN ||
-            addr == GAMECARDIN + 2) {
+        if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2 ||
+            addr == GAMECARDIN || addr == GAMECARDIN + 2) {
             u32 w = io7_read32(io, addr & ~3);
             if (addr & 2) return w >> 16;
             else return w;
@@ -76,17 +76,6 @@ void io7_write16(IO* io, u32 addr, u16 data) {
     if (addr == POSTFLG) {
         io7_write8(io, addr, data);
         io7_write8(io, addr | 1, data >> 8);
-        return;
-    }
-    if (ROMCOMMAND <= addr && addr < ROMCOMMAND + 8) {
-        io->h[addr >> 1] = data;
-        if (card_write_command(io->master->card, io->romcommand)) {
-            io->romctrl.busy = 1;
-            io->romctrl.drq = 1;
-        } else {
-            io->romctrl.busy = 0;
-            io->romctrl.drq = 0;
-        }
         return;
     }
     switch (addr) {
@@ -129,7 +118,8 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                 if (io->master->io9.ipcsync.irq) {
                     io->master->io9.ifl.ipcsync = 1;
                     io->master->cpu9.irq =
-                        (io->master->io9.ime & 1) && (io->master->io9.ie.w & io->master->io9.ifl.w);
+                        (io->master->io9.ime & 1) &&
+                        (io->master->io9.ie.w & io->master->io9.ifl.w);
                 }
             }
             break;
@@ -168,12 +158,29 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             card_spi_write(io->master->card, data, io->auxspicnt.hold);
             break;
         case ROMCTRL + 2:
-            io->h[addr >> 1] &= 0x8080;
-            io->h[addr >> 1] |= data & 0x7f7f;
+            io->h[addr >> 1] = data;
             u32 len = 0x100 << io->romctrl.blocksize;
             if (len == 0x100) len = 0;
             if (len == 0x8000) len = 4;
             io->master->card->len = len;
+            io->romctrl.drq = 0;
+            if (io->romctrl.busy) {
+                io->romctrl.busy = 0;
+                if (card_write_command(io->master->card, io->romcommand)) {
+                    io->romctrl.busy = 1;
+                    io->romctrl.drq = 1;
+
+                    for (int i = 0; i < 4; i++) {
+                        if (io->dma[i].cnt.mode == DMA7_DSCARD &&
+                            io->dma[i].cnt.enable) {
+                            while (io->romctrl.busy) {
+                                dma7_activate(&io->master->dma7, i);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
             break;
         case SPICNT:
             io->spicnt.h = data;
@@ -225,14 +232,16 @@ u32 io7_read32(IO* io, u32 addr) {
                         io->master->io9.ipcfifocnt.sendempty = 1;
                         if (io->master->io9.ipcfifocnt.send_irq) {
                             io->master->io9.ifl.ipcsend = 1;
-                            io->master->cpu9.irq = (io->master->io9.ime & 1) &&
-                                                   (io->master->io9.ie.w & io->master->io9.ifl.w);
+                            io->master->cpu9.irq =
+                                (io->master->io9.ime & 1) &&
+                                (io->master->io9.ie.w & io->master->io9.ifl.w);
                         }
                     }
                     io->ipcfifocnt.recvfull = 0;
                     io->master->io9.ipcfifocnt.sendfull = 0;
                     for (int i = 0; i < io->master->ipcfifo9to7_size; i++) {
-                        io->master->ipcfifo9to7[i] = io->master->ipcfifo9to7[i + 1];
+                        io->master->ipcfifo9to7[i] =
+                            io->master->ipcfifo9to7[i + 1];
                     }
                 }
                 return data;
@@ -250,7 +259,8 @@ u32 io7_read32(IO* io, u32 addr) {
                 io->romctrl.busy = 0;
                 if (io->auxspicnt.irq) {
                     io->ifl.gamecardtrans = 1;
-                    io->master->cpu7.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+                    io->master->cpu7.irq =
+                        (io->ime & 1) && (io->ie.w & io->ifl.w);
                 }
             }
             return data;
@@ -268,7 +278,8 @@ void io7_write32(IO* io, u32 addr, u32 data) {
                 if (io->master->ipcfifo7to9_size == 16) {
                     io->ipcfifocnt.error = 1;
                 } else {
-                    io->master->ipcfifo7to9[io->master->ipcfifo7to9_size++] = data;
+                    io->master->ipcfifo7to9[io->master->ipcfifo7to9_size++] =
+                        data;
                     if (io->master->ipcfifo7to9_size == 16) {
                         io->ipcfifocnt.sendfull = 1;
                         io->master->io9.ipcfifocnt.recvfull = 1;
@@ -277,8 +288,9 @@ void io7_write32(IO* io, u32 addr, u32 data) {
                         io->master->io9.ipcfifocnt.recvempty = 0;
                         if (io->master->io9.ipcfifocnt.recv_irq) {
                             io->master->io9.ifl.ipcrecv = 1;
-                            io->master->cpu9.irq = (io->master->io9.ime & 1) &&
-                                                   (io->master->io9.ie.w & io->master->io9.ifl.w);
+                            io->master->cpu9.irq =
+                                (io->master->io9.ime & 1) &&
+                                (io->master->io9.ie.w & io->master->io9.ifl.w);
                         }
                     }
                 }
@@ -401,7 +413,8 @@ void io9_write8(IO* io, u32 addr, u8 data) {
             VRAMBank b = i + 1;
             if (b > VRAMG) b--;
             if (io->vramcnt[i].enable) {
-                VRAMBank* pre = get_vram_map(io->master, b, io->vramcnt[i].mst, io->vramcnt[i].ofs);
+                VRAMBank* pre = get_vram_map(io->master, b, io->vramcnt[i].mst,
+                                             io->vramcnt[i].ofs);
                 if (*pre == b) *pre = VRAMNULL;
                 if (b == VRAMC && io->vramcnt[i].mst == 2) {
                     io->master->io7.vramstat &= ~1;
@@ -411,7 +424,8 @@ void io9_write8(IO* io, u32 addr, u8 data) {
             }
             io->vramcnt[i].b = data;
             if (io->vramcnt[i].enable) {
-                *get_vram_map(io->master, b, io->vramcnt[i].mst, io->vramcnt[i].ofs) = b;
+                *get_vram_map(io->master, b, io->vramcnt[i].mst,
+                              io->vramcnt[i].ofs) = b;
                 if (b == VRAMC && io->vramcnt[i].mst == 2) {
                     io->master->io7.vramstat |= 1;
                 } else if (b == VRAMD && io->vramcnt[i].mst == 2) {
@@ -440,8 +454,8 @@ void io9_write8(IO* io, u32 addr, u8 data) {
 
 u16 io9_read16(IO* io, u32 addr) {
     if (addr >= IO_SIZE) {
-        if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2 || addr == GAMECARDIN ||
-            addr == GAMECARDIN + 2) {
+        if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2 ||
+            addr == GAMECARDIN || addr == GAMECARDIN + 2) {
             u32 w = io9_read32(io, addr & ~3);
             if (addr & 2) return w >> 16;
             else return w;
@@ -524,17 +538,6 @@ void io9_write16(IO* io, u32 addr, u16 data) {
         io->sqrtcnt.busy = 0;
         return;
     }
-    if (ROMCOMMAND <= addr && addr < ROMCOMMAND + 8) {
-        io->h[addr >> 1] = data;
-        if (card_write_command(io->master->card, io->romcommand)) {
-            io->romctrl.busy = 1;
-            io->romctrl.drq = 1;
-        } else {
-            io->romctrl.busy = 0;
-            io->romctrl.drq = 0;
-        }
-        return;
-    }
     switch (addr) {
         case DISPSTAT:
             data &= ~0b111;
@@ -574,7 +577,8 @@ void io9_write16(IO* io, u32 addr, u16 data) {
                 if (io->master->io7.ipcsync.irq) {
                     io->master->io7.ifl.ipcsync = 1;
                     io->master->cpu7.irq =
-                        (io->master->io7.ime & 1) && (io->master->io7.ie.w & io->master->io7.ifl.w);
+                        (io->master->io7.ime & 1) &&
+                        (io->master->io7.ie.w & io->master->io7.ifl.w);
                 }
             }
             break;
@@ -613,12 +617,29 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             card_spi_write(io->master->card, data, io->auxspicnt.hold);
             break;
         case ROMCTRL + 2:
-            io->h[addr >> 1] &= 0x8080;
-            io->h[addr >> 1] |= data & 0x7f7f;
+            io->h[addr >> 1] = data;
             u32 len = 0x100 << io->romctrl.blocksize;
             if (len == 0x100) len = 0;
             if (len == 0x8000) len = 4;
             io->master->card->len = len;
+            io->romctrl.drq = 0;
+            if (io->romctrl.busy) {
+                io->romctrl.busy = 0;
+                if (card_write_command(io->master->card, io->romcommand)) {
+                    io->romctrl.busy = 1;
+                    io->romctrl.drq = 1;
+
+                    for (int i = 0; i < 4; i++) {
+                        if (io->dma[i].cnt.mode == DMA9_DSCARD &&
+                            io->dma[i].cnt.enable) {
+                            while (io->romctrl.busy) {
+                                dma9_activate(&io->master->dma9, i);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
             break;
         case EXMEMCNT:
             io->exmemcnt.w = data;
@@ -662,14 +683,16 @@ u32 io9_read32(IO* io, u32 addr) {
                         io->master->io7.ipcfifocnt.sendempty = 1;
                         if (io->master->io7.ipcfifocnt.send_irq) {
                             io->master->io7.ifl.ipcsend = 1;
-                            io->master->cpu7.irq = (io->master->io7.ime & 1) &&
-                                                   (io->master->io7.ie.w & io->master->io7.ifl.w);
+                            io->master->cpu7.irq =
+                                (io->master->io7.ime & 1) &&
+                                (io->master->io7.ie.w & io->master->io7.ifl.w);
                         }
                     }
                     io->ipcfifocnt.recvfull = 0;
                     io->master->io7.ipcfifocnt.sendfull = 0;
                     for (int i = 0; i < io->master->ipcfifo7to9_size; i++) {
-                        io->master->ipcfifo7to9[i] = io->master->ipcfifo7to9[i + 1];
+                        io->master->ipcfifo7to9[i] =
+                            io->master->ipcfifo7to9[i + 1];
                     }
                 }
                 return data;
@@ -687,7 +710,8 @@ u32 io9_read32(IO* io, u32 addr) {
                 io->romctrl.busy = 0;
                 if (io->auxspicnt.irq) {
                     io->ifl.gamecardtrans = 1;
-                    io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+                    io->master->cpu9.irq =
+                        (io->ime & 1) && (io->ie.w & io->ifl.w);
                 }
             }
             return data;
@@ -705,7 +729,8 @@ void io9_write32(IO* io, u32 addr, u32 data) {
                 if (io->master->ipcfifo9to7_size == 16) {
                     io->ipcfifocnt.error = 1;
                 } else {
-                    io->master->ipcfifo9to7[io->master->ipcfifo9to7_size++] = data;
+                    io->master->ipcfifo9to7[io->master->ipcfifo9to7_size++] =
+                        data;
                     if (io->master->ipcfifo9to7_size == 16) {
                         io->ipcfifocnt.sendfull = 1;
                         io->master->io7.ipcfifocnt.recvfull = 1;
@@ -714,8 +739,9 @@ void io9_write32(IO* io, u32 addr, u32 data) {
                         io->master->io7.ipcfifocnt.recvempty = 0;
                         if (io->master->io7.ipcfifocnt.recv_irq) {
                             io->master->io7.ifl.ipcrecv = 1;
-                            io->master->cpu7.irq = (io->master->io7.ime & 1) &&
-                                                   (io->master->io7.ie.w & io->master->io7.ifl.w);
+                            io->master->cpu7.irq =
+                                (io->master->io7.ime & 1) &&
+                                (io->master->io7.ie.w & io->master->io7.ifl.w);
                         }
                     }
                 }

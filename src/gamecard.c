@@ -31,17 +31,57 @@ void destroy_card(GameCard* card) {
 }
 
 bool card_write_command(GameCard* card, u8* command) {
-    if (command[0] == 0xb8) {
-        card->state = CARD_CHIPID;
-        return true;
+    if (card->key1mode) {
+        switch (command[0] >> 4) {
+            case 1:
+                card->state = CARD_CHIPID;
+                return true;
+                break;
+            case 2: {
+                int block = command[2] >> 4 | command[1] << 4 |
+                            (command[0] & 0xf) << 12;
+                card->addr = block << 12;
+                card->i = 0;
+                card->len = 0x1000;
+                return true;
+                break;
+            }
+            case 0xa:
+                card->key1mode = false;
+                return true;
+                break;
+            default:
+                return false;
+        }
+    } else {
+        switch (command[0]) {
+            case 0x00:
+                card->state = CARD_DATA;
+                card->addr = 0;
+                card->len = 0x200;
+                card->i = 0;
+                return true;
+                break;
+            case 0x3c:
+                card->key1mode = true;
+                return false;
+                break;
+            case 0xb7:
+                card->state = CARD_DATA;
+                card->addr = command[1] << 24 | command[2] << 16 |
+                             command[3] << 8 | command[4];
+                card->i = 0;
+                return true;
+                break;
+            case 0xb8:
+            case 0x90:
+                card->state = CARD_CHIPID;
+                return true;
+                break;
+            default:
+                return false;
+        }
     }
-    if (command[0] == 0xb7) {
-        card->state = CARD_DATA;
-        card->addr = command[1] << 24 | command[2] << 16 | command[3] << 8 | command[4];
-        card->i = 0;
-        return true;
-    }
-    return false;
 }
 
 bool card_read_data(GameCard* card, u32* data) {
@@ -113,7 +153,8 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
             card->eepromst.addr |= data;
             if (++card->eepromst.i == card->addrtype) {
                 card->eepromst.i = 0;
-                card->eeprom_state = card->eepromst.read ? CARDEEPROM_READ : CARDEEPROM_WRITE;
+                card->eeprom_state =
+                    card->eepromst.read ? CARDEEPROM_READ : CARDEEPROM_WRITE;
             }
             break;
         case CARDEEPROM_READ:

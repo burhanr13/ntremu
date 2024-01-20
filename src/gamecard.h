@@ -23,7 +23,18 @@ typedef struct {
     u32 arm7_entry;
     u32 arm7_ram_offset;
     u32 arm7_size;
-    u8 rest[0x1c0];
+    u32 fnt_offset;
+    u32 fnt_size;
+    u32 fat_offset;
+    u32 fat_size;
+    u8 stuff[0x1c];
+    u16 secure_crc;
+    u16 secure_delay;
+    u8 more_stuff[0x50];
+    u8 nintendo_logo[0x9c];
+    u16 logo_crc;
+    u16 header_crc;
+    u8 rest[0xa0];
 } CardHeader;
 
 typedef enum { CARD_IDLE, CARD_CHIPID, CARD_DATA } CardState;
@@ -45,6 +56,7 @@ typedef struct {
     u32 addr;
     u32 i;
     u32 len;
+    bool key1mode;
 
     u8* eeprom;
     u32 eeprom_size;

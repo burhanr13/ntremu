@@ -181,7 +181,7 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds) {
         y = 0xff;
     }
 
-    nds->io7.extkeyin.pen = ~pressed;
+    nds->io7.extkeyin.pen = !pressed;
     nds->tsc.x = x;
     nds->tsc.y = y;
 }
