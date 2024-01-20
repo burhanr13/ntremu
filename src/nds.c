@@ -25,6 +25,11 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->ppuA.master = nds;
     nds->ppuA.io = &nds->io9.ppuA;
     nds->ppuA.pal = nds->palA;
+    nds->ppuA.extPalBg[0] = (u16*) nds->vramE;
+    nds->ppuA.extPalBg[1] = (u16*) nds->vramE + 0x1000;
+    nds->ppuA.extPalBg[2] = (u16*) nds->vramE + 0x2000;
+    nds->ppuA.extPalBg[3] = (u16*) nds->vramE + 0x3000;
+    nds->ppuA.extPalObj = (u16*) nds->vramF;
     nds->ppuA.oam = nds->oamA;
     nds->ppuA.bgReg = VRAMBGA;
     nds->ppuA.objReg = VRAMOBJA;
@@ -32,6 +37,11 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->ppuB.master = nds;
     nds->ppuB.io = &nds->io9.ppuB;
     nds->ppuB.pal = nds->palB;
+    nds->ppuB.extPalBg[0] = (u16*) nds->vramH;
+    nds->ppuB.extPalBg[1] = (u16*) nds->vramH + 0x1000;
+    nds->ppuB.extPalBg[2] = (u16*) nds->vramH + 0x2000;
+    nds->ppuB.extPalBg[3] = (u16*) nds->vramH + 0x3000;
+    nds->ppuB.extPalObj = (u16*) nds->vramI;
     nds->ppuB.oam = nds->oamB;
     nds->ppuB.bgReg = VRAMBGB;
     nds->ppuB.objReg = VRAMOBJB;

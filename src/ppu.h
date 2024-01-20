@@ -75,6 +75,8 @@ typedef struct {
 
     PPUIO* io;
     u16* pal;
+    u16* extPalBg[4];
+    u16* extPalObj;
     ObjAttr* oam;
     VRAMRegion bgReg;
     VRAMRegion objReg;

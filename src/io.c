@@ -398,6 +398,47 @@ VRAMBank* get_vram_map(NDS* nds, VRAMBank bank, int mst, int ofs) {
     return &nds->vramstate.lcdc[bank - 1];
 }
 
+void vram_map_ppu(NDS* nds, VRAMBank bank, int mst, int ofs) {
+    switch (bank) {
+        case VRAME:
+            switch (mst) {
+                case 4:
+                    nds->ppuA.extPalBg[0] = (u16*) nds->vramE;
+                    nds->ppuA.extPalBg[1] = (u16*) nds->vramE + 0x1000;
+                    nds->ppuA.extPalBg[2] = (u16*) nds->vramE + 0x2000;
+                    nds->ppuA.extPalBg[3] = (u16*) nds->vramE + 0x3000;
+                    break;
+            }
+            break;
+        case VRAMF:
+            switch (mst) {
+                case 4:
+                    nds->ppuA.extPalBg[2 * ofs] = (u16*) nds->vramF;
+                    nds->ppuA.extPalBg[2 * ofs + 1] =
+                        (u16*) nds->vramF + 0x1000;
+                    break;
+                case 5:
+                    nds->ppuA.extPalObj = (u16*) nds->vramF;
+                    break;
+            }
+            break;
+        case VRAMG:
+            switch (mst) {
+                case 4:
+                    nds->ppuA.extPalBg[2 * ofs] = (u16*) nds->vramG;
+                    nds->ppuA.extPalBg[2 * ofs + 1] =
+                        (u16*) nds->vramG + 0x1000;
+                    break;
+                case 5:
+                    nds->ppuA.extPalObj = (u16*) nds->vramG;
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void io9_write8(IO* io, u32 addr, u8 data) {
     switch (addr) {
         case VRAMCNT_A:
@@ -431,6 +472,9 @@ void io9_write8(IO* io, u32 addr, u8 data) {
                 } else if (b == VRAMD && io->vramcnt[i].mst == 2) {
                     io->master->io7.vramstat |= 2;
                 }
+
+                vram_map_ppu(io->master, b, io->vramcnt[i].mst,
+                             io->vramcnt[i].ofs);
             }
             break;
         }
