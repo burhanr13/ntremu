@@ -5,6 +5,9 @@
 
 #include "nds.h"
 
+#define UPDATE_IRQ(x)                                                          \
+    (io->master->cpu##x.irq = io->ime && (io->ie.w & io->ifl.w))
+
 u8 io7_read8(IO* io, u32 addr) {
     u16 h = io7_read16(io, addr & ~1);
     if (addr & 1) {
@@ -55,9 +58,11 @@ u16 io7_read16(IO* io, u32 addr) {
             break;
         }
         case AUXSPIDATA: {
-            u8 data = io->master->card->spidata;
-            io->master->card->spidata = 0;
-            return data;
+            if (io->master->card) {
+                u8 data = io->master->card->spidata;
+                io->master->card->spidata = 0;
+                return data;
+            } else return 0;
             break;
         }
         case SPIDATA: {
@@ -118,7 +123,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                 if (io->master->io9.ipcsync.irq) {
                     io->master->io9.ifl.ipcsync = 1;
                     io->master->cpu9.irq =
-                        (io->master->io9.ime & 1) &&
+                        io->master->io9.ime &&
                         (io->master->io9.ie.w & io->master->io9.ifl.w);
                 }
             }
@@ -142,7 +147,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             if (io->ipcfifocnt.recv_irq && !io->ipcfifocnt.recvempty) {
                 io->ifl.ipcrecv = 1;
             }
-            io->master->cpu7.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+            UPDATE_IRQ(7);
             break;
         }
         case IPCFIFOSEND:
@@ -159,10 +164,6 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             break;
         case ROMCTRL + 2:
             io->h[addr >> 1] = data;
-            u32 len = 0x100 << io->romctrl.blocksize;
-            if (len == 0x100) len = 0;
-            if (len == 0x8000) len = 4;
-            io->master->card->len = len;
             io->romctrl.drq = 0;
             if (io->romctrl.busy) {
                 io->romctrl.busy = 0;
@@ -195,16 +196,23 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                     tsc_spi_write(io->master, data);
                     break;
             }
+            if (io->spicnt.irq) {
+                io->ifl.spi = 1;
+                UPDATE_IRQ(7);
+            }
             break;
         case EXMEMCNT:
             io->exmemcnt.w &= 0xff80;
             io->exmemcnt.w |= data & 0x7f;
             break;
         case IME:
+            io->ime = data & 1;
+            UPDATE_IRQ(7);
+            break;
         case IE:
         case IE + 2:
             io->h[addr >> 1] = data;
-            io->master->cpu7.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+            UPDATE_IRQ(7);
             break;
         case IF:
             io9_write32(io, addr & ~3, data);
@@ -233,7 +241,7 @@ u32 io7_read32(IO* io, u32 addr) {
                         if (io->master->io9.ipcfifocnt.send_irq) {
                             io->master->io9.ifl.ipcsend = 1;
                             io->master->cpu9.irq =
-                                (io->master->io9.ime & 1) &&
+                                io->master->io9.ime &&
                                 (io->master->io9.ie.w & io->master->io9.ifl.w);
                         }
                     }
@@ -251,16 +259,16 @@ u32 io7_read32(IO* io, u32 addr) {
             break;
         case GAMECARDIN: {
             u32 data;
+            bool busy = io->romctrl.busy;
             if (card_read_data(io->master->card, &data)) {
                 io->romctrl.drq = 1;
                 io->romctrl.busy = 1;
             } else {
                 io->romctrl.drq = 0;
                 io->romctrl.busy = 0;
-                if (io->auxspicnt.irq) {
+                if (busy && io->auxspicnt.irq) {
                     io->ifl.gamecardtrans = 1;
-                    io->master->cpu7.irq =
-                        (io->ime & 1) && (io->ie.w & io->ifl.w);
+                    UPDATE_IRQ(7);
                 }
             }
             return data;
@@ -289,7 +297,7 @@ void io7_write32(IO* io, u32 addr, u32 data) {
                         if (io->master->io9.ipcfifocnt.recv_irq) {
                             io->master->io9.ifl.ipcrecv = 1;
                             io->master->cpu9.irq =
-                                (io->master->io9.ime & 1) &&
+                                io->master->io9.ime &&
                                 (io->master->io9.ie.w & io->master->io9.ifl.w);
                         }
                     }
@@ -298,7 +306,7 @@ void io7_write32(IO* io, u32 addr, u32 data) {
             break;
         case IF:
             io->ifl.w &= ~data;
-            io->master->cpu7.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+            UPDATE_IRQ(7);
             break;
         default:
             io7_write16(io, addr, data);
@@ -517,9 +525,11 @@ u16 io9_read16(IO* io, u32 addr) {
             break;
         }
         case AUXSPIDATA: {
-            u8 data = io->master->card->spidata;
-            io->master->card->spidata = 0;
-            return data;
+            if (io->master->card) {
+                u8 data = io->master->card->spidata;
+                io->master->card->spidata = 0;
+                return data;
+            } else return 0;
             break;
         }
         default:
@@ -621,7 +631,7 @@ void io9_write16(IO* io, u32 addr, u16 data) {
                 if (io->master->io7.ipcsync.irq) {
                     io->master->io7.ifl.ipcsync = 1;
                     io->master->cpu7.irq =
-                        (io->master->io7.ime & 1) &&
+                        io->master->io7.ime &&
                         (io->master->io7.ie.w & io->master->io7.ifl.w);
                 }
             }
@@ -645,7 +655,7 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             if (io->ipcfifocnt.recv_irq && !io->ipcfifocnt.recvempty) {
                 io->ifl.ipcrecv = 1;
             }
-            io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+            UPDATE_IRQ(9);
             break;
         }
         case IPCFIFOSEND:
@@ -662,10 +672,6 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             break;
         case ROMCTRL + 2:
             io->h[addr >> 1] = data;
-            u32 len = 0x100 << io->romctrl.blocksize;
-            if (len == 0x100) len = 0;
-            if (len == 0x8000) len = 4;
-            io->master->card->len = len;
             io->romctrl.drq = 0;
             if (io->romctrl.busy) {
                 io->romctrl.busy = 0;
@@ -691,20 +697,19 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             io->master->io7.exmemcnt.w |= data & 0xff80;
             break;
         case IME:
+            io->ime = data & 1;
+            UPDATE_IRQ(9);
+            break;
         case IE:
         case IE + 2:
             io->h[addr >> 1] = data;
-            io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+            UPDATE_IRQ(9);
             break;
         case IF:
             io9_write32(io, addr & ~3, data);
             break;
         case IF + 2:
             io9_write32(io, addr & ~3, data << 16);
-            break;
-        case GXFIFO:
-            io->ifl.gxfifo = 1;
-            io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
             break;
         case GXSTAT + 2:
             io->h[addr >> 1] = data | 0x0600;
@@ -728,7 +733,7 @@ u32 io9_read32(IO* io, u32 addr) {
                         if (io->master->io7.ipcfifocnt.send_irq) {
                             io->master->io7.ifl.ipcsend = 1;
                             io->master->cpu7.irq =
-                                (io->master->io7.ime & 1) &&
+                                io->master->io7.ime &&
                                 (io->master->io7.ie.w & io->master->io7.ifl.w);
                         }
                     }
@@ -746,16 +751,16 @@ u32 io9_read32(IO* io, u32 addr) {
             break;
         case GAMECARDIN: {
             u32 data;
+            bool busy = io->romctrl.busy;
             if (card_read_data(io->master->card, &data)) {
                 io->romctrl.drq = 1;
                 io->romctrl.busy = 1;
             } else {
                 io->romctrl.drq = 0;
                 io->romctrl.busy = 0;
-                if (io->auxspicnt.irq) {
+                if (busy && io->auxspicnt.irq) {
                     io->ifl.gamecardtrans = 1;
-                    io->master->cpu9.irq =
-                        (io->ime & 1) && (io->ie.w & io->ifl.w);
+                    UPDATE_IRQ(9);
                 }
             }
             return data;
@@ -784,7 +789,7 @@ void io9_write32(IO* io, u32 addr, u32 data) {
                         if (io->master->io7.ipcfifocnt.recv_irq) {
                             io->master->io7.ifl.ipcrecv = 1;
                             io->master->cpu7.irq =
-                                (io->master->io7.ime & 1) &&
+                                io->master->io7.ime &&
                                 (io->master->io7.ie.w & io->master->io7.ifl.w);
                         }
                     }
@@ -793,7 +798,7 @@ void io9_write32(IO* io, u32 addr, u32 data) {
             break;
         case IF:
             io->ifl.w &= ~data;
-            io->master->cpu9.irq = (io->ime & 1) && (io->ie.w & io->ifl.w);
+            UPDATE_IRQ(9);
             break;
         default:
             io9_write16(io, addr, data);

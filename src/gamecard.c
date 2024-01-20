@@ -74,6 +74,7 @@ bool card_write_command(GameCard* card, u8* command) {
                 card->addr = command[1] << 24 | command[2] << 16 |
                              command[3] << 8 | command[4];
                 card->i = 0;
+                card->len = 0x200;
                 return true;
                 break;
             case 0xb8:

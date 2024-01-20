@@ -129,11 +129,7 @@ u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx) {
     else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
         data = *(u16*) &cpu->dtcm[(addr & ~1) % DTCMSIZE];
     else data = bus9_read16(cpu->master, addr & ~1);
-    if (addr & 1) {
-        if (sx) {
-            data = ((s16) data) >> 8;
-        } else data = (data >> 8) | (data << 24);
-    } else if (sx) data = (s16) data;
+    if (sx) data = (s16) data;
     return data;
 }
 
