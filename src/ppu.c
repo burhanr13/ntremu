@@ -69,8 +69,8 @@ void render_bg_line_text(PPU* ppu, int bg) {
             u16 col_ind = row & 0xff;
             if (col_ind) {
                 if (extPal) col_ind |= tile.palette << 8;
-                ppu->layerlines[bg][x] = bpp8Pal[col_ind] & ~(1 << 15);
-            } else ppu->layerlines[bg][x] = 1 << 15;
+                ppu->layerlines[bg][x] = bpp8Pal[col_ind] | (1 << 15);
+            }
 
             row >>= 8;
             fx++;
@@ -118,8 +118,8 @@ void render_bg_line_text(PPU* ppu, int bg) {
             u8 col_ind = row & 0xf;
             if (col_ind) {
                 col_ind |= tile.palette << 4;
-                ppu->layerlines[bg][x] = ppu->pal[col_ind] & ~(1 << 15);
-            } else ppu->layerlines[bg][x] = 1 << 15;
+                ppu->layerlines[bg][x] = ppu->pal[col_ind] | (1 << 15);
+            }
 
             row >>= 4;
             fx++;
@@ -174,7 +174,6 @@ void render_bg_line_aff(PPU* ppu, int bg) {
         u32 sx = x0 >> 8;
         u32 sy = y0 >> 8;
         if ((sx >= size || sy >= size) && !ppu->io->bgcnt[bg].overflow) {
-            ppu->layerlines[bg][x] = 1 << 15;
             continue;
         }
 
@@ -190,19 +189,20 @@ void render_bg_line_aff(PPU* ppu, int bg) {
         col_ind = vram_read8(ppu->master, ppu->bgReg,
                              tile_start + 64 * tile + finey * 8 + finex);
 
-        if (col_ind) ppu->layerlines[bg][x] = ppu->pal[col_ind] & ~(1 << 15);
-        else ppu->layerlines[bg][x] = 1 << 15;
+        if (col_ind) ppu->layerlines[bg][x] = ppu->pal[col_ind] | (1 << 15);
     }
 }
 
 void render_bg_line_aff_ext(PPU* ppu, int bg) {
-    // render_bg_line_text(ppu, bg);
+    if (!(ppu->io->dispcnt.bg_enable & (1 << bg))) return;
+    ppu->draw_bg[bg] = true;
 }
 
 void render_bgs(PPU* ppu) {
     int mode = ppu->io->dispcnt.bg_mode;
     if (mode != 6) {
-        render_bg_line_text(ppu, 0);
+        if(!ppu->io->dispcnt.enable_3d)
+            render_bg_line_text(ppu, 0);
         render_bg_line_text(ppu, 1);
         switch (mode) {
             case 0:
@@ -235,6 +235,8 @@ void render_bgs(PPU* ppu) {
 
 void render_obj_line(PPU* ppu, int i) {
     ObjAttr o = ppu->oam[i];
+
+    if (o.mode == OBJ_MODE_BITMAP) return;
 
     bool extPal = ppu->io->dispcnt.obj_extpal;
     u16* bpp8Pal = ppu->pal + 0x100;
@@ -278,11 +280,7 @@ void render_obj_line(PPU* ppu, int i) {
                                              ? ppu->io->dispcnt.obj_boundary
                                              : 0));
 
-    if (ppu->io->dispcnt.bg_mode > 2 && tile_start < 0x4000) return;
-
     if (o.aff) {
-        ppu->obj_cycles -= 10 + 2 * w;
-
         u8 ow = w;
         u8 oh = h;
         if (o.disable_double) {
@@ -310,7 +308,7 @@ void render_obj_line(PPU* ppu, int i) {
             u16 col;
 
             if (ty >= oh / 8 || tx >= ow / 8) {
-                col = 1 << 15;
+                col = 0;
             } else {
                 if (o.palmode) {
                     u32 tile_addr =
@@ -321,8 +319,8 @@ void render_obj_line(PPU* ppu, int i) {
                         vram_read8(ppu->master, ppu->objReg, tile_addr);
                     if (col_ind) {
                         if (extPal) col_ind |= o.palette << 8;
-                        col = bpp8Pal[col_ind] & ~(1 << 15);
-                    } else col = 1 << 15;
+                        col = bpp8Pal[col_ind] | (1 << 15);
+                    } else col = 0;
                 } else {
                     u32 tile_addr =
                         tile_start +
@@ -334,17 +332,17 @@ void render_obj_line(PPU* ppu, int i) {
                     else col_ind &= 0b1111;
                     if (col_ind) {
                         col_ind |= o.palette << 4;
-                        col = ppu->pal[0x100 + col_ind] & ~(1 << 15);
-                    } else col = 1 << 15;
+                        col = ppu->pal[0x100 + col_ind] | (1 << 15);
+                    } else col = 0;
                 }
             }
             if (o.mode == OBJ_MODE_OBJWIN) {
-                if (ppu->io->dispcnt.winobj_enable && !(col & (1 << 15))) {
+                if (ppu->io->dispcnt.winobj_enable && (col & (1 << 15))) {
                     ppu->window[sx] = WOBJ;
                 }
             } else if (o.priority < ppu->objdotattrs[sx].priority ||
-                       (ppu->layerlines[LOBJ][sx] & (1 << 15))) {
-                if (!(col & (1 << 15))) {
+                       !(ppu->layerlines[LOBJ][sx] & (1 << 15))) {
+                if (col & (1 << 15)) {
                     ppu->draw_obj = true;
                     ppu->layerlines[LOBJ][sx] = col;
                     ppu->objdotattrs[sx].semitrans =
@@ -355,8 +353,6 @@ void render_obj_line(PPU* ppu, int i) {
             }
         }
     } else {
-        ppu->obj_cycles -= w;
-
         u32 tile_addr = tile_start;
 
         if (o.vflip) yofs = h - 1 - yofs;
@@ -394,12 +390,12 @@ void render_obj_line(PPU* ppu, int i) {
                             ppu->window[sx] = WOBJ;
                         }
                     } else if (o.priority < ppu->objdotattrs[sx].priority ||
-                               (ppu->layerlines[LOBJ][sx] & (1 << 15))) {
+                               !(ppu->layerlines[LOBJ][sx] & (1 << 15))) {
                         if (col_ind) {
                             if (extPal) col_ind |= o.palette << 8;
                             u16 col = bpp8Pal[col_ind];
                             ppu->draw_obj = true;
-                            ppu->layerlines[LOBJ][sx] = col & ~(1 << 15);
+                            ppu->layerlines[LOBJ][sx] = col | (1 << 15);
                             ppu->objdotattrs[sx].semitrans =
                                 (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
                             ppu->objdotattrs[sx].mosaic = o.mosaic;
@@ -457,12 +453,12 @@ void render_obj_line(PPU* ppu, int i) {
                             ppu->window[sx] = WOBJ;
                         }
                     } else if (o.priority < ppu->objdotattrs[sx].priority ||
-                               (ppu->layerlines[LOBJ][sx] & (1 << 15))) {
+                               !(ppu->layerlines[LOBJ][sx] & (1 << 15))) {
                         if (col_ind) {
                             col_ind |= o.palette << 4;
                             u16 col = ppu->pal[0x100 + col_ind];
                             ppu->draw_obj = true;
-                            ppu->layerlines[LOBJ][sx] = col & ~(1 << 15);
+                            ppu->layerlines[LOBJ][sx] = col | (1 << 15);
                             ppu->objdotattrs[sx].semitrans =
                                 (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
                             ppu->objdotattrs[sx].mosaic = o.mosaic;
@@ -496,16 +492,8 @@ void render_obj_line(PPU* ppu, int i) {
 void render_objs(PPU* ppu) {
     if (!ppu->io->dispcnt.obj_enable) return;
 
-    for (int x = 0; x < NDS_SCREEN_W; x++) {
-        ppu->layerlines[LOBJ][x] = 1 << 15;
-    }
-
-    ppu->obj_cycles =
-        (ppu->io->dispcnt.hblank_free ? NDS_SCREEN_W : DOTS_W) * 6;
-
     for (int i = 0; i < 128; i++) {
         render_obj_line(ppu, i);
-        if (ppu->obj_cycles <= 0) break;
     }
 }
 
@@ -588,14 +576,14 @@ void compose_lines(PPU* ppu) {
             u8 win = ppu->window[x];
             int l = 0;
             bool put_obj = ppu->draw_obj &&
-                           !(ppu->layerlines[LOBJ][x] & (1 << 15)) &&
+                           (ppu->layerlines[LOBJ][x] & (1 << 15)) &&
                            (!win_ena || (ppu->io->wincnt[win].obj_enable));
             for (int i = 0; i < bgs && l < 2; i++) {
                 if (put_obj && ppu->objdotattrs[x].priority <= bg_prios[i]) {
                     put_obj = false;
                     layers[l++] = LOBJ;
                 }
-                if (!(ppu->layerlines[sorted_bgs[i]][x] & (1 << 15)) &&
+                if ((ppu->layerlines[sorted_bgs[i]][x] & (1 << 15)) &&
                     (!win_ena ||
                      (ppu->io->wincnt[win].bg_enable & (1 << sorted_bgs[i])))) {
                     layers[l++] = sorted_bgs[i];
@@ -672,7 +660,7 @@ void compose_lines(PPU* ppu) {
             u8 win = ppu->window[x];
             int l = 0;
             bool put_obj = ppu->draw_obj &&
-                           !(ppu->layerlines[LOBJ][x] & (1 << 15)) &&
+                           (ppu->layerlines[LOBJ][x] & (1 << 15)) &&
                            (!win_ena || (ppu->io->wincnt[win].obj_enable));
 
             for (int i = 0; i < bgs; i++) {
@@ -681,7 +669,7 @@ void compose_lines(PPU* ppu) {
                     layers[l++] = LOBJ;
                     break;
                 }
-                if (!(ppu->layerlines[sorted_bgs[i]][x] & (1 << 15)) &&
+                if ((ppu->layerlines[sorted_bgs[i]][x] & (1 << 15)) &&
                     (!win_ena ||
                      (ppu->io->wincnt[win].bg_enable & (1 << sorted_bgs[i])))) {
                     layers[l++] = sorted_bgs[i];
@@ -699,6 +687,7 @@ void compose_lines(PPU* ppu) {
 }
 
 void draw_scanline_normal(PPU* ppu) {
+    memset(ppu->layerlines, 0, sizeof ppu->layerlines);
     for (int x = 0; x < NDS_SCREEN_W; x++) {
         ppu->layerlines[LBD][x] = ppu->pal[0];
     }
