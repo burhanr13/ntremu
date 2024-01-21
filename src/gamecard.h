@@ -34,7 +34,7 @@ typedef struct {
     u8 nintendo_logo[0x9c];
     u16 logo_crc;
     u16 header_crc;
-    u8 rest[0xa0];
+    u8 reserved[0x10];
 } CardHeader;
 
 typedef enum { CARD_IDLE, CARD_CHIPID, CARD_DATA } CardState;
