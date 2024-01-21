@@ -104,6 +104,7 @@ enum {
     // system/interrupt control
     EXMEMCNT = 0x204,
     EXMEMSTAT = 0x204,
+    WIFIWAITCNT = 0x206,
     IME = 0x208,
     IE = 0x210,
     IF = 0x214,
@@ -141,7 +142,11 @@ enum {
     GXFIFO = 0x400,
     GXSTAT = 0x600,
 
-    PPUB_OFF = 0x1000
+    PPUB_OFF = 0x1000,
+
+    // wifi
+    WIFIRAM = 0x804000,
+    WIFI_OFF = 0x808000
 };
 
 typedef struct _NDS NDS;
@@ -456,20 +461,27 @@ typedef struct _IO {
             u16 spidata;
             u8 gap1dx[EXMEMCNT - SPIDATA - 2];
             union {
-                u32 w;
+                u16 h;
                 struct {
-                    u32 gbasramtime : 2;
-                    u32 gbaromtime : 2;
-                    u32 gbaromstime : 1;
-                    u32 phi : 2;
-                    u32 gbacartrights : 1;
-                    u32 unused : 3;
-                    u32 ndscardrights : 1;
-                    u32 unused1 : 3;
-                    u32 ramprio : 1;
-                    u32 unused2 : 16;
+                    u16 gbasramtime : 2;
+                    u16 gbaromtime : 2;
+                    u16 gbaromstime : 1;
+                    u16 phi : 2;
+                    u16 gbacartrights : 1;
+                    u16 unused : 3;
+                    u16 ndscardrights : 1;
+                    u16 unused1 : 3;
+                    u16 ramprio : 1;
                 };
             } exmemcnt;
+            union {
+                u16 h;
+                struct {
+                    u16 ws0 : 3;
+                    u16 ws1 : 3;
+                    u16 unused : 10;
+                };
+            } wifiwaitcnt;
             u32 ime;
             u32 unused_20c;
             union {

@@ -16,6 +16,9 @@
 #define WRAMSIZE (1 << 15)
 #define WRAM7SIZE (1 << 16)
 
+#define WIFIRAMSIZE (1 << 13)
+#define WIFIIOSIZE (1 << 12)
+
 #define VRAMSIZE 0xa4000
 #define VRAMABCDSIZE (1 << 17)
 #define VRAMESIZE (1 << 16)
@@ -97,6 +100,9 @@ typedef struct _NDS {
 
     IO io7;
     IO io9;
+
+    u8 wifiram[WIFIRAMSIZE];
+    u8 wifi_io[WIFIIOSIZE];
 
     union {
         struct {

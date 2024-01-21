@@ -45,6 +45,12 @@ u16 io7_read16(IO* io, u32 addr) {
             if (addr & 2) return w >> 16;
             else return w;
         }
+        if (WIFIRAM <= addr && addr < WIFIRAM + WIFIRAMSIZE) {
+            return *(u16*) &io->master->wifiram[addr - WIFIRAM];
+        }
+        if (WIFI_OFF <= addr && addr < WIFI_OFF + WIFIIOSIZE) {
+            return *(u16*) &io->master->wifi_io[addr - WIFI_OFF];
+        }
         return 0;
     }
     switch (addr) {
@@ -81,6 +87,12 @@ void io7_write16(IO* io, u32 addr, u16 data) {
     if (addr == POSTFLG) {
         io7_write8(io, addr, data);
         io7_write8(io, addr | 1, data >> 8);
+        if (WIFIRAM <= addr && addr < WIFIRAM + WIFIRAMSIZE) {
+            *(u16*) &io->master->wifiram[addr - WIFIRAM] = data;
+        }
+        if (WIFI_OFF <= addr && addr < WIFI_OFF + WIFIIOSIZE) {
+            *(u16*) &io->master->wifi_io[addr - WIFI_OFF] = data;
+        }
         return;
     }
     switch (addr) {
@@ -202,8 +214,8 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             }
             break;
         case EXMEMCNT:
-            io->exmemcnt.w &= 0xff80;
-            io->exmemcnt.w |= data & 0x7f;
+            io->exmemcnt.h &= 0xff80;
+            io->exmemcnt.h |= data & 0x7f;
             break;
         case IME:
             io->ime = data & 1;
@@ -697,9 +709,9 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             }
             break;
         case EXMEMCNT:
-            io->exmemcnt.w = data;
-            io->master->io7.exmemcnt.w &= 0x7f;
-            io->master->io7.exmemcnt.w |= data & 0xff80;
+            io->exmemcnt.h = data;
+            io->master->io7.exmemcnt.h &= 0x7f;
+            io->master->io7.exmemcnt.h |= data & 0xff80;
             break;
         case IME:
             io->ime = data & 1;
