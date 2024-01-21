@@ -84,8 +84,9 @@ int main(int argc, char** argv) {
                             }
                         }
                         nds_step(ntremu.nds);
+                        if (ntremu.nds->cpuerr) break;
                     }
-                    if (bkpthit) break;
+                    if (bkpthit || ntremu.nds->cpuerr) break;
                     ntremu.nds->frame_complete = false;
                     frame++;
 
@@ -93,7 +94,7 @@ int main(int argc, char** argv) {
                     elapsed = cur_time - prev_time;
                 } while (ntremu.uncap && elapsed < frame_ticks);
             }
-            if (bkpthit) break;
+            if (bkpthit || ntremu.nds->cpuerr) break;
 
             void* pixels;
             int pitch;
@@ -158,8 +159,8 @@ int main(int argc, char** argv) {
         }
 
         if (ntremu.debugger) {
+            ntremu.running = false;
             if (bkpthit) {
-                ntremu.running = false;
                 printf("Breakpoint hit: %08x\n", ntremu.breakpoint);
             }
             debugger_run();

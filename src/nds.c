@@ -119,6 +119,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
         *(u16*) &nds->ram[0x3ffc08] = header->header_crc;
         *(u16*) &nds->ram[0x3ffc0a] = header->secure_crc;
         *(u16*) &nds->ram[0x3ffc10] = 0x5835;
+        *(u16*) &nds->ram[0x3ffc40] = 2;
 
         memcpy(&nds->ram[0x3ffc80], &firmware[0x3ff00], 0x70);
 

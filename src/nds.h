@@ -186,6 +186,9 @@ typedef struct _NDS {
     bool half_tick;
     bool frame_complete;
 
+    bool memerr;
+    bool cpuerr;
+
 } NDS;
 
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware, bool bootbios);

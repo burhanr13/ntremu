@@ -152,11 +152,21 @@ void cpu7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w) {
 }
 
 u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr) {
-    return bus7_read16(cpu->master, addr & ~1);
+    u16 data = bus7_read16(cpu->master, addr & ~1);
+    if (cpu->master->memerr) {
+        printf("Invalid instruction fetch at 0x%08x\n", addr);
+        cpu->master->cpuerr = true;
+    }
+    return data;
 }
 
 u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr) {
-    return bus7_read32(cpu->master, addr & ~3);
+    u32 data = bus7_read32(cpu->master, addr & ~3);
+    if (cpu->master->memerr) {
+        printf("Invalid instruction fetch at 0x%08x\n", addr);
+        cpu->master->cpuerr = true;
+    }
+    return data;
 }
 
 void print_cpu7_state(Arm7TDMI* cpu) {
