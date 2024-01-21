@@ -86,6 +86,16 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
         cpu7_handle_interrupt(&nds->cpu7, I_RESET);
         cpu9_handle_interrupt(&nds->cpu9, I_RESET);
     } else {
+
+        nds->io9.ppuA.bgaff[0].pa = 1 << 8;
+        nds->io9.ppuA.bgaff[0].pd = 1 << 8;
+        nds->io9.ppuA.bgaff[1].pa = 1 << 8;
+        nds->io9.ppuA.bgaff[1].pd = 1 << 8;
+        nds->io9.ppuB.bgaff[0].pa = 1 << 8;
+        nds->io9.ppuB.bgaff[0].pd = 1 << 8;
+        nds->io9.ppuB.bgaff[1].pa = 1 << 8;
+        nds->io9.ppuB.bgaff[1].pd = 1 << 8;
+
         nds->io7.wramstat = 3;
         nds->io9.wramcnt = 3;
         nds->io7.postflg = 1;

@@ -210,7 +210,7 @@ void render_bg_line_aff_ext(PPU* ppu, int bg) {
                     ppu->io->bgcnt[bg].tilemap_base * 0x800;
     u32 tile_start = ppu->io->dispcnt.tile_base * 0x10000 +
                      ppu->io->bgcnt[bg].tile_base * 0x4000;
-    u32 bm_start = ppu->io->bgcnt[bg].tilemap_base * 0x800;
+    u32 bm_start = ppu->io->bgcnt[bg].tilemap_base * 0x4000;
 
     s32 x0, y0;
     if (ppu->io->bgcnt[bg].mosaic) {
@@ -227,8 +227,7 @@ void render_bg_line_aff_ext(PPU* ppu, int bg) {
         w = BMLAYOUT[ppu->io->bgcnt[bg].size][0];
         h = BMLAYOUT[ppu->io->bgcnt[bg].size][1];
     } else {
-        w = (ppu->io->bgcnt[bg].size & 1) ? 512 : 256;
-        h = (ppu->io->bgcnt[bg].size & 2) ? 512 : 256;
+        w = h = 1 << (7 + ppu->io->bgcnt[bg].size);
     }
 
     for (int x = 0; x < NDS_SCREEN_W; x++, x0 += ppu->io->bgaff[bg - 2].pa,
@@ -255,15 +254,12 @@ void render_bg_line_aff_ext(PPU* ppu, int bg) {
                 }
             }
         } else {
-            u16 scx = sx >> 8;
-            u16 scy = sy >> 8;
-            int sc = SCLAYOUT[ppu->io->bgcnt[bg].size][scx][scy];
-            u16 tilex = (sx >> 3) & 0x1f;
-            u16 tiley = (sy >> 3) & 0x1f;
+            u16 tilex = (sx >> 3);
+            u16 tiley = (sy >> 3);
             u16 finex = sx & 0b111;
             u16 finey = sy & 0b111;
             BgTile tile = {vram_read16(ppu->master, ppu->bgReg,
-                                       map_start + 0x800 * sc + tiley * 2 * 32 +
+                                       map_start + tiley * w / 4 +
                                            2 * tilex)};
             if (tile.hflip) finex = 7 - finex;
             if (tile.vflip) finey = 7 - finey;
