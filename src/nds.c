@@ -46,6 +46,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->ppuB.bgReg = VRAMBGB;
     nds->ppuB.objReg = VRAMOBJB;
 
+    nds->gpu.master = nds;
+
     nds->io7.master = nds;
     nds->io9.master = nds;
 
@@ -81,6 +83,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->io7.ipcfifocnt.recvempty = 1;
     nds->io9.ipcfifocnt.sendempty = 1;
     nds->io9.ipcfifocnt.recvempty = 1;
+    nds->io9.gxstat.gxfifo_empty = 1;
+    nds->io9.gxstat.gxfifo_half = 1;
 
     if (bootbios) {
         cpu7_handle_interrupt(&nds->cpu7, I_RESET);

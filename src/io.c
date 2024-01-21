@@ -592,6 +592,11 @@ void io9_write16(IO* io, u32 addr, u16 data) {
         io->sqrtcnt.busy = 0;
         return;
     }
+    if (GXFIFO <= addr && addr < GXSTAT) {
+        io->h[addr >> 1] = data;
+        io9_write32(io, addr & ~3, io->w[addr >> 2]);
+        return;
+    }
     switch (addr) {
         case DISPSTAT:
             data &= ~0b111;
@@ -711,8 +716,16 @@ void io9_write16(IO* io, u32 addr, u16 data) {
         case IF + 2:
             io9_write32(io, addr & ~3, data << 16);
             break;
+        case GXSTAT:
+            break;
         case GXSTAT + 2:
-            io->h[addr >> 1] = data | 0x0600;
+            io->h[addr >> 1] &= 0x3fff;
+            io->h[addr >> 1] |= data & 0xc000;
+            io->ifl.gxfifo = ((io->gxstat.gxfifo_half && io->gxstat.irq_half) ||
+                              (io->gxstat.gxfifo_empty && io->gxstat.irq_empty))
+                                 ? 1
+                                 : 0;
+            UPDATE_IRQ(9);
             break;
         default:
             io->h[addr >> 1] = data;
@@ -771,6 +784,16 @@ u32 io9_read32(IO* io, u32 addr) {
 }
 
 void io9_write32(IO* io, u32 addr, u32 data) {
+    if (GXFIFO <= addr && addr < GXSTAT) {
+        u8 com = addr >> 2;
+        if (com < 0x10) {
+            gxfifo_write(&io->master->gpu, data);
+        } else {
+            gxfifo_write(&io->master->gpu, com);
+            gxfifo_write(&io->master->gpu, data);
+        }
+        return;
+    }
     switch (addr) {
         case IPCFIFOSEND:
             io->ipcfifosend = data;
@@ -798,6 +821,10 @@ void io9_write32(IO* io, u32 addr, u32 data) {
             break;
         case IF:
             io->ifl.w &= ~data;
+            io->ifl.gxfifo = ((io->gxstat.gxfifo_half && io->gxstat.irq_half) ||
+                              (io->gxstat.gxfifo_empty && io->gxstat.irq_empty))
+                                 ? 1
+                                 : 0;
             UPDATE_IRQ(9);
             break;
         default:

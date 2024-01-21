@@ -5,6 +5,7 @@
 #include "arm946e.h"
 #include "dma.h"
 #include "gamecard.h"
+#include "gpu.h"
 #include "io.h"
 #include "ppu.h"
 #include "scheduler.h"
@@ -81,6 +82,7 @@ typedef struct _NDS {
 
     PPU ppuA;
     PPU ppuB;
+    GPU gpu;
 
     u8 ram[RAMSIZE];
 

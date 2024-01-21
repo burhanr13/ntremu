@@ -49,7 +49,8 @@ enum {
     BLDCNT = 0x050,
     BLDALPHA = 0x052,
     BLDY = 0x054,
-
+    // extra display stuff
+    DISP3DCNT = 0x060,
     MASTERBRIGHT = 0x06c,
 
     // dma control
@@ -586,7 +587,27 @@ typedef struct _IO {
                     u32 unusedhi : 16;
                 };
             } powcnt;
-            u8 gap_3xx[PPUB_OFF - POWCNT - 4];
+            u8 gap_3xx[GXSTAT - POWCNT - 4];
+            union {
+                u32 w;
+                struct {
+                    u32 test_busy : 1;
+                    u32 boxtest : 1;
+                    u32 unused : 6;
+                    u32 mtxstk_size : 5;
+                    u32 projstk_size : 1;
+                    u32 mtxstk_busy : 1;
+                    u32 mtxstk_error : 1;
+                    u32 gxfifo_size : 9;
+                    u32 gxfifo_half : 1;
+                    u32 gxfifo_empty : 1;
+                    u32 gx_busy : 1;
+                    u32 unused2 : 2;
+                    u32 irq_half : 1;
+                    u32 irq_empty : 1;
+                };
+            } gxstat;
+            u8 gap_6xx[PPUB_OFF - GXSTAT - 4];
             PPUIO ppuB;
         };
     };
