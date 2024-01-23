@@ -4,12 +4,33 @@
 #include "ppu.h"
 #include "types.h"
 
-typedef struct {
-    s16 p[3];
-} vec3;
+#define MAX_VTX 6144
+#define MAX_POLY 2048
+
+enum {
+    COLOR = 0x20,
+    NORMAL,
+    TEXCOORD,
+    VTX_16,
+    VTX_10,
+    VTX_XY,
+    VTX_XZ,
+    VTX_YZ,
+    VTX_DIFF,
+    POLYGON_ATTR,
+    TEXIMAGE_PARAM,
+    PLTT_BASE,
+    BEGIN_VTXS = 0x40,
+    END_VTXS,
+    SWAP_BUFFERS = 0x50,
+};
 
 typedef struct {
-    s32 p[4][4];
+    float p[4];
+} vec4;
+
+typedef struct {
+    float p[4][4];
 } mat4;
 
 typedef struct _NDS NDS;
@@ -37,12 +58,20 @@ typedef struct {
     mat4 vec_mtxstk[32];
     u8 vecstk_size;
 
-    vec3 vertexram[6144];
+    int mtx_mode;
+    mat4 clipmtx;
+
+    vec4 vertexram[MAX_VTX];
     u16 n_verts;
+
+    int poly_mode;
+
+    vec4 cur_vtx;
 
 } GPU;
 
 void gxfifo_write(GPU* gpu, u32 command);
 void gxcmd_execute(GPU* gpu);
+void gpu_render(GPU* gpu);
 
 #endif

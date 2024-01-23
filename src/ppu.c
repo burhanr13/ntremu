@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "gpu.h"
 #include "io.h"
 #include "nds.h"
 #include "scheduler.h"
@@ -259,8 +260,7 @@ void render_bg_line_aff_ext(PPU* ppu, int bg) {
             u16 finex = sx & 0b111;
             u16 finey = sy & 0b111;
             BgTile tile = {vram_read16(ppu->master, ppu->bgReg,
-                                       map_start + tiley * w / 4 +
-                                           2 * tilex)};
+                                       map_start + tiley * w / 4 + 2 * tilex)};
             if (tile.hflip) finex = 7 - finex;
             if (tile.vflip) finey = 7 - finey;
 
@@ -279,7 +279,15 @@ void render_bg_line_aff_ext(PPU* ppu, int bg) {
 void render_bgs(PPU* ppu) {
     int mode = ppu->io->dispcnt.bg_mode;
     if (mode != 6) {
-        if (!ppu->io->dispcnt.enable_3d) render_bg_line_text(ppu, 0);
+        if (ppu->io->dispcnt.enable_3d) {
+            if (ppu->io->dispcnt.bg_enable & 1) {
+                ppu->draw_bg[0] = true;
+                memcpy(ppu->layerlines[0], ppu->master->gpu.screen[ppu->ly],
+                       sizeof ppu->screen[0]);
+            }
+        } else {
+            render_bg_line_text(ppu, 0);
+        }
         render_bg_line_text(ppu, 1);
         switch (mode) {
             case 0:
