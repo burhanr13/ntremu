@@ -8,6 +8,19 @@
 #define MAX_POLY 2048
 
 enum {
+    MTX_MODE = 0x10,
+    MTX_PUSH,
+    MTX_POP,
+    MTX_STORE,
+    MTX_RESTORE,
+    MTX_IDENTITY,
+    MTX_LOAD_44,
+    MTX_LOAD_43,
+    MTX_MULT_44,
+    MTX_MULT_43,
+    MTX_MULT_33,
+    MTX_SCALE,
+    MTX_TRANS,
     COLOR = 0x20,
     NORMAL,
     TEXCOORD,
