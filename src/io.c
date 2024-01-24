@@ -23,6 +23,7 @@ void io7_write8(IO* io, u32 addr, u8 data) {
     if (addr == HALTCNT) {
         io->haltcnt = data;
         if ((data >> 6) == 2) io->master->halt7 = true;
+        if ((data >> 6) == 3) printf("sleep mode\n");
         return;
     }
 
