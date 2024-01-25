@@ -107,12 +107,15 @@ void io7_write16(IO* io, u32 addr, u16 data) {
         case DMA0CNT + 2:
         case DMA1CNT + 2:
         case DMA2CNT + 2:
-        case DMA3CNT + 2:
-            io->h[addr >> 1] = data;
+        case DMA3CNT + 2: {
             int i = (addr - DMA0CNT - 2) / (DMA1CNT - DMA0CNT);
+            bool prev_ena = io->dma[i].cnt.enable;
+            io->h[addr >> 1] = data;
             io->dma[i].cnt.mode &= 6;
-            if (io->dma[i].cnt.enable) dma7_enable(&io->master->dma7, i);
+            if (!prev_ena && io->dma[i].cnt.enable)
+                dma7_enable(&io->master->dma7, i);
             break;
+        }
         case TM0CNT + 2:
         case TM1CNT + 2:
         case TM2CNT + 2:
@@ -621,11 +624,14 @@ void io9_write16(IO* io, u32 addr, u16 data) {
         case DMA0CNT + 2:
         case DMA1CNT + 2:
         case DMA2CNT + 2:
-        case DMA3CNT + 2:
-            io->h[addr >> 1] = data;
+        case DMA3CNT + 2: {
             int i = (addr - DMA0CNT - 2) / (DMA1CNT - DMA0CNT);
-            if (io->dma[i].cnt.enable) dma9_enable(&io->master->dma9, i);
+            bool prev_ena = io->dma[i].cnt.enable;
+            io->h[addr >> 1] = data;
+            if (!prev_ena && io->dma[i].cnt.enable)
+                dma9_enable(&io->master->dma9, i);
             break;
+        }
         case TM0CNT + 2:
         case TM1CNT + 2:
         case TM2CNT + 2:
