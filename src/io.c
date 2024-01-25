@@ -228,10 +228,10 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             UPDATE_IRQ(7);
             break;
         case IF:
-            io9_write32(io, addr & ~3, data);
+            io7_write32(io, addr & ~3, data);
             break;
         case IF + 2:
-            io9_write32(io, addr & ~3, data << 16);
+            io7_write32(io, addr & ~3, data << 16);
             break;
         case VRAMSTAT:
             break;
