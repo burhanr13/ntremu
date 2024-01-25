@@ -867,6 +867,7 @@ void lcd_hdraw(NDS* nds) {
             }
         }
     } else if (nds->io7.vcount == NDS_SCREEN_H) {
+        nds->io9.dispcapcnt &= ~(1 << 31);
         lcd_vblank(nds);
         nds->frame_complete = true;
     } else if (nds->io7.vcount == LINES_H - 1) {

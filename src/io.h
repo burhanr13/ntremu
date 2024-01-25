@@ -51,6 +51,8 @@ enum {
     BLDY = 0x054,
     // extra display stuff
     DISP3DCNT = 0x060,
+    DISPCAPCNT = 0x064,
+    DISP_MMEM_FIFO = 0x068,
     MASTERBRIGHT = 0x06c,
 
     // dma control
@@ -262,7 +264,10 @@ typedef struct {
             u32 unused : 27;
         };
     } bldy;
-    u8 gap[MASTERBRIGHT - BLDY - 4];
+    u64 unused_058;
+    u32 disp3dcnt;
+    u32 dispcapcnt;
+    u32 disp_mmem_fifo;
     u32 masterbright;
 } PPUIO;
 
@@ -292,7 +297,11 @@ typedef struct _IO {
                         };
                     } dispstat;
                     u16 vcount;
-                    u8 pad_ppuA[MASTERBRIGHT - VCOUNT + 2];
+                    u8 pad_ppuA[DISP3DCNT - VCOUNT - 2];
+                    u32 disp3dcnt;
+                    u32 dispcapcnt;
+                    u32 disp_mmem_fifo;
+                    u32 masterbright;
                 };
             };
             u8 gap_0xx[DMA0SAD - MASTERBRIGHT - 4];
