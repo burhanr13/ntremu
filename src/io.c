@@ -736,6 +736,7 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             io9_write32(io, addr & ~3, data << 16);
             break;
         case GXSTAT:
+            if (data & (1 << 15)) io->gxstat.mtxstk_error = 0;
             break;
         case GXSTAT + 2:
             io->h[addr >> 1] &= 0x3fff;

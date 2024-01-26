@@ -36,7 +36,13 @@ enum {
     BEGIN_VTXS = 0x40,
     END_VTXS,
     SWAP_BUFFERS = 0x50,
+    BOX_TEST = 0x70,
+    POS_TEST,
+    VEC_TEST
 };
+
+enum { MM_PROJ, MM_POS, MM_POSVEC, MM_TEX };
+enum { POLY_TRIS, POLY_QUADS, POLY_TRI_STRIP, POLY_QUAD_STRIP };
 
 typedef struct {
     float p[4];
@@ -45,6 +51,10 @@ typedef struct {
 typedef struct {
     float p[4][4];
 } mat4;
+
+typedef struct {
+    vec4* p[4];
+} poly;
 
 typedef struct _NDS NDS;
 
@@ -59,17 +69,17 @@ typedef struct {
     u8 param_fifosize;
     u8 params_pending;
 
-    mat4 cur_projmtx;
-    mat4 proj_mtxstk[1];
+    mat4 projmtx;
+    mat4 projmtx_stk[1];
     u8 projstk_size;
 
-    mat4 cur_posmtx;
-    mat4 pos_mtxstk[32];
-    u8 posstk_size;
+    mat4 posmtx;
+    mat4 posmtx_stk[32];
 
-    mat4 cur_vecmtx;
-    mat4 vec_mtxstk[32];
-    u8 vecstk_size;
+    mat4 vecmtx;
+    mat4 vecmtx_stk[32];
+
+    u8 mtxstk_size;
 
     int mtx_mode;
     mat4 clipmtx;
@@ -77,9 +87,13 @@ typedef struct {
     vec4 vertexram[MAX_VTX];
     u16 n_verts;
 
+    poly polygonram[MAX_POLY];
+    u16 n_polys;
+
     int poly_mode;
 
     vec4 cur_vtx;
+    int cur_vtx_ct;
 
 } GPU;
 

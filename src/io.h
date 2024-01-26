@@ -143,6 +143,12 @@ enum {
     // 3d control
     GXFIFO = 0x400,
     GXSTAT = 0x600,
+    RAM_COUNT = 0x604,
+    DISP_1DOT_DEPTH = 0x610,
+    POS_RESULT = 0x620,
+    VEC_RESULT  = 0x630,
+    CLIPMTX_RESULT = 0x640,
+    VECMTX_RESULT = 0x680,
 
     PPUB_OFF = 0x1000,
 
@@ -628,7 +634,16 @@ typedef struct _IO {
                     u32 irq_empty : 1;
                 };
             } gxstat;
-            u8 gap_6xx[PPUB_OFF - GXSTAT - 4];
+            u32 ram_count;
+            u64 unused_608;
+            u16 disp_1dot_depth;
+            u8 unused_61x[POS_RESULT - DISP_1DOT_DEPTH - 2];
+            s32 pos_result[4];
+            s16 vec_result[3];
+            u16 unused_63x[5];
+            s32 clipmtx_result[4][4];
+            s32 vecmtx_result[3][3];
+            u8 gap_6xx[PPUB_OFF - VECMTX_RESULT - 0x24];
             PPUIO ppuB;
         };
     };
