@@ -809,7 +809,8 @@ void io9_write32(IO* io, u32 addr, u32 data) {
         if (com < 0x10) {
             gxfifo_write(&io->master->gpu, data);
         } else {
-            gxfifo_write(&io->master->gpu, com);
+            if (!io->master->gpu.params_pending)
+                gxfifo_write(&io->master->gpu, com);
             gxfifo_write(&io->master->gpu, data);
         }
         return;

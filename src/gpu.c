@@ -1,5 +1,6 @@
 #include "gpu.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "io.h"
@@ -56,7 +57,7 @@ void matmul(mat4* src, mat4* dst) {
         for (int j = 0; j < 4; j++) {
             float sum = 0;
             for (int k = 0; k < 4; k++) {
-                sum += src->p[i][k] * dst->p[k][j];
+                sum += dst->p[i][k] * src->p[k][j];
             }
             res.p[i][j] = sum;
         }
@@ -77,8 +78,8 @@ void vecmul(mat4* src, vec4* dst) {
 }
 
 void update_mtxs(GPU* gpu) {
-    gpu->clipmtx = gpu->posmtx;
-    matmul(&gpu->projmtx, &gpu->clipmtx);
+    gpu->clipmtx = gpu->projmtx;
+    matmul(&gpu->posmtx, &gpu->clipmtx);
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
@@ -97,9 +98,9 @@ void update_mtxs(GPU* gpu) {
 void add_poly(GPU* gpu, vec4* p0, vec4* p1, vec4* p2, vec4* p3) {
     if (gpu->n_polys == MAX_POLY) return;
     gpu->polygonram[gpu->n_polys].p[0] = p0;
-    gpu->polygonram[gpu->n_polys].p[0] = p1;
-    gpu->polygonram[gpu->n_polys].p[0] = p2;
-    gpu->polygonram[gpu->n_polys].p[0] = p3;
+    gpu->polygonram[gpu->n_polys].p[1] = p1;
+    gpu->polygonram[gpu->n_polys].p[2] = p2;
+    gpu->polygonram[gpu->n_polys].p[3] = p3;
     gpu->n_polys++;
 }
 
@@ -140,7 +141,7 @@ void add_vtx(GPU* gpu) {
             }
             break;
         case POLY_QUAD_STRIP:
-            if (gpu->cur_vtx_ct >= 4 & !(gpu->cur_vtx_ct & 1)) {
+            if (gpu->cur_vtx_ct >= 4 && !(gpu->cur_vtx_ct & 1)) {
                 add_poly(gpu, &gpu->vertexram[gpu->n_verts - 2],
                          &gpu->vertexram[gpu->n_verts - 4],
                          &gpu->vertexram[gpu->n_verts - 3],
@@ -399,6 +400,7 @@ void gxcmd_execute(GPU* gpu) {
                     matmul(&m, &gpu->vecmtx);
                     break;
             }
+            break;
         }
         case VTX_16:
             gpu->cur_vtx.p[0] =
@@ -461,9 +463,12 @@ void gxcmd_execute(GPU* gpu) {
             gpu->cur_vtx_ct = 0;
             gpu->poly_mode = gpu->param_fifo[0] & 3;
             break;
+        case END_VTXS:
+            break;
         case SWAP_BUFFERS:
             gpu_render(gpu);
             gpu->n_verts = 0;
+            gpu->n_polys = 0;
             break;
         case BOX_TEST:
             gpu->master->io9.gxstat.boxtest = 1;
@@ -507,13 +512,60 @@ void gxcmd_execute(GPU* gpu) {
     }
 }
 
+void render_line(GPU* gpu, vec4* v0, vec4* v1) {
+    float w0 = v0->p[3];
+    int x0 = (v0->p[0] / w0 + 1) * NDS_SCREEN_W / 2;
+    int y0 = (1 - v0->p[1] / w0) * NDS_SCREEN_H / 2;
+    float w1 = v1->p[3];
+    int x1 = (v1->p[0] / w1 + 1) * NDS_SCREEN_W / 2;
+    int y1 = (1 - v1->p[1] / w1) * NDS_SCREEN_H / 2;
+    if ((x0 < 0 || x0 > NDS_SCREEN_W || y0 < 0 || y0 > NDS_SCREEN_W) &&
+        (x1 < 0 || x1 > NDS_SCREEN_W || y1 < 0 || y1 > NDS_SCREEN_W))
+        return;
+
+    float m = (float) (y1 - y0) / (x1 - x0);
+    if (fabsf(m) > 1) {
+        m = 1 / m;
+        if (y0 > y1) {
+            int t = y0;
+            y0 = y1;
+            y1 = t;
+            x0 = x1;
+        }
+        float x = x0;
+        for (int y = y0; y <= y1; y++, x += m) {
+            int sx = x, sy = y;
+            if (sx < 0 || sx >= NDS_SCREEN_W || sy < 0 || sy >= NDS_SCREEN_H)
+                continue;
+            gpu->screen[sy][sx] = 0x801f;
+        }
+    } else {
+        if (x0 > x1) {
+            int t = x0;
+            x0 = x1;
+            x1 = t;
+            y0 = y1;
+        }
+        float y = y0;
+        for (int x = x0; x <= x1; x++, y += m) {
+            int sx = x, sy = y;
+            if (sx < 0 || sx >= NDS_SCREEN_W || sy < 0 || sy >= NDS_SCREEN_H)
+                continue;
+            gpu->screen[sy][sx] = 0x801f;
+        }
+    }
+}
+
 void gpu_render(GPU* gpu) {
     memset(gpu->screen, 0, sizeof gpu->screen);
-    for (int i = 0; i < gpu->n_verts; i++) {
-        float w = gpu->vertexram[i].p[3];
-        int x = (gpu->vertexram[i].p[0] / w + 1) * NDS_SCREEN_W / 2;
-        int y = (gpu->vertexram[i].p[1] / w + 1) * NDS_SCREEN_H / 2;
-        if (x < 0 || x >= NDS_SCREEN_W || y < 0 || y >= NDS_SCREEN_H) continue;
-        gpu->screen[y][x] = 0xffff;
+    for (int i = 0; i < gpu->n_polys; i++) {
+        render_line(gpu, gpu->polygonram[i].p[0], gpu->polygonram[i].p[1]);
+        render_line(gpu, gpu->polygonram[i].p[1], gpu->polygonram[i].p[2]);
+        if (gpu->polygonram[i].p[3]) {
+            render_line(gpu, gpu->polygonram[i].p[2], gpu->polygonram[i].p[3]);
+            render_line(gpu, gpu->polygonram[i].p[3], gpu->polygonram[i].p[0]);
+        } else {
+            render_line(gpu, gpu->polygonram[i].p[2], gpu->polygonram[i].p[0]);
+        }
     }
 }
