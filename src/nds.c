@@ -126,7 +126,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 
         memcpy(&nds->ram[0x3ffe00], header, sizeof *header);
 
-        memcpy(&nds->ram[header->arm9_ram_offset & 0xffffff],
+        memcpy(&nds->ram[header->arm9_ram_offset % RAMSIZE],
                &card->rom[header->arm9_rom_offset], header->arm9_size);
         nds->cpu9.itcm_virtsize = 0x2000000;
         nds->cpu9.dtcm_base = 0x3000000;

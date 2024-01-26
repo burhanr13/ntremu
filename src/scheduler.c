@@ -52,7 +52,8 @@ void add_event(Scheduler* sched, EventType t, u64 time) {
     sched->event_queue[sched->n_events].time = time;
     sched->n_events++;
 
-    while (i > 0 && sched->event_queue[i].time < sched->event_queue[i - 1].time) {
+    while (i > 0 &&
+           sched->event_queue[i].time < sched->event_queue[i - 1].time) {
         Event tmp = sched->event_queue[i - 1];
         sched->event_queue[i - 1] = sched->event_queue[i];
         sched->event_queue[i] = tmp;
@@ -74,12 +75,14 @@ void remove_event(Scheduler* sched, EventType t) {
 
 void print_scheduled_events(Scheduler* sched) {
     static char* event_names[EVENT_MAX] = {
-        "LCD HDraw",    "LCD HBlank",   "TM0-7 Reload", "TM1-7 Reload", "TM2-7 Reload",
-        "TM3-7 Reload", "TM0-9 Reload", "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload",
+        "Force Sync",   "LCD HDraw",    "LCD HBlank",   "TM0-7 Reload",
+        "TM1-7 Reload", "TM2-7 Reload", "TM3-7 Reload", "TM0-9 Reload",
+        "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload",
     };
 
     printf("Now: %ld\n", sched->now);
     for (int i = 0; i < sched->n_events; i++) {
-        printf("%ld => %s\n", sched->event_queue[i].time, event_names[sched->event_queue[i].type]);
+        printf("%ld => %s\n", sched->event_queue[i].time,
+               event_names[sched->event_queue[i].type]);
     }
 }

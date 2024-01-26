@@ -141,25 +141,54 @@ void debugger_run() {
                     case 'b':
                     case '8':
                         if (ntremu.nds->cur_cpu) {
-                            printf("[%08x] = 0x%02x\n", addr, bus7_read8(ntremu.nds, addr));
+                            printf("[%08x] = 0x%02x\n", addr,
+                                   bus7_read8(ntremu.nds, addr));
                         } else {
-                            printf("[%08x] = 0x%02x\n", addr, bus9_read8(ntremu.nds, addr));
+                            printf("[%08x] = 0x%02x\n", addr,
+                                   bus9_read8(ntremu.nds, addr));
                         }
                         break;
                     case 'h':
                     case '1':
                         if (ntremu.nds->cur_cpu) {
-                            printf("[%08x] = 0x%04x\n", addr, bus7_read16(ntremu.nds, addr));
+                            printf("[%08x] = 0x%04x\n", addr,
+                                   bus7_read16(ntremu.nds, addr));
                         } else {
-                            printf("[%08x] = 0x%04x\n", addr, bus9_read16(ntremu.nds, addr));
+                            printf("[%08x] = 0x%04x\n", addr,
+                                   bus9_read16(ntremu.nds, addr));
                         }
                         break;
                     case 'w':
                     case '3':
                         if (ntremu.nds->cur_cpu) {
-                            printf("[%08x] = 0x%08x\n", addr, bus7_read32(ntremu.nds, addr));
+                            printf("[%08x] = 0x%08x\n", addr,
+                                   bus7_read32(ntremu.nds, addr));
                         } else {
-                            printf("[%08x] = 0x%08x\n", addr, bus9_read32(ntremu.nds, addr));
+                            printf("[%08x] = 0x%08x\n", addr,
+                                   bus9_read32(ntremu.nds, addr));
+                        }
+                        break;
+                    case 'm':
+                        u32 n;
+                        if (read_num(strtok(NULL, " \t\n"), &n) < 0) n = 8;
+                        printf("[%08x] = ", addr);
+                        if (ntremu.nds->cur_cpu) {
+                            for (int i = 0; i < n; i++) {
+                                if (i > 0 && !(i & 7)) printf("             ");
+                                printf("0x%08x ",
+                                       bus7_read32(ntremu.nds, addr + 4 * i));
+                                if ((i & 7) == 7) printf("\n");
+                            }
+                            if (n & 7) printf("\n");
+                        } else {
+                            for (int i = 0; i < n; i++) {
+                                if (i > 0 && !(i & 7))
+                                    printf("             ");
+                                printf("0x%08x ",
+                                       bus9_read32(ntremu.nds, addr + 4 * i));
+                                if ((i & 7) == 7) printf("\n");
+                            }
+                            if (n & 7) printf("\n");
                         }
                         break;
                     default:
@@ -184,30 +213,36 @@ void debugger_run() {
                     case '8':
                         if (ntremu.nds->cur_cpu) {
                             bus7_write8(ntremu.nds, addr, data);
-                            printf("[%08x] = 0x%02x\n", addr, bus7_read8(ntremu.nds, addr));
+                            printf("[%08x] = 0x%02x\n", addr,
+                                   bus7_read8(ntremu.nds, addr));
                         } else {
                             bus9_write8(ntremu.nds, addr, data);
-                            printf("[%08x] = 0x%02x\n", addr, bus9_read8(ntremu.nds, addr));
+                            printf("[%08x] = 0x%02x\n", addr,
+                                   bus9_read8(ntremu.nds, addr));
                         }
                         break;
                     case 'h':
                     case '1':
                         if (ntremu.nds->cur_cpu) {
                             bus7_write16(ntremu.nds, addr, data);
-                            printf("[%08x] = 0x%04x\n", addr, bus7_read16(ntremu.nds, addr));
+                            printf("[%08x] = 0x%04x\n", addr,
+                                   bus7_read16(ntremu.nds, addr));
                         } else {
                             bus9_write16(ntremu.nds, addr, data);
-                            printf("[%08x] = 0x%04x\n", addr, bus9_read16(ntremu.nds, addr));
+                            printf("[%08x] = 0x%04x\n", addr,
+                                   bus9_read16(ntremu.nds, addr));
                         }
                         break;
                     case 'w':
                     case '3':
                         if (ntremu.nds->cur_cpu) {
                             bus7_write32(ntremu.nds, addr, data);
-                            printf("[%08x] = 0x%08x\n", addr, bus7_read32(ntremu.nds, addr));
+                            printf("[%08x] = 0x%08x\n", addr,
+                                   bus7_read32(ntremu.nds, addr));
                         } else {
                             bus9_write32(ntremu.nds, addr, data);
-                            printf("[%08x] = 0x%08x\n", addr, bus9_read32(ntremu.nds, addr));
+                            printf("[%08x] = 0x%08x\n", addr,
+                                   bus9_read32(ntremu.nds, addr));
                         }
                         break;
                     default:
@@ -236,16 +271,20 @@ void debugger_run() {
                         if (i == lines) printf("-> ");
                         else printf("   ");
                         if (ntremu.nds->cpu7.cpsr.t) {
-                            u32 addr = ntremu.nds->cpu7.cur_instr_addr + ((i - lines) << 1);
+                            u32 addr = ntremu.nds->cpu7.cur_instr_addr +
+                                       ((i - lines) << 1);
                             printf("%03x: ", addr & 0xfff);
-                            thumb1_disassemble((Thumb1Instr){bus7_read16(ntremu.nds, addr)}, addr,
-                                               stdout);
+                            thumb1_disassemble(
+                                (Thumb1Instr){bus7_read16(ntremu.nds, addr)},
+                                addr, stdout);
                             printf("\n");
                         } else {
-                            u32 addr = ntremu.nds->cpu7.cur_instr_addr + ((i - lines) << 2);
+                            u32 addr = ntremu.nds->cpu7.cur_instr_addr +
+                                       ((i - lines) << 2);
                             printf("%03x: ", addr & 0xfff);
-                            arm4_disassemble((Arm4Instr){bus7_read32(ntremu.nds, addr)}, addr,
-                                             stdout);
+                            arm4_disassemble(
+                                (Arm4Instr){bus7_read32(ntremu.nds, addr)},
+                                addr, stdout);
                             printf("\n");
                         }
                     }
@@ -254,24 +293,30 @@ void debugger_run() {
                         if (i == lines) printf("-> ");
                         else printf("   ");
                         if (ntremu.nds->cpu9.cpsr.t) {
-                            u32 addr = ntremu.nds->cpu9.cur_instr_addr + ((i - lines) << 1);
+                            u32 addr = ntremu.nds->cpu9.cur_instr_addr +
+                                       ((i - lines) << 1);
                             printf("%03x: ", addr & 0xfff);
-                            thumb2_disassemble((Thumb2Instr){bus9_read16(ntremu.nds, addr)}, addr,
-                                               stdout);
+                            thumb2_disassemble((Thumb2Instr){cpu9_fetch16(
+                                                   &ntremu.nds->cpu9, addr)},
+                                               addr, stdout);
                             printf("\n");
                         } else {
-                            u32 addr = ntremu.nds->cpu9.cur_instr_addr + ((i - lines) << 2);
+                            u32 addr = ntremu.nds->cpu9.cur_instr_addr +
+                                       ((i - lines) << 2);
                             printf("%03x: ", addr & 0xfff);
-                            arm5_disassemble((Arm5Instr){bus9_read32(ntremu.nds, addr)}, addr,
-                                             stdout);
+                            arm5_disassemble((Arm5Instr){cpu9_fetch32(
+                                                 &ntremu.nds->cpu9, addr)},
+                                             addr, stdout);
                             printf("\n");
                         }
                     }
                 }
                 break;
             case 't':
-                printf("ITCM: base=%08x, size=%08x\n", 0, ntremu.nds->cpu9.itcm_virtsize);
-                printf("DTCM: base=%08x, size=%08x\n", ntremu.nds->cpu9.dtcm_base,
+                printf("ITCM: base=%08x, size=%08x\n", 0,
+                       ntremu.nds->cpu9.itcm_virtsize);
+                printf("DTCM: base=%08x, size=%08x\n",
+                       ntremu.nds->cpu9.dtcm_base,
                        ntremu.nds->cpu9.dtcm_virtsize);
                 break;
             default:
