@@ -48,6 +48,10 @@ typedef enum {
 } CardEepromState;
 
 typedef struct {
+
+    char* rom_filename;
+    char* sav_filename;
+
     u8* rom;
     u32 rom_size;
 
@@ -61,6 +65,7 @@ typedef struct {
     u8* eeprom;
     u32 eeprom_size;
     int addrtype;
+    bool eeprom_detected;
 
     CardEepromState eeprom_state;
     u8 spidata;
@@ -70,7 +75,6 @@ typedef struct {
         int i;
         bool write_enable;
         bool read;
-        bool size_detected;
     } eepromst;
 
 } GameCard;

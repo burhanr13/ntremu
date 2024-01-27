@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 GameCard* create_card(char* filename) {
     FILE* fp = fopen(filename, "rb");
@@ -17,21 +18,47 @@ GameCard* create_card(char* filename) {
     fread(card->rom, 1, card->rom_size, fp);
     fclose(fp);
 
-    card->eeprom = calloc(1 << 20, 1);
-    card->eeprom_size = 1 << 16;
-    card->addrtype = 2;
+    card->rom_filename = malloc(strlen(filename) + 1);
+    strcpy(card->rom_filename, filename);
+    int i = strrchr(filename, '.') - filename;
+    card->sav_filename = malloc(i + sizeof ".sav");
+    strncpy(card->sav_filename, card->rom_filename, i);
+    strcpy(card->sav_filename + i, ".sav");
+
+    fp = fopen(card->sav_filename, "rb");
+    if (!fp) {
+        card->eeprom = calloc(1 << 16, 1);
+        card->eeprom_size = 1 << 16;
+        card->addrtype = 2;
+    } else {
+        fseek(fp, 0, SEEK_END);
+        card->eeprom_size = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        card->eeprom = malloc(card->eeprom_size);
+        fread(card->eeprom, 1, card->eeprom_size, fp);
+        fclose(fp);
+        if (card->eeprom_size == 512) card->addrtype = 1;
+        else if (card->eeprom_size <= (1 << 16)) card->addrtype = 2;
+        else card->addrtype = 3;
+        card->eeprom_detected = true;
+    }
 
     return card;
 }
 
 void destroy_card(GameCard* card) {
+    FILE* fp = fopen(card->sav_filename, "wb");
+    if (fp) {
+        fwrite(card->eeprom, 1, card->eeprom_size, fp);
+        fclose(fp);
+    }
     free(card->eeprom);
     free(card->rom);
     free(card);
 }
 
 bool card_write_command(GameCard* card, u8* command) {
-    //printf("%02x\n", command[0]);
+    // printf("%02x\n", command[0]);
     if (card->key1mode) {
         // TODO: decrypt the command
         switch (command[0] >> 4) {
