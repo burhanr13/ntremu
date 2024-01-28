@@ -93,6 +93,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
         }
         if (WIFI_OFF <= addr && addr < WIFI_OFF + WIFIIOSIZE) {
             *(u16*) &io->master->wifi_io[addr - WIFI_OFF] = data;
+            *(u16*) &io->master->wifi_io[0x03c] = 0x0200;
         }
         return;
     }

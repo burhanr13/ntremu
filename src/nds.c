@@ -86,6 +86,9 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->io9.gxstat.gxfifo_empty = 1;
     nds->io9.gxstat.gxfifo_half = 1;
 
+    *(u16*) &nds->wifi_io[0x000] = 0x1440;
+    *(u16*) &nds->wifi_io[0x03c] = 0x0200;
+
     if (bootbios) {
         cpu7_handle_interrupt(&nds->cpu7, I_RESET);
         cpu9_handle_interrupt(&nds->cpu9, I_RESET);

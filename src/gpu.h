@@ -33,6 +33,8 @@ enum {
     POLYGON_ATTR,
     TEXIMAGE_PARAM,
     PLTT_BASE,
+    DIF_AMB = 0x30,
+    SPE_EMI,
     BEGIN_VTXS = 0x40,
     END_VTXS,
     SWAP_BUFFERS = 0x50,
@@ -44,6 +46,54 @@ enum {
 enum { MM_PROJ, MM_POS, MM_POSVEC, MM_TEX };
 enum { POLY_TRIS, POLY_QUADS, POLY_TRI_STRIP, POLY_QUAD_STRIP };
 
+typedef union {
+    u32 w;
+    struct {
+        u32 light_enable : 4;
+        u32 mode : 2;
+        u32 back : 1;
+        u32 front : 1;
+        u32 unused : 3;
+        u32 depth_transparent : 1;
+        u32 farplane : 1;
+        u32 onedot : 1;
+        u32 depth_test : 1;
+        u32 fog : 1;
+        u32 alpha : 5;
+        u32 unused2 : 3;
+        u32 id : 6;
+        u32 unused3 : 2;
+    };
+} PolygonAttr;
+
+typedef union {
+    u32 w;
+    struct {
+        u32 dif_r : 5;
+        u32 dif_g : 5;
+        u32 dif_b : 5;
+        u32 vtx_color : 1;
+        u32 amb_r : 5;
+        u32 amb_g : 5;
+        u32 amb_b : 5;
+        u32 unused : 1;
+    };
+} Material0;
+
+typedef union {
+    u32 w;
+    struct {
+        u32 spe_r : 5;
+        u32 spe_g : 5;
+        u32 spe_b : 5;
+        u32 shininess : 1;
+        u32 emi_r : 5;
+        u32 emi_g : 5;
+        u32 emi_b : 5;
+        u32 unused : 1;
+    };
+} Material1;
+
 typedef struct {
     float p[4];
 } vec4;
@@ -53,8 +103,20 @@ typedef struct {
 } mat4;
 
 typedef struct {
-    vec4* p[4];
+    vec4 v;
+    u16 color;
+} vertex;
+
+typedef struct {
+    vertex* p[4];
+    PolygonAttr attr;
 } poly;
+
+struct raster_attrs {
+    int x;
+    float z, w;
+    float r, g, b;
+};
 
 typedef struct _NDS NDS;
 
@@ -62,6 +124,8 @@ typedef struct {
     NDS* master;
 
     u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
+
+    float depth_buf[NDS_SCREEN_H][NDS_SCREEN_W];
 
     u8 cmd_fifo[256];
     u32 param_fifo[256];
@@ -84,16 +148,21 @@ typedef struct {
     int mtx_mode;
     mat4 clipmtx;
 
-    vec4 vertexram[MAX_VTX];
+    vertex vertexram[MAX_VTX];
     u16 n_verts;
 
     poly polygonram[MAX_POLY];
     u16 n_polys;
 
     int poly_mode;
+    PolygonAttr cur_attr;
 
     vec4 cur_vtx;
     int cur_vtx_ct;
+    u16 cur_color;
+
+    Material0 cur_mtl0;
+    Material1 cur_mtl1;
 
 } GPU;
 

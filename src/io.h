@@ -634,7 +634,13 @@ typedef struct _IO {
                     u32 irq_empty : 1;
                 };
             } gxstat;
-            u32 ram_count;
+            union {
+                u32 w;
+                struct {
+                    u16 n_polys;
+                    u16 n_verts;
+                };
+            } ram_count;
             u64 unused_608;
             u16 disp_1dot_depth;
             u8 unused_61x[POS_RESULT - DISP_1DOT_DEPTH - 2];
