@@ -120,14 +120,14 @@ void add_vtx(GPU* gpu) {
     }
     update_mtxs(gpu);
 
-    vertex v = gpu->cur_vtx;
     if (gpu->cur_texparam.transform == 3) {
-        gpu->texmtx.p[0][3] = v.vt.p[0];
-        gpu->texmtx.p[1][3] = v.vt.p[1];
-        v.vt = v.v;
-        vecmul(&gpu->texmtx, &v.vt);
+        gpu->texmtx.p[0][3] = gpu->cur_vtx.vt.p[0];
+        gpu->texmtx.p[1][3] = gpu->cur_vtx.vt.p[1];
+        gpu->cur_vtx.vt = gpu->cur_vtx.v;
+        vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
     }
-    
+
+    vertex v = gpu->cur_vtx;
     vecmul(&gpu->clipmtx, &v.v);
     v.v.p[0] /= v.v.p[3];
     v.v.p[1] /= v.v.p[3];
@@ -906,8 +906,8 @@ void render_polygon(GPU* gpu, poly* p) {
                 bool depth_test;
                 if (p->attr.depth_test) {
                     if (gpu->w_buffer)
-                        depth_test = fabsf(w - gpu->depth_buf[y][x]) <= 0.125;
-                    else depth_test = fabsf(z - gpu->depth_buf[y][x]) <= 0.125;
+                        depth_test = fabsf(w - gpu->depth_buf[y][x]) <= 0.125f;
+                    else depth_test = fabsf(z - gpu->depth_buf[y][x]) <= 0.125f;
                 } else {
                     if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
                     else depth_test = z < gpu->depth_buf[y][x];
@@ -1013,13 +1013,14 @@ void render_polygon(GPU* gpu, poly* p) {
                         case TEX_COMPRESS: {
                             u32 block_ofs =
                                 ((tt >> 2) << (s_shift - 2)) + (ss >> 2);
-                            u32 addr = base + (block_ofs << 2) + (tt & 3);
-                            u8 ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                            u32 block_addr = base + (block_ofs << 2);
+                            u32 row_addr = block_addr + (tt & 3);
+                            u8 ind = gpu->texram[row_addr >> 17][row_addr & 0x1ffff];
                             ind >>= (ss & 3) << 1;
                             ind &= 3;
                             u16 palmode =
-                                *(u16*) &gpu->texram[1][(addr >> 18 << 16) +
-                                                        (block_ofs << 1)];
+                                *(u16*) &gpu->texram[1][(block_addr >> 18 << 16) +
+                                                        ((block_addr >> 1) & 0xffff)];
                             u32 paladdr = palbase + ((palmode & 0x3fff) << 1);
                             palmode >>= 14;
                             if (palmode < 2 && ind == 3) transparent = true;
@@ -1099,8 +1100,8 @@ void render_polygon(GPU* gpu, poly* p) {
                 bool depth_test;
                 if (p->attr.depth_test) {
                     if (gpu->w_buffer)
-                        depth_test = fabsf(w - gpu->depth_buf[y][x]) <= 0.125;
-                    else depth_test = fabsf(z - gpu->depth_buf[y][x]) <= 0.125;
+                        depth_test = fabsf(w - gpu->depth_buf[y][x]) <= 0.125f;
+                    else depth_test = fabsf(z - gpu->depth_buf[y][x]) <= 0.125f;
                 } else {
                     if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
                     else depth_test = z < gpu->depth_buf[y][x];
