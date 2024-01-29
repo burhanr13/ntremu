@@ -53,7 +53,7 @@ enum {
     TEX_2BPP,
     TEX_4BPP,
     TEX_8BPP,
-    TEX_4x4,
+    TEX_COMPRESS,
     TEX_A5I3,
     TEX_DIRECT
 };
@@ -211,6 +211,9 @@ typedef struct {
 
 void gxfifo_write(GPU* gpu, u32 command);
 void gxcmd_execute(GPU* gpu);
+
+void update_mtxs(GPU* gpu);
+
 void gpu_render(GPU* gpu);
 
 #endif

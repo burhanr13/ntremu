@@ -768,6 +768,9 @@ void io9_write16(IO* io, u32 addr, u16 data) {
 }
 
 u32 io9_read32(IO* io, u32 addr) {
+    if (CLIPMTX_RESULT <= addr && addr < VECMTX_RESULT + 0x24) {
+        update_mtxs(&io->master->gpu);
+    }
     switch (addr) {
         case IPCFIFORECV:
             if (io->ipcfifocnt.fifo_enable) {

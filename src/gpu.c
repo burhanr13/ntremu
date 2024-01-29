@@ -798,7 +798,7 @@ void render_polygon(GPU* gpu, poly* p) {
     if (p->attr.alpha == 0) {
         render_polygon_wireframe(gpu, p);
         return;
-    }
+    } else if (p->attr.alpha < 31) return;
 
     if (p->attr.mode == 3) return;
 
@@ -894,7 +894,8 @@ void render_polygon(GPU* gpu, poly* p) {
                     switch (format) {
                         case TEX_2BPP: {
                             u32 addr = base + (ofs >> 2);
-                            u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                            u8 col_ind =
+                                gpu->texram[addr >> 17][addr & 0x1ffff];
                             col_ind >>= (ofs & 3) << 1;
                             col_ind &= 3;
                             if (!col_ind && p->texparam.color0)
@@ -908,7 +909,8 @@ void render_polygon(GPU* gpu, poly* p) {
                         }
                         case TEX_4BPP: {
                             u32 addr = base + (ofs >> 1);
-                            u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                            u8 col_ind =
+                                gpu->texram[addr >> 17][addr & 0x1ffff];
                             col_ind >>= (ofs & 1) << 2;
                             col_ind &= 15;
                             if (!col_ind && p->texparam.color0)
@@ -922,7 +924,8 @@ void render_polygon(GPU* gpu, poly* p) {
                         }
                         case TEX_8BPP: {
                             u32 addr = base + ofs;
-                            u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                            u8 col_ind =
+                                gpu->texram[addr >> 17][addr & 0x1ffff];
                             if (!col_ind && p->texparam.color0)
                                 transparent = true;
                             else {
@@ -938,8 +941,7 @@ void render_polygon(GPU* gpu, poly* p) {
                                 gpu->texram[addr >> 17][addr & 0x1ffff];
                             u8 alpha = col_ind >> 5;
                             col_ind &= 31;
-                            if (!alpha)
-                                transparent = true;
+                            if (alpha < 7) transparent = true;
                             else {
                                 u32 paladdr = palbase + col_ind;
                                 color = gpu->texpal[paladdr >> 13]
@@ -953,7 +955,7 @@ void render_polygon(GPU* gpu, poly* p) {
                                 gpu->texram[addr >> 17][addr & 0x1ffff];
                             u8 alpha = col_ind >> 3;
                             col_ind &= 7;
-                            if (!alpha) transparent = true;
+                            if (alpha < 31) transparent = true;
                             else {
                                 u32 paladdr = palbase + col_ind;
                                 color = gpu->texpal[paladdr >> 13]
@@ -961,10 +963,13 @@ void render_polygon(GPU* gpu, poly* p) {
                             }
                             break;
                         }
+                        case TEX_COMPRESS:
+                            
+                            break;
                         case TEX_DIRECT: {
                             u32 addr = base + (ofs << 1);
-                            color =
-                                *(u16*) &gpu->texram[addr >> 17][addr & 0x1ffff];
+                            color = *(u16*) &gpu
+                                         ->texram[addr >> 17][addr & 0x1ffff];
                             if (!(color & 0x8000)) transparent = true;
                             break;
                         }
@@ -976,8 +981,10 @@ void render_polygon(GPU* gpu, poly* p) {
 
                     u16 c = 0x8000;
                     c |= (u16) (r / w * (color & 0x1f) / 32) & 0x1f;
-                    c |= ((u16) (g / w * ((color >> 5) & 0x1f) / 32) & 0x1f) << 5;
-                    c |= ((u16) (b / w * ((color >> 10) & 0x1f) / 32) & 0x1f) << 10;
+                    c |= ((u16) (g / w * ((color >> 5) & 0x1f) / 32) & 0x1f)
+                         << 5;
+                    c |= ((u16) (b / w * ((color >> 10) & 0x1f) / 32) & 0x1f)
+                         << 10;
                     gpu->screen[y][x] = color | 0x8000;
                 }
             }
@@ -1039,6 +1046,6 @@ void gpu_render(GPU* gpu) {
         }
     }
     for (int i = 0; i < gpu->n_polys; i++) {
-        render_polygon(gpu, &gpu->polygonram[i]);
+        render_polygon_wireframe(gpu, &gpu->polygonram[i]);
     }
 }
