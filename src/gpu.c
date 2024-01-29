@@ -97,11 +97,21 @@ void update_mtxs(GPU* gpu) {
     }
 }
 
+bool in_screen_bound(vertex* v) {
+    return -1 <= v->v.p[0] && v->v.p[0] <= 1 && -1 <= v->v.p[1] &&
+           v->v.p[1] <= 1 && v->v.p[2] >= 0;
+}
+
 void add_poly(GPU* gpu, vertex* p0, vertex* p1, vertex* p2, vertex* p3) {
     if (gpu->n_polys == MAX_POLY) {
         gpu->master->io9.disp3dcnt.ram_overflow = 1;
         return;
     }
+
+    if (!in_screen_bound(p0) && !in_screen_bound(p1) &&
+        !in_screen_bound(p2))
+        return;
+
     gpu->polygonram[gpu->n_polys].p[0] = p0;
     gpu->polygonram[gpu->n_polys].p[1] = p1;
     gpu->polygonram[gpu->n_polys].p[2] = p2;
@@ -619,11 +629,6 @@ void gxcmd_execute(GPU* gpu) {
     }
 }
 
-bool in_screen_bound(vertex* v) {
-    return -1 <= v->v.p[0] && v->v.p[0] <= 1 && -1 <= v->v.p[1] &&
-           v->v.p[1] <= 1 && v->v.p[2] >= 0;
-}
-
 void render_line(GPU* gpu, vertex* v0, vertex* v1) {
     int x0 = (v0->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
     int y0 = (1 - v0->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
@@ -666,10 +671,7 @@ void render_line(GPU* gpu, vertex* v0, vertex* v1) {
 }
 
 void render_polygon_wireframe(GPU* gpu, poly* p) {
-    if (!in_screen_bound(p->p[0]) && !in_screen_bound(p->p[1]) &&
-        !in_screen_bound(p->p[2]))
-        return;
-
+    
     render_line(gpu, p->p[0], p->p[1]);
     render_line(gpu, p->p[1], p->p[2]);
     if (p->p[3]) {
@@ -838,10 +840,7 @@ void render_line_attrs(GPU* gpu, vertex* v0, vertex* v1,
 }
 
 void render_polygon(GPU* gpu, poly* p) {
-    if (!in_screen_bound(p->p[0]) && !in_screen_bound(p->p[1]) &&
-        !in_screen_bound(p->p[2]))
-        return;
-
+    
     if (p->attr.alpha == 0) {
         render_polygon_wireframe(gpu, p);
         return;
