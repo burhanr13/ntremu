@@ -140,7 +140,18 @@ enum {
     HALTCNT = 0x301,
     POWCNT = 0x304,
 
-    // 3d control
+    // 3d render control
+    RDLINES_COUNT = 0x320,
+    EDGE_COLOR = 0x330,
+    ALPHA_TEST_REF = 0x340,
+    CLEAR_COLOR = 0x350,
+    CLEAR_DEPTH = 0x354,
+    CLRIMAGE_OFFSET = 0x356,
+    FOG_COLOR = 0x358,
+    FOG_OFFSET = 0x35c,
+    FOG_TABLE = 0x360,
+    TOON_TABLE = 0x380,
+    // 3d geometry control
     GXFIFO = 0x400,
     GXSTAT = 0x600,
     RAM_COUNT = 0x604,
@@ -270,10 +281,7 @@ typedef struct {
             u32 unused : 27;
         };
     } bldy;
-    u64 unused_058;
-    u32 disp3dcnt;
-    u32 dispcapcnt;
-    u32 disp_mmem_fifo;
+    u8 gap[MASTERBRIGHT - BLDY - 4];
     u32 masterbright;
 } PPUIO;
 
@@ -304,7 +312,24 @@ typedef struct _IO {
                     } dispstat;
                     u16 vcount;
                     u8 pad_ppuA[DISP3DCNT - VCOUNT - 2];
-                    u32 disp3dcnt;
+                    union {
+                        u32 w;
+                        struct {
+                            u32 texture : 1;
+                            u32 shading_mode : 1;
+                            u32 alpha_test : 1;
+                            u32 alpha_blending : 1;
+                            u32 anti_aliasing : 1;
+                            u32 edge_marking : 1;
+                            u32 fog_mode : 1;
+                            u32 fog_enable : 1;
+                            u32 fog_shift : 4;
+                            u32 rdlines_underflow : 1;
+                            u32 ram_overflow : 1;
+                            u32 rearplane_mode : 1;
+                            u32 unused : 17;
+                        };
+                    } disp3dcnt;
                     u32 dispcapcnt;
                     u32 disp_mmem_fifo;
                     u32 masterbright;
@@ -614,7 +639,31 @@ typedef struct _IO {
                     u32 unusedhi : 16;
                 };
             } powcnt;
-            u8 gap_3xx[GXSTAT - POWCNT - 4];
+            u8 gap_3xx[RDLINES_COUNT - POWCNT - 4];
+            u8 rdlines_count;
+            u8 unused_32x[EDGE_COLOR - RDLINES_COUNT - 1];
+            u16 edge_color[8];
+            u8 alpha_test_ref;
+            u8 unused_34x[CLEAR_COLOR - ALPHA_TEST_REF - 1];
+            union {
+                u32 w;
+                struct {
+                    u32 color : 15;
+                    u32 fog : 1;
+                    u32 alpha : 5;
+                    u32 unused : 3;
+                    u32 id : 6;
+                    u32 unused2 : 2;
+                };
+            } clear_color;
+            u16 clear_depth;
+            u16 clrimage_offset;
+            u32 fog_color;
+            u32 fog_offset;
+            u8 fog_table[0x20];
+            u16 toon_table[0x20];
+            u8 unused_3cx[GXFIFO - TOON_TABLE - 0x40];
+            u32 gxfifo[0x80];
             union {
                 u32 w;
                 struct {

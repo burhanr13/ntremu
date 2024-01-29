@@ -38,6 +38,7 @@ enum {
     BEGIN_VTXS = 0x40,
     END_VTXS,
     SWAP_BUFFERS = 0x50,
+    VIEWPORT = 0x60,
     BOX_TEST = 0x70,
     POS_TEST,
     VEC_TEST
@@ -45,6 +46,17 @@ enum {
 
 enum { MM_PROJ, MM_POS, MM_POSVEC, MM_TEX };
 enum { POLY_TRIS, POLY_QUADS, POLY_TRI_STRIP, POLY_QUAD_STRIP };
+
+enum {
+    TEX_NONE,
+    TEX_A3I5,
+    TEX_2BPP,
+    TEX_4BPP,
+    TEX_8BPP,
+    TEX_4x4,
+    TEX_A5I3,
+    TEX_DIRECT
+};
 
 typedef union {
     u32 w;
@@ -94,6 +106,22 @@ typedef union {
     };
 } Material1;
 
+typedef union {
+    u32 w;
+    struct {
+        u32 offset : 16;
+        u32 s_rep : 1;
+        u32 t_rep : 1;
+        u32 s_flip : 1;
+        u32 t_flip : 1;
+        u32 s_size : 3;
+        u32 t_size : 3;
+        u32 format : 3;
+        u32 color0 : 1;
+        u32 transform : 2;
+    };
+} TexParam;
+
 typedef struct {
     float p[4];
 } vec4;
@@ -104,17 +132,21 @@ typedef struct {
 
 typedef struct {
     vec4 v;
+    vec4 vt;
     u16 color;
 } vertex;
 
 typedef struct {
     vertex* p[4];
     PolygonAttr attr;
+    TexParam texparam;
+    u32 pltt_base;
 } poly;
 
 struct raster_attrs {
     int x;
     float z, w;
+    float s, t;
     float r, g, b;
 };
 
@@ -126,6 +158,9 @@ typedef struct {
     u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
 
     float depth_buf[NDS_SCREEN_H][NDS_SCREEN_W];
+
+    u8* texram[4];
+    u16* texpal[6];
 
     u8 cmd_fifo[256];
     u32 param_fifo[256];
@@ -157,12 +192,20 @@ typedef struct {
     int poly_mode;
     PolygonAttr cur_attr;
 
-    vec4 cur_vtx;
+    vertex cur_vtx;
     int cur_vtx_ct;
-    u16 cur_color;
 
     Material0 cur_mtl0;
     Material1 cur_mtl1;
+    TexParam cur_texparam;
+    u32 cur_pltt_base;
+
+    bool w_buffer;
+
+    int view_x;
+    int view_y;
+    int view_w;
+    int view_h;
 
 } GPU;
 

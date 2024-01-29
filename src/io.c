@@ -425,8 +425,22 @@ VRAMBank* get_vram_map(NDS* nds, VRAMBank bank, int mst, int ofs) {
 
 void vram_map_ppu(NDS* nds, VRAMBank bank, int mst, int ofs) {
     switch (bank) {
+        case VRAMA:
+        case VRAMB:
+        case VRAMC:
+        case VRAMD:
+            if (mst == 3) {
+                nds->gpu.texram[ofs] = nds->vrambanks[bank - 1];
+            }
+            break;
         case VRAME:
             switch (mst) {
+                case 3:
+                    nds->gpu.texpal[0] = (u16*) nds->vramE;
+                    nds->gpu.texpal[1] = (u16*) nds->vramE + 0x2000;
+                    nds->gpu.texpal[2] = (u16*) nds->vramE + 0x4000;
+                    nds->gpu.texpal[3] = (u16*) nds->vramE + 0x6000;
+                    break;
                 case 4:
                     nds->ppuA.extPalBg[0] = (u16*) nds->vramE;
                     nds->ppuA.extPalBg[1] = (u16*) nds->vramE + 0x1000;
@@ -436,26 +450,20 @@ void vram_map_ppu(NDS* nds, VRAMBank bank, int mst, int ofs) {
             }
             break;
         case VRAMF:
-            switch (mst) {
-                case 4:
-                    nds->ppuA.extPalBg[2 * ofs] = (u16*) nds->vramF;
-                    nds->ppuA.extPalBg[2 * ofs + 1] =
-                        (u16*) nds->vramF + 0x1000;
-                    break;
-                case 5:
-                    nds->ppuA.extPalObj = (u16*) nds->vramF;
-                    break;
-            }
-            break;
         case VRAMG:
             switch (mst) {
+                case 3:
+                    nds->gpu.texpal[((ofs & 2) << 1) + (ofs & 1)] =
+                        (u16*) nds->vrambanks[bank - 1];
+                    break;
                 case 4:
-                    nds->ppuA.extPalBg[2 * ofs] = (u16*) nds->vramG;
+                    nds->ppuA.extPalBg[2 * ofs] =
+                        (u16*) nds->vrambanks[bank - 1];
                     nds->ppuA.extPalBg[2 * ofs + 1] =
-                        (u16*) nds->vramG + 0x1000;
+                        (u16*) nds->vrambanks[bank - 1] + 0x1000;
                     break;
                 case 5:
-                    nds->ppuA.extPalObj = (u16*) nds->vramG;
+                    nds->ppuA.extPalObj = (u16*) nds->vrambanks[bank - 1];
                     break;
             }
             break;
@@ -621,6 +629,12 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             io->dispstat.h |= data;
             break;
         case VCOUNT:
+            break;
+        case DISP3DCNT:
+            io->disp3dcnt.w = data;
+            if (io->disp3dcnt.rdlines_underflow)
+                io->disp3dcnt.rdlines_underflow = 0;
+            if (io->disp3dcnt.ram_overflow) io->disp3dcnt.ram_overflow = 0;
             break;
         case DMA0CNT + 2:
         case DMA1CNT + 2:

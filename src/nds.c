@@ -47,6 +47,16 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->ppuB.objReg = VRAMOBJB;
 
     nds->gpu.master = nds;
+    nds->gpu.texram[0] = nds->vramA;
+    nds->gpu.texram[1] = nds->vramB;
+    nds->gpu.texram[2] = nds->vramC;
+    nds->gpu.texram[3] = nds->vramD;
+    nds->gpu.texpal[0] = (u16*) nds->vramE;
+    nds->gpu.texpal[1] = (u16*) nds->vramE + 0x2000;
+    nds->gpu.texpal[2] = (u16*) nds->vramE + 0x4000;
+    nds->gpu.texpal[3] = (u16*) nds->vramE + 0x6000;
+    nds->gpu.texpal[4] = (u16*) nds->vramF;
+    nds->gpu.texpal[5] = (u16*) nds->vramG;
 
     nds->io7.master = nds;
     nds->io9.master = nds;

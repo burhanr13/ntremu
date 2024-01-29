@@ -15,6 +15,8 @@ const int cmd_parms[8][16] = {{0},
                               {1},
                               {3, 2, 1}};
 
+const int texformat_bpp[8] = {0, 8, 2, 4, 8, 2, 8, 16};
+
 void gxfifo_write(GPU* gpu, u32 command) {
     if (gpu->params_pending) {
         gpu->param_fifo[gpu->param_fifosize++] = command;
@@ -96,23 +98,35 @@ void update_mtxs(GPU* gpu) {
 }
 
 void add_poly(GPU* gpu, vertex* p0, vertex* p1, vertex* p2, vertex* p3) {
-    if (gpu->n_polys == MAX_POLY) return;
+    if (gpu->n_polys == MAX_POLY) {
+        gpu->master->io9.disp3dcnt.ram_overflow = 1;
+        return;
+    }
     gpu->polygonram[gpu->n_polys].p[0] = p0;
     gpu->polygonram[gpu->n_polys].p[1] = p1;
     gpu->polygonram[gpu->n_polys].p[2] = p2;
     gpu->polygonram[gpu->n_polys].p[3] = p3;
     gpu->polygonram[gpu->n_polys].attr = gpu->cur_attr;
+    gpu->polygonram[gpu->n_polys].texparam = gpu->cur_texparam;
+    gpu->polygonram[gpu->n_polys].pltt_base = gpu->cur_pltt_base;
     gpu->n_polys++;
+    gpu->master->io9.ram_count.n_polys = gpu->n_polys;
 }
 
 void add_vtx(GPU* gpu) {
-    if (gpu->n_verts == MAX_VTX) return;
+    if (gpu->n_verts == MAX_VTX) {
+        gpu->master->io9.disp3dcnt.ram_overflow = 1;
+        return;
+    }
 
-    gpu->vertexram[gpu->n_verts].v = gpu->cur_vtx;
+    gpu->vertexram[gpu->n_verts] = gpu->cur_vtx;
     vecmul(&gpu->clipmtx, &gpu->vertexram[gpu->n_verts].v);
-    gpu->vertexram[gpu->n_verts].color = gpu->cur_color;
+    gpu->vertexram[gpu->n_verts].v.p[0] /= gpu->vertexram[gpu->n_verts].v.p[3];
+    gpu->vertexram[gpu->n_verts].v.p[1] /= gpu->vertexram[gpu->n_verts].v.p[3];
+    gpu->vertexram[gpu->n_verts].v.p[2] /= gpu->vertexram[gpu->n_verts].v.p[3];
     gpu->n_verts++;
     gpu->cur_vtx_ct++;
+    gpu->master->io9.ram_count.n_verts = gpu->n_verts;
 
     switch (gpu->poly_mode) {
         case POLY_TRIS:
@@ -406,69 +420,83 @@ void gxcmd_execute(GPU* gpu) {
             break;
         }
         case COLOR:
-            gpu->cur_color = gpu->param_fifo[0];
+            gpu->cur_vtx.color = gpu->param_fifo[0];
             break;
         case NORMAL:
-            gpu->cur_color = (gpu->cur_mtl0.w & 0xffff);
+            gpu->cur_vtx.color = (gpu->cur_mtl0.w & 0xffff);
+            break;
+        case TEXCOORD:
+            gpu->cur_vtx.vt.p[0] =
+                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 20);
+            gpu->cur_vtx.vt.p[1] =
+                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 20);
+            gpu->cur_vtx.vt.p[2] = 0.0625f;
+            gpu->cur_vtx.vt.p[3] = 0.0625f;
             break;
         case VTX_16:
-            gpu->cur_vtx.p[0] =
+            gpu->cur_vtx.v.p[0] =
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.p[1] =
+            gpu->cur_vtx.v.p[1] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
-            gpu->cur_vtx.p[2] =
+            gpu->cur_vtx.v.p[2] =
                 ((s32) (gpu->param_fifo[1] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.p[3] = 1;
+            gpu->cur_vtx.v.p[3] = 1;
             add_vtx(gpu);
             break;
         case VTX_10:
-            gpu->cur_vtx.p[0] =
+            gpu->cur_vtx.v.p[0] =
                 ((s32) (gpu->param_fifo[0] & 0x3ff) << 22) / (float) (1 << 28);
-            gpu->cur_vtx.p[1] =
+            gpu->cur_vtx.v.p[1] =
                 ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12) /
                 (float) (1 << 28);
-            gpu->cur_vtx.p[2] =
+            gpu->cur_vtx.v.p[2] =
                 ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2) /
                 (float) (1 << 28);
-            gpu->cur_vtx.p[3] = 1;
+            gpu->cur_vtx.v.p[3] = 1;
             add_vtx(gpu);
             break;
         case VTX_XY:
-            gpu->cur_vtx.p[0] =
+            gpu->cur_vtx.v.p[0] =
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.p[1] =
+            gpu->cur_vtx.v.p[1] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
             add_vtx(gpu);
             break;
         case VTX_XZ:
-            gpu->cur_vtx.p[0] =
+            gpu->cur_vtx.v.p[0] =
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.p[2] =
+            gpu->cur_vtx.v.p[2] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
             add_vtx(gpu);
             break;
         case VTX_YZ:
-            gpu->cur_vtx.p[1] =
+            gpu->cur_vtx.v.p[1] =
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.p[2] =
+            gpu->cur_vtx.v.p[2] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
             add_vtx(gpu);
             break;
         case VTX_DIFF:
-            gpu->cur_vtx.p[0] +=
+            gpu->cur_vtx.v.p[0] +=
                 ((s32) (gpu->param_fifo[0] & 0x3ff) << 22 >> 6) /
                 (float) (1 << 28);
-            gpu->cur_vtx.p[1] +=
+            gpu->cur_vtx.v.p[1] +=
                 ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12 >> 6) /
                 (float) (1 << 28);
-            gpu->cur_vtx.p[2] +=
+            gpu->cur_vtx.v.p[2] +=
                 ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2 >> 6) /
                 (float) (1 << 28);
-            gpu->cur_vtx.p[3] = 1;
+            gpu->cur_vtx.v.p[3] = 1;
             add_vtx(gpu);
             break;
         case POLYGON_ATTR:
             gpu->cur_attr.w = gpu->param_fifo[0];
+            break;
+        case TEXIMAGE_PARAM:
+            gpu->cur_texparam.w = gpu->param_fifo[0];
+            break;
+        case PLTT_BASE:
+            gpu->cur_pltt_base = gpu->param_fifo[0] & 0x1fff;
             break;
         case DIF_AMB:
             gpu->cur_mtl0.w = gpu->param_fifo[0];
@@ -487,20 +515,34 @@ void gxcmd_execute(GPU* gpu) {
             gpu_render(gpu);
             gpu->n_verts = 0;
             gpu->n_polys = 0;
+            gpu->master->io9.ram_count.w = 0;
+            gpu->w_buffer = gpu->param_fifo[0] & 2;
             break;
+        case VIEWPORT: {
+            int x0, y0, x1, y1;
+            x0 = gpu->param_fifo[0] & 0xff;
+            y0 = (gpu->param_fifo[0] >> 8) & 0xff;
+            x1 = (gpu->param_fifo[0] >> 0x10) & 0xff;
+            y1 = (gpu->param_fifo[0] >> 0x18) & 0xff;
+            gpu->view_x = x0;
+            gpu->view_y = y0;
+            gpu->view_w = x1 - x0;
+            gpu->view_h = y1 - y0;
+            break;
+        }
         case BOX_TEST:
             gpu->master->io9.gxstat.boxtest = 1;
             break;
         case POS_TEST:
-            gpu->cur_vtx.p[0] =
+            gpu->cur_vtx.v.p[0] =
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.p[1] =
+            gpu->cur_vtx.v.p[1] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
-            gpu->cur_vtx.p[2] =
+            gpu->cur_vtx.v.p[2] =
                 ((s32) (gpu->param_fifo[1] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.p[3] = 1;
+            gpu->cur_vtx.v.p[3] = 1;
             update_mtxs(gpu);
-            vec4 pos = gpu->cur_vtx;
+            vec4 pos = gpu->cur_vtx.v;
             vecmul(&gpu->clipmtx, &pos);
             gpu->master->io9.pos_result[0] = pos.p[0] * (1 << 12);
             gpu->master->io9.pos_result[1] = pos.p[1] * (1 << 12);
@@ -531,19 +573,15 @@ void gxcmd_execute(GPU* gpu) {
 }
 
 bool in_screen_bound(vertex* v) {
-    float w = v->v.p[3];
-    int x = (v->v.p[0] / w + 1) * NDS_SCREEN_W / 2;
-    int y = (1 - v->v.p[1] / w) * NDS_SCREEN_H / 2;
-    return x >= 0 && y >= 0 && x < NDS_SCREEN_W && y < NDS_SCREEN_H && v->v.p[2] / v->v.p[3] > 0;
+    return -1 <= v->v.p[0] && v->v.p[0] <= 1 && -1 <= v->v.p[1] &&
+           v->v.p[1] <= 1 && v->v.p[2] >= 0;
 }
 
 void render_line(GPU* gpu, vertex* v0, vertex* v1) {
-    float w0 = v0->v.p[3];
-    int x0 = (v0->v.p[0] / w0 + 1) * NDS_SCREEN_W / 2;
-    int y0 = (1 - v0->v.p[1] / w0) * NDS_SCREEN_H / 2;
-    float w1 = v1->v.p[3];
-    int x1 = (v1->v.p[0] / w1 + 1) * NDS_SCREEN_W / 2;
-    int y1 = (1 - v1->v.p[1] / w1) * NDS_SCREEN_H / 2;
+    int x0 = (v0->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
+    int y0 = (1 - v0->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
+    int x1 = (v1->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
+    int y1 = (1 - v1->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
 
     float m = (float) (y1 - y0) / (x1 - x0);
     if (fabsf(m) > 1) {
@@ -580,32 +618,37 @@ void render_line(GPU* gpu, vertex* v0, vertex* v1) {
     }
 }
 
-void render_polygon_wireframe(GPU* gpu, poly* t) {
-    if (!in_screen_bound(t->p[0]) && !in_screen_bound(t->p[1]) &&
-        !in_screen_bound(t->p[2]))
+void render_polygon_wireframe(GPU* gpu, poly* p) {
+    if (!in_screen_bound(p->p[0]) && !in_screen_bound(p->p[1]) &&
+        !in_screen_bound(p->p[2]))
         return;
 
-    render_line(gpu, t->p[0], t->p[1]);
-    render_line(gpu, t->p[1], t->p[2]);
-    if (t->p[3]) {
-        render_line(gpu, t->p[2], t->p[3]);
-        render_line(gpu, t->p[3], t->p[0]);
+    render_line(gpu, p->p[0], p->p[1]);
+    render_line(gpu, p->p[1], p->p[2]);
+    if (p->p[3]) {
+        render_line(gpu, p->p[2], p->p[3]);
+        render_line(gpu, p->p[3], p->p[0]);
     } else {
-        render_line(gpu, t->p[2], t->p[0]);
+        render_line(gpu, p->p[2], p->p[0]);
     }
 }
 
-void render_line_attrs(vertex* v0, vertex* v1, struct raster_attrs* left,
-                       struct raster_attrs* right) {
-    float w0 = 1 / v0->v.p[3];
-    int x0 = (v0->v.p[0] * w0 + 1) * NDS_SCREEN_W / 2;
-    int y0 = (1 - v0->v.p[1] * w0) * NDS_SCREEN_H / 2;
-    float w1 = 1 / v1->v.p[3];
-    int x1 = (v1->v.p[0] * w1 + 1) * NDS_SCREEN_W / 2;
-    int y1 = (1 - v1->v.p[1] * w1) * NDS_SCREEN_H / 2;
+void render_line_attrs(GPU* gpu, vertex* v0, vertex* v1,
+                       struct raster_attrs* left, struct raster_attrs* right) {
+    int x0 = (v0->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
+    int y0 = (1 - v0->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
+    int x1 = (v1->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
+    int y1 = (1 - v1->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
 
     float z0 = v0->v.p[2];
     float z1 = v1->v.p[2];
+    float w0 = 1 / v0->v.p[3];
+    float w1 = 1 / v1->v.p[3];
+
+    float s0 = v0->vt.p[0];
+    float s1 = v1->vt.p[0];
+    float t0 = v0->vt.p[1];
+    float t1 = v1->vt.p[1];
 
     u16 c0 = v0->color;
     u16 c1 = v1->color;
@@ -614,19 +657,25 @@ void render_line_attrs(vertex* v0, vertex* v1, struct raster_attrs* left,
     if (fabsf(m) > 1) {
         m = 1 / m;
         if (y0 > y1) {
-            int t = y0;
+            int ti = y0;
             y0 = y1;
-            y1 = t;
+            y1 = ti;
             x0 = x1;
-            t = c0;
+            ti = c0;
             c0 = c1;
-            c1 = t;
-            float t1 = w0;
+            c1 = ti;
+            float tf = w0;
             w0 = w1;
-            w1 = t1;
-            t1 = z0;
+            w1 = tf;
+            tf = z0;
             z0 = z1;
-            z1 = t1;
+            z1 = tf;
+            tf = s0;
+            s0 = s1;
+            s1 = tf;
+            tf = t0;
+            t0 = t1;
+            t1 = tf;
         }
         int h = y1 - y0;
 
@@ -635,22 +684,28 @@ void render_line_attrs(vertex* v0, vertex* v1, struct raster_attrs* left,
         float dz = (z1 - z) / h;
         float w = w0;
         float dw = (w1 - w) / h;
+        float s = s0 * w0;
+        float ds = (s1 * w1 - s) / h;
+        float t = t0 * w0;
+        float dt = (t1 * w1 - t) / h;
         float r = (c0 & 0x1f) * w0;
         float g = ((c0 >> 5) & 0x1f) * w0;
         float b = ((c0 >> 10) & 0x1f) * w0;
         float dr = ((c1 & 0x1f) * w1 - r) / h;
         float dg = (((c1 >> 5) & 0x1f) * w1 - g) / h;
         float db = (((c1 >> 10) & 0x1f) * w1 - b) / h;
-        for (int y = y0; y <= y1;
-             y++, x += m, z += dz, w += dw, r += dr, g += dg, b += db) {
+        for (int y = y0; y <= y1; y++, x += m, z += dz, w += dw, s += ds,
+                 t += dt, r += dr, g += dg, b += db) {
             int sx = x, sy = y;
             if (sy < 0 || sy >= NDS_SCREEN_H) continue;
             if (sx < 0) sx = 0;
-            if (sx >= NDS_SCREEN_W) sx = NDS_SCREEN_W;
+            if (sx >= NDS_SCREEN_W) sx = NDS_SCREEN_W - 1;
             if (sx <= left[sy].x) {
                 left[sy].x = sx;
                 left[sy].z = z;
                 left[sy].w = w;
+                left[sy].s = s;
+                left[sy].t = t;
                 left[sy].r = r;
                 left[sy].g = g;
                 left[sy].b = b;
@@ -659,6 +714,8 @@ void render_line_attrs(vertex* v0, vertex* v1, struct raster_attrs* left,
                 right[sy].x = sx;
                 right[sy].z = z;
                 right[sy].w = w;
+                right[sy].s = s;
+                right[sy].t = t;
                 right[sy].r = r;
                 right[sy].g = g;
                 right[sy].b = b;
@@ -666,19 +723,25 @@ void render_line_attrs(vertex* v0, vertex* v1, struct raster_attrs* left,
         }
     } else {
         if (x0 > x1) {
-            int t = x0;
+            int ti = x0;
             x0 = x1;
-            x1 = t;
+            x1 = ti;
             y0 = y1;
-            t = c0;
+            ti = c0;
             c0 = c1;
-            c1 = t;
-            float t1 = w0;
+            c1 = ti;
+            float tf = w0;
             w0 = w1;
-            w1 = t1;
-            t1 = z0;
+            w1 = tf;
+            tf = z0;
             z0 = z1;
-            z1 = t1;
+            z1 = tf;
+            tf = s0;
+            s0 = s1;
+            s1 = tf;
+            tf = t0;
+            t0 = t1;
+            t1 = tf;
         }
         int h = x1 - x0;
 
@@ -687,22 +750,28 @@ void render_line_attrs(vertex* v0, vertex* v1, struct raster_attrs* left,
         float dz = (z1 - z) / h;
         float w = w0;
         float dw = (w1 - w) / h;
+        float s = s0 * w0;
+        float ds = (s1 * w1 - s) / h;
+        float t = t0 * w0;
+        float dt = (t1 * w1 - t) / h;
         float r = (c0 & 0x1f) * w0;
         float g = ((c0 >> 5) & 0x1f) * w0;
         float b = ((c0 >> 10) & 0x1f) * w0;
         float dr = ((c1 & 0x1f) * w1 - r) / h;
         float dg = (((c1 >> 5) & 0x1f) * w1 - g) / h;
         float db = (((c1 >> 10) & 0x1f) * w1 - b) / h;
-        for (int x = x0; x <= x1;
-             x++, y += m, z += dz, w += dw, r += dr, g += dg, b += db) {
+        for (int x = x0; x <= x1; x++, y += m, z += dz, w += dw, s += ds,
+                 t += dt, r += dr, g += dg, b += db) {
             int sx = x, sy = y;
             if (sy < 0 || sy >= NDS_SCREEN_H) continue;
             if (sx < 0) sx = 0;
-            if (sx >= NDS_SCREEN_W) sx = NDS_SCREEN_W;
+            if (sx >= NDS_SCREEN_W) sx = NDS_SCREEN_W - 1;
             if (sx <= left[sy].x) {
                 left[sy].x = sx;
                 left[sy].z = z;
                 left[sy].w = w;
+                left[sy].s = s;
+                left[sy].t = t;
                 left[sy].r = r;
                 left[sy].g = g;
                 left[sy].b = b;
@@ -711,6 +780,8 @@ void render_line_attrs(vertex* v0, vertex* v1, struct raster_attrs* left,
                 right[sy].x = sx;
                 right[sy].z = z;
                 right[sy].w = w;
+                right[sy].s = s;
+                right[sy].t = t;
                 right[sy].r = r;
                 right[sy].g = g;
                 right[sy].b = b;
@@ -719,20 +790,25 @@ void render_line_attrs(vertex* v0, vertex* v1, struct raster_attrs* left,
     }
 }
 
-void render_polygon(GPU* gpu, poly* t) {
-    if (!in_screen_bound(t->p[0]) && !in_screen_bound(t->p[1]) &&
-        !in_screen_bound(t->p[2]))
+void render_polygon(GPU* gpu, poly* p) {
+    if (!in_screen_bound(p->p[0]) && !in_screen_bound(p->p[1]) &&
+        !in_screen_bound(p->p[2]))
         return;
 
-    if (t->attr.mode == 3) return;
+    if (p->attr.alpha == 0) {
+        render_polygon_wireframe(gpu, p);
+        return;
+    }
 
-    float ax = t->p[1]->v.p[0] - t->p[0]->v.p[0];
-    float ay = t->p[1]->v.p[1] - t->p[0]->v.p[1];
-    float bx = t->p[2]->v.p[0] - t->p[0]->v.p[0];
-    float by = t->p[2]->v.p[1] - t->p[0]->v.p[1];
+    if (p->attr.mode == 3) return;
+
+    float ax = p->p[1]->v.p[0] - p->p[0]->v.p[0];
+    float ay = p->p[1]->v.p[1] - p->p[0]->v.p[1];
+    float bx = p->p[2]->v.p[0] - p->p[0]->v.p[0];
+    float by = p->p[2]->v.p[1] - p->p[0]->v.p[1];
     float area = ax * by - ay * bx;
-    if (area < 0 && !t->attr.back) return;
-    if (area > 0 && !t->attr.front) return;
+    if (area < 0 && !p->attr.back) return;
+    if (area > 0 && !p->attr.front) return;
 
     struct raster_attrs left[NDS_SCREEN_H], right[NDS_SCREEN_H];
     for (int y = 0; y < NDS_SCREEN_H; y++) {
@@ -740,39 +816,209 @@ void render_polygon(GPU* gpu, poly* t) {
         right[y].x = -1;
     }
 
-    render_line_attrs(t->p[0], t->p[1], left, right);
-    render_line_attrs(t->p[1], t->p[2], left, right);
-    if (t->p[3]) {
-        render_line_attrs(t->p[2], t->p[3], left, right);
-        render_line_attrs(t->p[3], t->p[0], left, right);
+    render_line_attrs(gpu, p->p[0], p->p[1], left, right);
+    render_line_attrs(gpu, p->p[1], p->p[2], left, right);
+    if (p->p[3]) {
+        render_line_attrs(gpu, p->p[2], p->p[3], left, right);
+        render_line_attrs(gpu, p->p[3], p->p[0], left, right);
     } else {
-        render_line_attrs(t->p[2], t->p[0], left, right);
+        render_line_attrs(gpu, p->p[2], p->p[0], left, right);
     }
 
-    for (int y = 0; y < NDS_SCREEN_H; y++) {
-        if (left[y].x > right[y].x) continue;
-        int h = right[y].x - left[y].x;
+    if (gpu->master->io9.disp3dcnt.texture && p->texparam.format) {
 
-        float z = left[y].z;
-        float w = left[y].w;
-        float dz = (right[y].z - z) / h;
-        float dw = (right[y].w - w) / h;
+        u32 base = p->texparam.offset << 3;
+        u32 s_shift = p->texparam.s_size + 3;
+        u32 t_shift = p->texparam.t_size + 3;
+        int format = p->texparam.format;
 
-        float r = left[y].r;
-        float g = left[y].g;
-        float b = left[y].b;
-        float dr = (right[y].r - r) / h;
-        float dg = (right[y].g - g) / h;
-        float db = (right[y].b - b) / h;
-        for (int x = left[y].x; x <= right[y].x;
-             x++, z += dz, w += dw, r += dr, g += dg, b += db) {
-            if (z < gpu->depth_buf[y][x]) {
-                gpu->depth_buf[y][x] = z;
-                u16 c = 0x8000;
-                c |= (u16) (r / w) & 0x1f;
-                c |= ((u16) (g / w) & 0x1f) << 5;
-                c |= ((u16) (b / w) & 0x1f) << 10;
-                gpu->screen[y][x] = c;
+        u32 palbase = p->pltt_base << 3;
+        if (format == TEX_2BPP) palbase >>= 1;
+
+        for (int y = 0; y < NDS_SCREEN_H; y++) {
+            if (left[y].x > right[y].x) continue;
+            int h = right[y].x - left[y].x;
+
+            float z = left[y].z;
+            float w = left[y].w;
+            float dz = (right[y].z - z) / h;
+            float dw = (right[y].w - w) / h;
+            float s = left[y].s;
+            float t = left[y].t;
+            float ds = (right[y].s - s) / h;
+            float dt = (right[y].t - t) / h;
+
+            float r = left[y].r;
+            float g = left[y].g;
+            float b = left[y].b;
+            float dr = (right[y].r - r) / h;
+            float dg = (right[y].g - g) / h;
+            float db = (right[y].b - b) / h;
+            for (int x = left[y].x; x <= right[y].x; x++, z += dz, w += dw,
+                     s += ds, t += dt, r += dr, g += dg, b += db) {
+                bool depth_test;
+                if (p->attr.depth_test) {
+                    if (gpu->w_buffer)
+                        depth_test = fabsf(w - gpu->depth_buf[y][x]) <= 0.125;
+                    else depth_test = fabsf(z - gpu->depth_buf[y][x]) <= 0.125;
+                } else {
+                    if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
+                    else depth_test = z < gpu->depth_buf[y][x];
+                }
+                if (0 < z && depth_test) {
+                    if (gpu->w_buffer) gpu->depth_buf[y][x] = w;
+                    else gpu->depth_buf[y][x] = z;
+
+                    s32 ss = s / w;
+                    s32 tt = t / w;
+                    if (p->texparam.s_rep) {
+                        bool flip = p->texparam.s_flip && ((ss >> s_shift) & 1);
+                        ss &= (1 << s_shift) - 1;
+                        if (flip) ss = (1 << s_shift) - 1 - ss;
+                    } else {
+                        if (ss < 0) ss = 0;
+                        if (ss > (1 << s_shift) - 1) ss = (1 << s_shift) - 1;
+                    }
+                    if (p->texparam.t_rep) {
+                        bool flip = p->texparam.t_flip && ((tt >> t_shift) & 1);
+                        tt &= (1 << t_shift) - 1;
+                        if (flip) tt = (1 << t_shift) - 1 - tt;
+                    } else {
+                        if (tt < 0) tt = 0;
+                        if (tt > (1 << t_shift) - 1) tt = (1 << t_shift) - 1;
+                    }
+                    u32 ofs = (tt << s_shift) + ss;
+
+                    u16 color;
+                    bool transparent = false;
+                    switch (format) {
+                        case TEX_2BPP: {
+                            u32 addr = base + (ofs >> 2);
+                            u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                            col_ind >>= (ofs & 3) << 1;
+                            col_ind &= 3;
+                            if (!col_ind && p->texparam.color0)
+                                transparent = true;
+                            else {
+                                u32 paladdr = palbase + col_ind;
+                                color = gpu->texpal[paladdr >> 13]
+                                                   [paladdr & 0x1fff];
+                            }
+                            break;
+                        }
+                        case TEX_4BPP: {
+                            u32 addr = base + (ofs >> 1);
+                            u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                            col_ind >>= (ofs & 1) << 2;
+                            col_ind &= 15;
+                            if (!col_ind && p->texparam.color0)
+                                transparent = true;
+                            else {
+                                u32 paladdr = palbase + col_ind;
+                                color = gpu->texpal[paladdr >> 13]
+                                                   [paladdr & 0x1fff];
+                            }
+                            break;
+                        }
+                        case TEX_8BPP: {
+                            u32 addr = base + ofs;
+                            u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                            if (!col_ind && p->texparam.color0)
+                                transparent = true;
+                            else {
+                                u32 paladdr = palbase + col_ind;
+                                color = gpu->texpal[paladdr >> 13]
+                                                   [paladdr & 0x1fff];
+                            }
+                            break;
+                        }
+                        case TEX_A3I5: {
+                            u32 addr = base + ofs;
+                            u8 col_ind =
+                                gpu->texram[addr >> 17][addr & 0x1ffff];
+                            u8 alpha = col_ind >> 5;
+                            col_ind &= 31;
+                            if (!alpha)
+                                transparent = true;
+                            else {
+                                u32 paladdr = palbase + col_ind;
+                                color = gpu->texpal[paladdr >> 13]
+                                                   [paladdr & 0x1fff];
+                            }
+                            break;
+                        }
+                        case TEX_A5I3: {
+                            u32 addr = base + ofs;
+                            u8 col_ind =
+                                gpu->texram[addr >> 17][addr & 0x1ffff];
+                            u8 alpha = col_ind >> 3;
+                            col_ind &= 7;
+                            if (!alpha) transparent = true;
+                            else {
+                                u32 paladdr = palbase + col_ind;
+                                color = gpu->texpal[paladdr >> 13]
+                                                   [paladdr & 0x1fff];
+                            }
+                            break;
+                        }
+                        case TEX_DIRECT: {
+                            u32 addr = base + (ofs << 1);
+                            color =
+                                *(u16*) &gpu->texram[addr >> 17][addr & 0x1ffff];
+                            if (!(color & 0x8000)) transparent = true;
+                            break;
+                        }
+                        default:
+                            transparent = true;
+                            break;
+                    }
+                    if (transparent) continue;
+
+                    u16 c = 0x8000;
+                    c |= (u16) (r / w * (color & 0x1f) / 32) & 0x1f;
+                    c |= ((u16) (g / w * ((color >> 5) & 0x1f) / 32) & 0x1f) << 5;
+                    c |= ((u16) (b / w * ((color >> 10) & 0x1f) / 32) & 0x1f) << 10;
+                    gpu->screen[y][x] = color | 0x8000;
+                }
+            }
+        }
+    } else {
+        for (int y = 0; y < NDS_SCREEN_H; y++) {
+            if (left[y].x > right[y].x) continue;
+            int h = right[y].x - left[y].x;
+
+            float z = left[y].z;
+            float w = left[y].w;
+            float dz = (right[y].z - z) / h;
+            float dw = (right[y].w - w) / h;
+
+            float r = left[y].r;
+            float g = left[y].g;
+            float b = left[y].b;
+            float dr = (right[y].r - r) / h;
+            float dg = (right[y].g - g) / h;
+            float db = (right[y].b - b) / h;
+            for (int x = left[y].x; x <= right[y].x;
+                 x++, z += dz, w += dw, r += dr, g += dg, b += db) {
+                bool depth_test;
+                if (p->attr.depth_test) {
+                    if (gpu->w_buffer)
+                        depth_test = fabsf(w - gpu->depth_buf[y][x]) <= 0.125;
+                    else depth_test = fabsf(z - gpu->depth_buf[y][x]) <= 0.125;
+                } else {
+                    if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
+                    else depth_test = z < gpu->depth_buf[y][x];
+                }
+                if (0 < z && depth_test) {
+                    if (gpu->w_buffer) gpu->depth_buf[y][x] = w;
+                    else gpu->depth_buf[y][x] = z;
+
+                    u16 c = 0x8000;
+                    c |= (u16) (r / w) & 0x1f;
+                    c |= ((u16) (g / w) & 0x1f) << 5;
+                    c |= ((u16) (b / w) & 0x1f) << 10;
+                    gpu->screen[y][x] = c;
+                }
             }
         }
     }
@@ -782,7 +1028,14 @@ void gpu_render(GPU* gpu) {
     memset(gpu->screen, 0, sizeof gpu->screen);
     for (int y = 0; y < NDS_SCREEN_H; y++) {
         for (int x = 0; x < NDS_SCREEN_W; x++) {
-            gpu->depth_buf[y][x] = 0x7fff;
+            if (gpu->master->io9.clear_color.alpha) {
+                gpu->screen[y][x] = 0x8000 | gpu->master->io9.clear_color.color;
+            }
+            if (gpu->w_buffer) {
+                gpu->depth_buf[y][x] = 1 / (float) 0x7fff;
+            } else {
+                gpu->depth_buf[y][x] = 0x7fff;
+            }
         }
     }
     for (int i = 0; i < gpu->n_polys; i++) {
