@@ -10,6 +10,8 @@
 
 EmulatorState ntremu;
 
+bool wireframe;
+
 const char usage[] = "ntremu [options] <romfile>\n"
                      "-u -- run at uncapped speed\n"
                      "-d -- run the debugger\n";
@@ -122,6 +124,9 @@ void hotkey_press(SDL_KeyCode key) {
             break;
         case SDLK_TAB:
             ntremu.uncap = !ntremu.uncap;
+            break;
+        case SDLK_o:
+            wireframe = !wireframe;
             break;
         default:
             break;

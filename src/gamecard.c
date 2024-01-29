@@ -96,6 +96,11 @@ bool card_write_command(GameCard* card, u8* command) {
                 card->key1mode = true;
                 return false;
                 break;
+            case 0x90:
+                return false;
+                card->state = CARD_CHIPID;
+                return true;
+                break;
             case 0xb7:
                 card->state = CARD_DATA;
                 card->addr = command[1] << 24 | command[2] << 16 |
@@ -105,7 +110,6 @@ bool card_write_command(GameCard* card, u8* command) {
                 return true;
                 break;
             case 0xb8:
-            case 0x90:
                 card->state = CARD_CHIPID;
                 return true;
                 break;

@@ -108,7 +108,6 @@ void cpu9_handle_interrupt(Arm946E* cpu, CpuInterrupt intr) {
     if (cpu->cpsr.t) {
         if (intr == I_SWI || intr == I_UND) cpu->lr -= 2;
     } else cpu->lr -= 4;
-    cpu9_fetch_instr(cpu);
     cpu->cpsr.t = 0;
     cpu->cpsr.i = 1;
     cpu->pc = 0xffff0000 + 4 * intr;
@@ -196,7 +195,7 @@ u16 cpu9_fetch16(Arm946E* cpu, u32 addr) {
     else {
         data = bus9_read16(cpu->master, addr & ~1);
         if (cpu->master->memerr) {
-            printf("Invalid instruction fetch at 0x%08x\n", addr);
+            printf("Invalid CPU9 (thumb) instruction fetch at 0x%08x\n", addr);
             cpu->master->cpuerr = true;
         }
     }
@@ -210,7 +209,7 @@ u32 cpu9_fetch32(Arm946E* cpu, u32 addr) {
     else {
         data = bus9_read32(cpu->master, addr & ~3);
         if (cpu->master->memerr) {
-            printf("Invalid instruction fetch at 0x%08x\n", addr);
+            printf("Invalid CPU9 instruction fetch at 0x%08x\n", addr);
             cpu->master->cpuerr = true;
         }
     }

@@ -282,6 +282,7 @@ void render_bgs(PPU* ppu) {
         if (ppu->io->dispcnt.enable_3d) {
             if (ppu->io->dispcnt.bg_enable & 1) {
                 ppu->draw_bg[0] = true;
+                ppu->bg0_3d = true;
                 memcpy(ppu->layerlines[0], ppu->master->gpu.screen[ppu->ly],
                        sizeof ppu->screen[0]);
             }
@@ -707,16 +708,20 @@ void compose_lines(PPU* ppu) {
                         if (l == 1 ||
                             !(ppu->io->bldcnt.target2 & (1 << layers[1])))
                             break;
-                        u16 color2 = ppu->layerlines[layers[1]][x];
-                        u8 r2 = color2 & 0x1f;
-                        u8 g2 = (color2 >> 5) & 0x1f;
-                        u8 b2 = (color2 >> 10) & 0x1f;
-                        r1 = (eva * r1 + evb * r2) / 16;
-                        if (r1 > 31) r1 = 31;
-                        g1 = (eva * g1 + evb * g2) / 16;
-                        if (g1 > 31) g1 = 31;
-                        b1 = (eva * b1 + evb * b2) / 16;
-                        if (b1 > 31) b1 = 31;
+                        if (ppu->bg0_3d && layers[0] == 0) {
+
+                        } else {
+                            u16 color2 = ppu->layerlines[layers[1]][x];
+                            u8 r2 = color2 & 0x1f;
+                            u8 g2 = (color2 >> 5) & 0x1f;
+                            u8 b2 = (color2 >> 10) & 0x1f;
+                            r1 = (eva * r1 + evb * r2) / 16;
+                            if (r1 > 31) r1 = 31;
+                            g1 = (eva * g1 + evb * g2) / 16;
+                            if (g1 > 31) g1 = 31;
+                            b1 = (eva * b1 + evb * b2) / 16;
+                            if (b1 > 31) b1 = 31;
+                        }
                         break;
                     }
                     case EFF_BINC: {
@@ -784,6 +789,7 @@ void draw_scanline_normal(PPU* ppu) {
     ppu->draw_obj = false;
     ppu->obj_mos = false;
     ppu->obj_semitrans = false;
+    ppu->bg0_3d = false;
 
     if (ppu->io->dispcnt.win_enable || ppu->io->dispcnt.winobj_enable)
         memset(ppu->window, WOUT, NDS_SCREEN_W);

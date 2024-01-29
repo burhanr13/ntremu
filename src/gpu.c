@@ -6,6 +6,8 @@
 #include "io.h"
 #include "nds.h"
 
+extern bool wireframe;
+
 const int cmd_parms[8][16] = {{0},
                               {1, 0, 1, 1, 1, 0, 16, 12, 16, 12, 9, 3, 3},
                               {1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -108,7 +110,8 @@ void add_poly(GPU* gpu, vertex* p0, vertex* p1, vertex* p2, vertex* p3) {
         return;
     }
 
-    if (!in_screen_bound(p0) && !in_screen_bound(p1) && !in_screen_bound(p2))
+    if (!in_screen_bound(p0) && !in_screen_bound(p1) && !in_screen_bound(p2) &&
+        !(p3 && in_screen_bound(p3)))
         return;
 
     gpu->polygonram[gpu->n_polys].p[0] = p0;
@@ -1126,7 +1129,13 @@ void gpu_render(GPU* gpu) {
             }
         }
     }
-    for (int i = 0; i < gpu->n_polys; i++) {
-        render_polygon(gpu, &gpu->polygonram[i]);
+    if (wireframe) {
+        for (int i = 0; i < gpu->n_polys; i++) {
+            render_polygon_wireframe(gpu, &gpu->polygonram[i]);
+        }
+    } else {
+        for (int i = 0; i < gpu->n_polys; i++) {
+            render_polygon(gpu, &gpu->polygonram[i]);
+        }
     }
 }

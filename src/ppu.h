@@ -110,6 +110,7 @@ typedef struct {
     bool in_win[2];
     bool obj_semitrans;
     bool obj_mos;
+    bool bg0_3d;
 
 } PPU;
 
