@@ -1,6 +1,7 @@
 .vscode
 
 *.bin
+*.bin.*
 roms
 build
 
