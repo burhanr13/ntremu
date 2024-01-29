@@ -118,13 +118,22 @@ void add_vtx(GPU* gpu) {
         gpu->master->io9.disp3dcnt.ram_overflow = 1;
         return;
     }
+    update_mtxs(gpu);
 
-    gpu->vertexram[gpu->n_verts] = gpu->cur_vtx;
-    vecmul(&gpu->clipmtx, &gpu->vertexram[gpu->n_verts].v);
-    gpu->vertexram[gpu->n_verts].v.p[0] /= gpu->vertexram[gpu->n_verts].v.p[3];
-    gpu->vertexram[gpu->n_verts].v.p[1] /= gpu->vertexram[gpu->n_verts].v.p[3];
-    gpu->vertexram[gpu->n_verts].v.p[2] /= gpu->vertexram[gpu->n_verts].v.p[3];
-    gpu->n_verts++;
+    vertex v = gpu->cur_vtx;
+    if (gpu->cur_texparam.transform == 3) {
+        gpu->texmtx.p[0][3] = v.vt.p[0];
+        gpu->texmtx.p[1][3] = v.vt.p[1];
+        v.vt = v.v;
+        vecmul(&gpu->texmtx, &v.vt);
+    }
+    
+    vecmul(&gpu->clipmtx, &v.v);
+    v.v.p[0] /= v.v.p[3];
+    v.v.p[1] /= v.v.p[3];
+    v.v.p[2] /= v.v.p[3];
+
+    gpu->vertexram[gpu->n_verts++] = v;
     gpu->cur_vtx_ct++;
     gpu->master->io9.ram_count.n_verts = gpu->n_verts;
 
@@ -195,6 +204,9 @@ void gxcmd_execute(GPU* gpu) {
                     }
                     gpu->master->io9.gxstat.mtxstk_size = gpu->mtxstk_size;
                     break;
+                case MM_TEX:
+                    gpu->texmtx_stack[0] = gpu->texmtx;
+                    break;
             }
             break;
         case MTX_POP:
@@ -212,6 +224,9 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->vecmtx = gpu->vecmtx_stk[gpu->mtxstk_size];
                     gpu->master->io9.gxstat.mtxstk_size = gpu->mtxstk_size;
                     break;
+                case MM_TEX:
+                    gpu->texmtx = gpu->texmtx_stack[0];
+                    break;
             }
             break;
         case MTX_STORE:
@@ -226,6 +241,9 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->vecmtx_stk[i] = gpu->vecmtx;
                     break;
                 }
+                case MM_TEX:
+                    gpu->texmtx_stack[0] = gpu->texmtx;
+                    break;
             }
             break;
         case MTX_RESTORE:
@@ -240,6 +258,9 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->vecmtx = gpu->vecmtx_stk[i];
                     break;
                 }
+                case MM_TEX:
+                    gpu->texmtx = gpu->texmtx_stack[0];
+                    break;
             }
             break;
         case MTX_IDENTITY: {
@@ -258,6 +279,9 @@ void gxcmd_execute(GPU* gpu) {
                 case MM_POSVEC:
                     gpu->posmtx = m;
                     gpu->vecmtx = m;
+                    break;
+                case MM_TEX:
+                    gpu->texmtx = m;
                     break;
             }
             break;
@@ -280,6 +304,9 @@ void gxcmd_execute(GPU* gpu) {
                 case MM_POSVEC:
                     gpu->posmtx = m;
                     gpu->vecmtx = m;
+                    break;
+                case MM_TEX:
+                    gpu->texmtx = m;
                     break;
             }
             break;
@@ -305,6 +332,9 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->posmtx = m;
                     gpu->vecmtx = m;
                     break;
+                case MM_TEX:
+                    gpu->texmtx = m;
+                    break;
             }
             break;
         }
@@ -326,6 +356,9 @@ void gxcmd_execute(GPU* gpu) {
                 case MM_POSVEC:
                     matmul(&gpu->posmtx, &m);
                     matmul(&gpu->vecmtx, &m);
+                    break;
+                case MM_TEX:
+                    matmul(&gpu->texmtx, &m);
                     break;
             }
             break;
@@ -350,6 +383,9 @@ void gxcmd_execute(GPU* gpu) {
                 case MM_POSVEC:
                     matmul(&gpu->posmtx, &m);
                     matmul(&gpu->vecmtx, &m);
+                    break;
+                case MM_TEX:
+                    matmul(&gpu->texmtx, &m);
                     break;
             }
             break;
@@ -376,6 +412,9 @@ void gxcmd_execute(GPU* gpu) {
                     matmul(&gpu->posmtx, &m);
                     matmul(&gpu->vecmtx, &m);
                     break;
+                case MM_TEX:
+                    matmul(&gpu->texmtx, &m);
+                    break;
             }
             break;
         }
@@ -392,6 +431,9 @@ void gxcmd_execute(GPU* gpu) {
                 case MM_POS:
                 case MM_POSVEC:
                     matmul(&gpu->posmtx, &m);
+                    break;
+                case MM_TEX:
+                    matmul(&gpu->texmtx, &m);
                     break;
             }
             break;
@@ -416,6 +458,9 @@ void gxcmd_execute(GPU* gpu) {
                     matmul(&gpu->posmtx, &m);
                     matmul(&gpu->vecmtx, &m);
                     break;
+                case MM_TEX:
+                    matmul(&gpu->texmtx, &m);
+                    break;
             }
             break;
         }
@@ -430,8 +475,11 @@ void gxcmd_execute(GPU* gpu) {
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 20);
             gpu->cur_vtx.vt.p[1] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 20);
-            gpu->cur_vtx.vt.p[2] = 0.0625f;
-            gpu->cur_vtx.vt.p[3] = 0.0625f;
+            if (gpu->cur_texparam.transform == 1) {
+                gpu->cur_vtx.vt.p[2] = 0.0625f;
+                gpu->cur_vtx.vt.p[3] = 0.0625f;
+                vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
+            }
             break;
         case VTX_16:
             gpu->cur_vtx.v.p[0] =
@@ -486,7 +534,6 @@ void gxcmd_execute(GPU* gpu) {
             gpu->cur_vtx.v.p[2] +=
                 ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2 >> 6) /
                 (float) (1 << 28);
-            gpu->cur_vtx.v.p[3] = 1;
             add_vtx(gpu);
             break;
         case POLYGON_ATTR:
@@ -971,9 +1018,8 @@ void render_polygon(GPU* gpu, poly* p) {
                             ind >>= (ss & 3) << 1;
                             ind &= 3;
                             u16 palmode =
-                                *(u16*) &gpu
-                                     ->texram[1][((addr & (1 << 18)) >> 2) +
-                                                 (block_ofs << 1)];
+                                *(u16*) &gpu->texram[1][(addr >> 18 << 16) +
+                                                        (block_ofs << 1)];
                             u32 paladdr = palbase + ((palmode & 0x3fff) << 1);
                             palmode >>= 14;
                             if (palmode < 2 && ind == 3) transparent = true;
@@ -1028,7 +1074,7 @@ void render_polygon(GPU* gpu, poly* p) {
                          << 5;
                     c |= ((u16) (b / w * ((color >> 10) & 0x1f) / 32) & 0x1f)
                          << 10;
-                    gpu->screen[y][x] = color | 0x8000;
+                    gpu->screen[y][x] = c;
                 }
             }
         }

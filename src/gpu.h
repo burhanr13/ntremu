@@ -12,24 +12,24 @@ enum {
     MTX_PUSH,
     MTX_POP,
     MTX_STORE,
-    MTX_RESTORE,
+    MTX_RESTORE = 0x14,
     MTX_IDENTITY,
     MTX_LOAD_44,
     MTX_LOAD_43,
-    MTX_MULT_44,
+    MTX_MULT_44 = 0x18,
     MTX_MULT_43,
     MTX_MULT_33,
     MTX_SCALE,
-    MTX_TRANS,
+    MTX_TRANS = 0x1c,
     COLOR = 0x20,
     NORMAL,
     TEXCOORD,
     VTX_16,
-    VTX_10,
+    VTX_10 = 0x24,
     VTX_XY,
     VTX_XZ,
     VTX_YZ,
-    VTX_DIFF,
+    VTX_DIFF = 0x28,
     POLYGON_ATTR,
     TEXIMAGE_PARAM,
     PLTT_BASE,
@@ -180,6 +180,9 @@ typedef struct {
 
     u8 mtxstk_size;
 
+    mat4 texmtx;
+    mat4 texmtx_stack[1];
+
     int mtx_mode;
     mat4 clipmtx;
 
@@ -195,6 +198,8 @@ typedef struct {
     vertex cur_vtx;
     int cur_vtx_ct;
 
+    vec4 lightvec[4];
+    u16 lightcol[4];
     Material0 cur_mtl0;
     Material1 cur_mtl1;
     TexParam cur_texparam;
