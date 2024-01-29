@@ -1053,11 +1053,12 @@ void render_polygon(GPU* gpu, poly* p) {
                             break;
                         }
                     }
+                    if (alpha == 0) continue;
+
                     if (alpha == 31 || p->attr.depth_transparent) {
                         if (gpu->w_buffer) gpu->depth_buf[y][x] = w;
                         else gpu->depth_buf[y][x] = z;
                     }
-                    if (alpha == 0) continue;
 
                     u16 c = 0x8000;
                     c |= (u16) (r / w * (color & 0x1f) / 32) & 0x1f;
