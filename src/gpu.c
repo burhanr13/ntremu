@@ -963,9 +963,52 @@ void render_polygon(GPU* gpu, poly* p) {
                             }
                             break;
                         }
-                        case TEX_COMPRESS:
-                            
+                        case TEX_COMPRESS: {
+                            u32 block_ofs =
+                                ((tt >> 2) << (s_shift - 2)) + (ss >> 2);
+                            u32 addr = base + (block_ofs << 2) + (tt & 3);
+                            u8 ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                            ind >>= (ss & 3) << 1;
+                            ind &= 3;
+                            u16 palmode =
+                                *(u16*) &gpu
+                                     ->texram[1][((addr & (1 << 18)) >> 2) +
+                                                 (block_ofs << 1)];
+                            u32 paladdr = palbase + ((palmode & 0x3fff) << 1);
+                            palmode >>= 14;
+                            if (palmode < 2 && ind == 3) transparent = true;
+                            else if (ind < 2 || !(palmode & 1)) {
+                                paladdr += ind;
+                                color = gpu->texpal[paladdr >> 13]
+                                                   [paladdr & 0x1fff];
+                            } else {
+                                u16 color0 = gpu->texpal[paladdr >> 13]
+                                                        [paladdr & 0x1fff];
+                                paladdr++;
+                                u16 color1 = gpu->texpal[paladdr >> 13]
+                                                        [paladdr & 0x1fff];
+                                u16 r0 = color0 & 0x1f;
+                                u16 r1 = color1 & 0x1f;
+                                u16 g0 = (color0 >> 5) & 0x1f;
+                                u16 g1 = (color1 >> 5) & 0x1f;
+                                u16 b0 = (color0 >> 10) & 0x1f;
+                                u16 b1 = (color1 >> 10) & 0x1f;
+                                if (palmode == 1) {
+                                    color = (r0 + r1) / 2 | (g0 + g1) / 2 << 5 |
+                                            (b0 + b1) / 2 << 10;
+                                } else if (ind == 2) {
+                                    color = (5 * r0 + 3 * r1) / 8 |
+                                            (5 * g0 + 3 * g1) / 8 << 5 |
+                                            (5 * b0 + 3 * b1) / 8 << 10;
+                                } else {
+                                    color = (3 * r0 + 5 * r1) / 8 |
+                                            (3 * g0 + 5 * g1) / 8 << 5 |
+                                            (3 * b0 + 5 * b1) / 8 << 10;
+                                }
+                            }
+
                             break;
+                        }
                         case TEX_DIRECT: {
                             u32 addr = base + (ofs << 1);
                             color = *(u16*) &gpu
@@ -1046,6 +1089,6 @@ void gpu_render(GPU* gpu) {
         }
     }
     for (int i = 0; i < gpu->n_polys; i++) {
-        render_polygon_wireframe(gpu, &gpu->polygonram[i]);
+        render_polygon(gpu, &gpu->polygonram[i]);
     }
 }
