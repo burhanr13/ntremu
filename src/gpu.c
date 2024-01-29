@@ -101,7 +101,7 @@ void update_mtxs(GPU* gpu) {
 
 bool in_screen_bound(vertex* v) {
     return -1 <= v->v.p[0] && v->v.p[0] <= 1 && -1 <= v->v.p[1] &&
-           v->v.p[1] <= 1 && v->v.p[2] >= 0;
+           v->v.p[1] <= 1 && v->v.p[3] > 0;
 }
 
 void add_poly(GPU* gpu, vertex* p0, vertex* p1, vertex* p2, vertex* p3) {
@@ -141,9 +141,10 @@ void add_vtx(GPU* gpu) {
 
     vertex v = gpu->cur_vtx;
     vecmul(&gpu->clipmtx, &v.v);
-    v.v.p[0] /= v.v.p[3];
-    v.v.p[1] /= v.v.p[3];
-    v.v.p[2] /= v.v.p[3];
+    v.v.p[3] = 1 / v.v.p[3];
+    v.v.p[0] *= v.v.p[3];
+    v.v.p[1] *= v.v.p[3];
+    v.v.p[2] *= v.v.p[3];
 
     gpu->vertexram[gpu->n_verts++] = v;
     gpu->cur_vtx_ct++;
@@ -693,8 +694,8 @@ void render_line_attrs(GPU* gpu, vertex* v0, vertex* v1,
 
     float z0 = v0->v.p[2];
     float z1 = v1->v.p[2];
-    float w0 = 1 / v0->v.p[3];
-    float w1 = 1 / v1->v.p[3];
+    float w0 = v0->v.p[3];
+    float w1 = v1->v.p[3];
 
     float s0 = v0->vt.p[0];
     float s1 = v1->vt.p[0];
@@ -913,7 +914,7 @@ void render_polygon(GPU* gpu, poly* p) {
                     if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
                     else depth_test = z < gpu->depth_buf[y][x];
                 }
-                if (0 < z && depth_test) {
+                if (0 < w && depth_test) {
                     s32 ss = s / w;
                     s32 tt = t / w;
                     if (p->texparam.s_rep) {
@@ -1100,7 +1101,7 @@ void render_polygon(GPU* gpu, poly* p) {
                     if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
                     else depth_test = z < gpu->depth_buf[y][x];
                 }
-                if (0 < z && depth_test) {
+                if (0 < w && depth_test) {
                     if (gpu->w_buffer) gpu->depth_buf[y][x] = w;
                     else gpu->depth_buf[y][x] = z;
 
