@@ -99,56 +99,52 @@ void update_mtxs(GPU* gpu) {
     }
 }
 
-void interp_vtx(vertex* v0, float w0, vertex* v1, float w1, vertex* dst) {
-    w0 /= w0 + w1;
-    w1 = 1 - w0;
-    for (int i = 0; i < 4; i++) {
-        dst->v.p[i] = v0->v.p[i] * w0 + v1->v.p[i] * w1;
-    }
-    for (int i = 0; i < 2; i++) {
-        dst->vt.p[i] = v0->vt.p[i] * w0 + v1->vt.p[i] * w1;
-    }
-    dst->r = v0->r * w0 + v1->r * w1;
-    dst->g = v0->g * w0 + v1->g * w1;
-    dst->b = v0->b * w0 + v1->b * w1;
-}
-
 int clip_poly(vertex* src_orig, int n, vertex* dst) {
     vertex src[MAX_POLY_N];
     for (int i = 0; i < n; i++) {
         src[i] = src_orig[i];
     }
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 6; i++) {
         int n_new = 0;
         for (int cur = 0; cur < n; cur++) {
             int prev = cur ? cur - 1 : n - 1;
 
-            float diffcur = src[cur].v.p[i] + src[cur].v.p[3];
-            float diffprev = src[prev].v.p[i] + src[prev].v.p[3];
+            float diffcur = src[cur].v.p[3];
+            float diffprev = src[prev].v.p[3];
+            if (i & 1) {
+                diffcur += src[cur].v.p[i / 2];
+                diffprev += src[prev].v.p[i / 2];
+            } else {
+                diffcur -= src[cur].v.p[i / 2];
+                diffprev -= src[prev].v.p[i / 2];
+            }
 
-            if (diffcur * diffprev < 0)
-                interp_vtx(&src[cur], fabsf(diffprev), &src[prev],
-                           fabsf(diffcur), &dst[n_new++]);
+            if (diffcur * diffprev < 0) {
+                diffcur = fabsf(diffcur);
+                diffprev = fabsf(diffprev);
+                for (int k = 0; k < 4; k++) {
+                    dst[n_new].v.p[k] =
+                        src[cur].v.p[k] * diffprev + src[prev].v.p[k] * diffcur;
+                    dst[n_new].v.p[k] /= diffcur + diffprev;
+                }
+                for (int k = 0; k < 2; k++) {
+                    dst[n_new].vt.p[k] = src[cur].vt.p[k] * diffprev +
+                                         src[prev].vt.p[k] * diffcur;
+                    dst[n_new].vt.p[k] /= diffcur + diffprev;
+                }
+                dst[n_new].r = src[cur].r * diffprev + src[prev].r * diffcur;
+                dst[n_new].r /= diffcur + diffprev;
+                dst[n_new].g = src[cur].g * diffprev + src[prev].g * diffcur;
+                dst[n_new].g /= diffcur + diffprev;
+                dst[n_new].b = src[cur].b * diffprev + src[prev].b * diffcur;
+                dst[n_new].b /= diffcur + diffprev;
+
+                n_new++;
+                if (n_new == MAX_POLY_N) return n_new;
+            }
             if (diffcur >= 0) dst[n_new++] = src[cur];
-        }
-        n = n_new;
-
-        for (int i = 0; i < n; i++) {
-            src[i] = dst[i];
-        }
-
-        n_new = 0;
-        for (int cur = 0; cur < n; cur++) {
-            int prev = cur ? cur - 1 : n - 1;
-
-            float diffcur = src[cur].v.p[3] - src[cur].v.p[i];
-            float diffprev = src[cur].v.p[3] - src[prev].v.p[i];
-
-            if (diffcur * diffprev < 0)
-                interp_vtx(&src[cur], fabsf(diffprev), &src[prev],
-                           fabsf(diffcur), &dst[n_new++]);
-            if (diffcur >= 0) dst[n_new++] = src[cur];
+            if (n_new == MAX_POLY_N) return n;
         }
         n = n_new;
 
@@ -156,8 +152,6 @@ int clip_poly(vertex* src_orig, int n, vertex* dst) {
             src[i] = dst[i];
         }
     }
-
-    if (n > MAX_POLY_N) printf("%d\n", n);
 
     return n;
 }
