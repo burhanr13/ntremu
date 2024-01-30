@@ -110,6 +110,14 @@ void add_poly(GPU* gpu, vertex* p0, vertex* p1, vertex* p2, vertex* p3) {
         return;
     }
 
+    float ax = p1->v.p[0] - p0->v.p[0];
+    float ay = p1->v.p[1] - p0->v.p[1];
+    float bx = p2->v.p[0] - p0->v.p[0];
+    float by = p2->v.p[1] - p0->v.p[1];
+    float area = ax * by - ay * bx;
+    if (area < 0 && !gpu->cur_attr.back) return;
+    if (area > 0 && !gpu->cur_attr.front) return;
+
     if (!in_screen_bound(p0) && !in_screen_bound(p1) && !in_screen_bound(p2) &&
         !(p3 && in_screen_bound(p3)))
         return;
@@ -850,14 +858,6 @@ void render_polygon(GPU* gpu, poly* p) {
     }
 
     if (p->attr.mode == 3) return;
-
-    float ax = p->p[1]->v.p[0] - p->p[0]->v.p[0];
-    float ay = p->p[1]->v.p[1] - p->p[0]->v.p[1];
-    float bx = p->p[2]->v.p[0] - p->p[0]->v.p[0];
-    float by = p->p[2]->v.p[1] - p->p[0]->v.p[1];
-    float area = ax * by - ay * bx;
-    if (area < 0 && !p->attr.back) return;
-    if (area > 0 && !p->attr.front) return;
 
     struct raster_attrs left[NDS_SCREEN_H], right[NDS_SCREEN_H];
     for (int y = 0; y < NDS_SCREEN_H; y++) {
