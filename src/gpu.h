@@ -133,17 +133,18 @@ typedef struct {
 typedef struct {
     vec4 v;
     vec4 vt;
-    u16 color;
+    float r, g, b;
 } vertex;
 
 typedef struct {
-    vertex* p[4];
+    vertex* p[8];
+    int n;
     PolygonAttr attr;
     TexParam texparam;
     u32 pltt_base;
 } poly;
 
-struct raster_attrs {
+struct interp_attrs {
     int x;
     float z, w;
     float s, t;
@@ -197,6 +198,8 @@ typedef struct {
 
     vertex cur_vtx;
     int cur_vtx_ct;
+
+    vertex cur_poly_vtxs[4];
 
     vec4 lightvec[4];
     u16 lightcol[4];
