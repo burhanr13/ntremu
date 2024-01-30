@@ -100,109 +100,66 @@ void update_mtxs(GPU* gpu) {
 }
 
 void interp_vtx(vertex* v0, float w0, vertex* v1, float w1, vertex* dst) {
+    w0 /= w0 + w1;
+    w1 = 1 - w0;
     for (int i = 0; i < 4; i++) {
-        dst->v.p[i] = (v0->v.p[i] * w0 + v1->v.p[i] * w1) / (w0 + w1);
+        dst->v.p[i] = v0->v.p[i] * w0 + v1->v.p[i] * w1;
     }
     for (int i = 0; i < 2; i++) {
-        dst->vt.p[i] = (v0->vt.p[i] * w0 + v1->vt.p[i] * w1) / (w0 + w1);
+        dst->vt.p[i] = v0->vt.p[i] * w0 + v1->vt.p[i] * w1;
     }
-    dst->r = (v0->r * w0 + v1->r * w1) / (w0 + w1);
-    dst->g = (v0->g * w0 + v1->g * w1) / (w0 + w1);
-    dst->b = (v0->b * w0 + v1->b * w1) / (w0 + w1);
+    dst->r = v0->r * w0 + v1->r * w1;
+    dst->g = v0->g * w0 + v1->g * w1;
+    dst->b = v0->b * w0 + v1->b * w1;
 }
 
 int clip_poly(vertex* src_orig, int n, vertex* dst) {
-    vertex src[8];
+    vertex src[MAX_POLY_N];
     for (int i = 0; i < n; i++) {
         src[i] = src_orig[i];
     }
 
-    int n_new = 0;
-    for (int cur = 0; cur < n; cur++) {
-        int prev = cur ? cur - 1 : n - 1;
+    for (int i = 0; i < 3; i++) {
+        int n_new = 0;
+        for (int cur = 0; cur < n; cur++) {
+            int prev = cur ? cur - 1 : n - 1;
 
-        float diffcur = 1 / src[cur].v.p[3];
-        float diffprev = 1 / src[prev].v.p[3];
+            float diffcur = src[cur].v.p[i] + src[cur].v.p[3];
+            float diffprev = src[prev].v.p[i] + src[prev].v.p[3];
 
-        if (diffcur * diffprev < 0)
-            interp_vtx(&src[cur], fabsf(diffprev), &src[prev], fabsf(diffcur),
-                       &dst[n_new++]);
-        if (diffcur >= 0) dst[n_new++] = src[cur];
-    }
-    n = n_new;
+            if (diffcur * diffprev < 0)
+                interp_vtx(&src[cur], fabsf(diffprev), &src[prev],
+                           fabsf(diffcur), &dst[n_new++]);
+            if (diffcur >= 0) dst[n_new++] = src[cur];
+        }
+        n = n_new;
 
-    for (int i = 0; i < n; i++) {
-        src[i] = dst[i];
-    }
+        for (int i = 0; i < n; i++) {
+            src[i] = dst[i];
+        }
 
-    n_new = 0;
-    for (int cur = 0; cur < n; cur++) {
-        int prev = cur ? cur - 1 : n - 1;
+        n_new = 0;
+        for (int cur = 0; cur < n; cur++) {
+            int prev = cur ? cur - 1 : n - 1;
 
-        float diffcur = src[cur].v.p[0] + 1;
-        float diffprev = src[prev].v.p[0] + 1;
+            float diffcur = src[cur].v.p[3] - src[cur].v.p[i];
+            float diffprev = src[cur].v.p[3] - src[prev].v.p[i];
 
-        if (diffcur * diffprev < 0)
-            interp_vtx(&src[cur], fabsf(diffprev), &src[prev], fabsf(diffcur),
-                       &dst[n_new++]);
-        if (diffcur >= 0) dst[n_new++] = src[cur];
-    }
-    n = n_new;
+            if (diffcur * diffprev < 0)
+                interp_vtx(&src[cur], fabsf(diffprev), &src[prev],
+                           fabsf(diffcur), &dst[n_new++]);
+            if (diffcur >= 0) dst[n_new++] = src[cur];
+        }
+        n = n_new;
 
-    for (int i = 0; i < n; i++) {
-        src[i] = dst[i];
-    }
-
-    n_new = 0;
-    for (int cur = 0; cur < n; cur++) {
-        int prev = cur ? cur - 1 : n - 1;
-
-        float diffcur = 1 - src[cur].v.p[1];
-        float diffprev = 1 - src[prev].v.p[1];
-
-        if (diffcur * diffprev < 0)
-            interp_vtx(&src[cur], fabsf(diffprev), &src[prev], fabsf(diffcur),
-                       &dst[n_new++]);
-        if (diffcur >= 0) dst[n_new++] = src[cur];
-    }
-    n = n_new;
-
-    for (int i = 0; i < n; i++) {
-        src[i] = dst[i];
+        for (int i = 0; i < n; i++) {
+            src[i] = dst[i];
+        }
     }
 
-    n_new = 0;
-    for (int cur = 0; cur < n; cur++) {
-        int prev = cur ? cur - 1 : n - 1;
+    if (n > MAX_POLY_N) printf("%d\n", n);
 
-        float diffcur = 1 - src[cur].v.p[0];
-        float diffprev = 1 - src[prev].v.p[0];
-
-        if (diffcur * diffprev < 0)
-            interp_vtx(&src[cur], fabsf(diffprev), &src[prev], fabsf(diffcur),
-                       &dst[n_new++]);
-        if (diffcur >= 0) dst[n_new++] = src[cur];
-    }
-    n = n_new;
-
-    for (int i = 0; i < n; i++) {
-        src[i] = dst[i];
-    }
-
-    n_new = 0;
-    for (int cur = 0; cur < n; cur++) {
-        int prev = cur ? cur - 1 : n - 1;
-
-        float diffcur = src[cur].v.p[1] + 1;
-        float diffprev = src[prev].v.p[1] + 1;
-
-        if (diffcur * diffprev < 0)
-            interp_vtx(&src[cur], fabsf(diffprev), &src[prev], fabsf(diffcur),
-                       &dst[n_new++]);
-        if (diffcur >= 0) dst[n_new++] = src[cur];
-    }
-
-    return n_new;
+    return n;
 }
 
 void add_poly(GPU* gpu, int n_orig) {
@@ -221,7 +178,7 @@ void add_poly(GPU* gpu, int n_orig) {
     if (area < 0 && !gpu->cur_attr.back) return;
     if (area > 0 && !gpu->cur_attr.front) return;
 
-    vertex dst[8];
+    vertex dst[MAX_POLY_N];
     int n = clip_poly(src, n_orig, dst);
     if (!n) return;
 
@@ -230,6 +187,16 @@ void add_poly(GPU* gpu, int n_orig) {
             gpu->master->io9.disp3dcnt.ram_overflow = 1;
             return;
         }
+        float w = dst[i].v.p[3];
+        dst[i].v.p[3] = 1 / w;
+        dst[i].v.p[0] /= w;
+        dst[i].v.p[1] /= w;
+        dst[i].v.p[2] /= w;
+        dst[i].vt.p[0] /= w;
+        dst[i].vt.p[1] /= w;
+        dst[i].r /= w;
+        dst[i].g /= w;
+        dst[i].b /= w;
         gpu->vertexram[gpu->n_verts] = dst[i];
         gpu->polygonram[gpu->n_polys].p[i] = &gpu->vertexram[gpu->n_verts];
         gpu->n_verts++;
@@ -261,15 +228,6 @@ void add_vtx(GPU* gpu) {
 
     vertex v = gpu->cur_vtx;
     vecmul(&gpu->clipmtx, &v.v);
-    v.v.p[3] = 1 / v.v.p[3];
-    v.v.p[0] *= v.v.p[3];
-    v.v.p[1] *= v.v.p[3];
-    v.v.p[2] *= v.v.p[3];
-    v.vt.p[0] *= v.v.p[3];
-    v.vt.p[1] *= v.v.p[3];
-    v.r *= v.v.p[3];
-    v.g *= v.v.p[3];
-    v.b *= v.v.p[3];
 
     switch (gpu->poly_mode) {
         case POLY_TRIS: {
@@ -995,7 +953,7 @@ void render_polygon(GPU* gpu, poly* p) {
                     if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
                     else depth_test = z < gpu->depth_buf[y][x];
                 }
-                if (0 < w && depth_test) {
+                if (depth_test) {
                     s32 ss = s / w;
                     s32 tt = t / w;
                     if (p->texparam.s_rep) {
@@ -1182,7 +1140,7 @@ void render_polygon(GPU* gpu, poly* p) {
                     if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
                     else depth_test = z < gpu->depth_buf[y][x];
                 }
-                if (0 < w && depth_test) {
+                if (depth_test) {
                     if (gpu->w_buffer) gpu->depth_buf[y][x] = w;
                     else gpu->depth_buf[y][x] = z;
 

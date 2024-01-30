@@ -7,6 +7,8 @@
 #define MAX_VTX 6144
 #define MAX_POLY 2048
 
+#define MAX_POLY_N 10
+
 enum {
     MTX_MODE = 0x10,
     MTX_PUSH,
@@ -137,7 +139,7 @@ typedef struct {
 } vertex;
 
 typedef struct {
-    vertex* p[8];
+    vertex* p[MAX_POLY_N];
     int n;
     PolygonAttr attr;
     TexParam texparam;
