@@ -202,6 +202,7 @@ typedef struct {
     int cur_vtx_ct;
 
     vertex cur_poly_vtxs[4];
+    vertex* cur_poly_strip[4];
 
     vec4 lightvec[4];
     u16 lightcol[4];
