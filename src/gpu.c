@@ -193,12 +193,12 @@ bool add_poly(GPU* gpu, int n_orig, bool strip) {
     }
 
     int n = n_orig;
-    // float area = calc_area(&vtxs[0].v, &vtxs[1].v, &vtxs[2].v);
-    // if (area < 0 && !gpu->cur_attr.back) n = 0;
-    // else if (area > 0 && !gpu->cur_attr.front) n = 0;
-    // else n = clip_poly(vtxs, n);
+    float area = calc_area(&vtxs[0].v, &vtxs[1].v, &vtxs[2].v);
+    if (area < 0 && !gpu->cur_attr.back) n = 0;
+    else if (area > 0 && !gpu->cur_attr.front) n = 0;
+    else n = clip_poly(vtxs, n);
 
-    bool culled = false;
+    bool culled = true;
     if (n == -1) {
         culled = false;
         n = n_orig;
@@ -991,19 +991,21 @@ void render_polygon(GPU* gpu, poly* p) {
     }
 
     int yMin = NDS_SCREEN_H;
-    int yMax = -1;
+    int yMax = 0;
 
     for (int i = 0; i < p->n - 1; i++) {
         render_line_attrs(gpu, p->p[i], p->p[i + 1], left, right);
 
         int y = (1 - p->p[i]->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
-        if (y > yMax) yMax = y;
-        if (y < yMin) yMin = y;
+        if (y >= yMax) yMax = y;
+        if (y <= yMin) yMin = y;
     }
     render_line_attrs(gpu, p->p[p->n - 1], p->p[0], left, right);
     int y = (1 - p->p[p->n - 1]->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
-    if (y > yMax) yMax = y;
-    if (y < yMin) yMin = y;
+    if (y >= yMax) yMax = y;
+    if (y <= yMin) yMin = y;
+    if (yMax > NDS_SCREEN_H) yMax = NDS_SCREEN_H;
+    if (yMin < 0) yMin = 0;
 
     if (gpu->master->io9.disp3dcnt.texture && p->texparam.format) {
 
@@ -1015,8 +1017,7 @@ void render_polygon(GPU* gpu, poly* p) {
         u32 palbase = p->pltt_base << 3;
         if (format == TEX_2BPP) palbase >>= 1;
 
-        for (int y = yMin; y <= yMax; y++) {
-            if (left[y].x > right[y].x) continue;
+        for (int y = yMin; y < yMax; y++) {
             int h = right[y].x - left[y].x;
 
             struct interp_attrs i0 = left[y];
@@ -1215,8 +1216,7 @@ void render_polygon(GPU* gpu, poly* p) {
             }
         }
     } else {
-        for (int y = 0; y < NDS_SCREEN_H; y++) {
-            if (left[y].x > right[y].x) continue;
+        for (int y = yMin; y < yMax; y++) {
             int h = right[y].x - left[y].x;
 
             struct interp_attrs i0 = left[y];
