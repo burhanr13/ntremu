@@ -267,65 +267,64 @@ void add_vtx(GPU* gpu) {
     vertex v = gpu->cur_vtx;
     vecmul(&gpu->clipmtx, &v.v);
 
-    switch (gpu->poly_mode) {
-        case POLY_TRIS: {
-            int i = gpu->cur_vtx_ct++;
-            gpu->cur_poly_vtxs[i] = v;
-            if (gpu->cur_vtx_ct == 3) {
-                gpu->cur_vtx_ct = 0;
+    if (gpu->cur_vtx_ct < 2) {
+        gpu->cur_poly_vtxs[gpu->cur_vtx_ct++] = v;
+        gpu->tri_orient = !gpu->tri_orient;
+    } else {
+        switch (gpu->poly_mode) {
+            case POLY_TRIS: {
                 add_poly(gpu, 3, false);
-            }
-            break;
-        }
-        case POLY_QUADS: {
-            int i = gpu->cur_vtx_ct++;
-            gpu->cur_poly_vtxs[i] = v;
-            if (gpu->cur_vtx_ct == 4) {
                 gpu->cur_vtx_ct = 0;
-                add_poly(gpu, 4, false);
+                break;
             }
-            break;
-        }
-        case POLY_TRI_STRIP: {
-            if (gpu->cur_vtx_ct < 2) {
-                gpu->cur_poly_vtxs[gpu->cur_vtx_ct] = v;
-                gpu->cur_poly_strip[gpu->cur_vtx_ct] =
-                    &gpu->cur_poly_vtxs[gpu->cur_vtx_ct];
-                gpu->cur_vtx_ct++;
-                gpu->tri_orient = !gpu->tri_orient;
-            } else {
-                gpu->cur_poly_vtxs[2] = v;
-                if (add_poly(gpu, 3, gpu->cur_vtx_ct > 2)) {
-                    gpu->tri_orient = !gpu->tri_orient;
-                    if (gpu->tri_orient) {
-                        gpu->cur_poly_strip[0] = gpu->cur_poly_strip[2];
-                    } else {
-                        gpu->cur_poly_strip[1] = gpu->cur_poly_strip[2];
-                    }
-                    gpu->cur_vtx_ct++;
-                } else {
-                    gpu->tri_orient = !gpu->tri_orient;
-                    if (gpu->tri_orient) {
-                        gpu->cur_poly_vtxs[0] = gpu->cur_poly_vtxs[2];
-                        gpu->cur_poly_strip[0] = &gpu->cur_poly_vtxs[0];
-                        gpu->cur_poly_vtxs[1] = *gpu->cur_poly_strip[1];
-                        gpu->cur_poly_strip[1] = &gpu->cur_poly_vtxs[1];
-                    } else {
-                        gpu->cur_poly_vtxs[0] = *gpu->cur_poly_strip[0];
-                        gpu->cur_poly_strip[0] = &gpu->cur_poly_vtxs[0];
-                        gpu->cur_poly_vtxs[1] = gpu->cur_poly_vtxs[2];
-                        gpu->cur_poly_strip[1] = &gpu->cur_poly_vtxs[1];
-                    }
-                    gpu->cur_vtx_ct = 2;
+            case POLY_QUADS: {
+                gpu->cur_poly_vtxs[gpu->cur_vtx_ct++] = v;
+                if (gpu->cur_vtx_ct == 4) {
+                    add_poly(gpu, 4, false);
+                    gpu->cur_vtx_ct = 0;
                 }
+                break;
             }
-            break;
-        }
-        case POLY_QUAD_STRIP: {
-            if (gpu->cur_vtx_ct < 2) {
-                gpu->cur_poly_vtxs[gpu->cur_vtx_ct] = v;
+            case POLY_TRI_STRIP: {
+                gpu->cur_poly_vtxs[2] = v;
+                gpu->tri_orient = !gpu->tri_orient;
                 gpu->cur_vtx_ct++;
-            } else {
+                if (gpu->cur_vtx_ct == 3) {
+                    if (add_poly(gpu, 3, false)) {
+                        if (gpu->tri_orient) {
+                            gpu->cur_poly_strip[0] = gpu->cur_poly_strip[2];
+                        } else {
+                            gpu->cur_poly_strip[1] = gpu->cur_poly_strip[2];
+                        }
+                    } else {
+                        if (gpu->tri_orient) {
+                            gpu->cur_poly_vtxs[0] = gpu->cur_poly_vtxs[2];
+                        } else {
+                            gpu->cur_poly_vtxs[1] = gpu->cur_poly_vtxs[2];
+                        }
+                        gpu->cur_vtx_ct = 2;
+                    }
+                } else {
+                    if (add_poly(gpu, 3, true)) {
+                        if (gpu->tri_orient) {
+                            gpu->cur_poly_strip[0] = gpu->cur_poly_strip[2];
+                        } else {
+                            gpu->cur_poly_strip[1] = gpu->cur_poly_strip[2];
+                        }
+                    } else {
+                        if (gpu->tri_orient) {
+                            gpu->cur_poly_vtxs[0] = gpu->cur_poly_vtxs[2];
+                            gpu->cur_poly_vtxs[1] = *gpu->cur_poly_strip[1];
+                        } else {
+                            gpu->cur_poly_vtxs[1] = gpu->cur_poly_vtxs[2];
+                            gpu->cur_poly_vtxs[0] = *gpu->cur_poly_strip[0];
+                        }
+                        gpu->cur_vtx_ct = 2;
+                    }
+                }
+                break;
+            }
+            case POLY_QUAD_STRIP: {
                 if (++gpu->cur_vtx_ct & 1) {
                     gpu->cur_poly_vtxs[3] = v;
                 } else {
@@ -339,8 +338,8 @@ void add_vtx(GPU* gpu) {
                         gpu->cur_vtx_ct = 2;
                     }
                 }
+                break;
             }
-            break;
         }
     }
 }
