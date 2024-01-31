@@ -200,6 +200,7 @@ typedef struct {
 
     vertex cur_vtx;
     int cur_vtx_ct;
+    bool tri_orient;
 
     vertex cur_poly_vtxs[4];
     vertex* cur_poly_strip[4];

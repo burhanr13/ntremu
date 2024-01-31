@@ -193,12 +193,12 @@ bool add_poly(GPU* gpu, int n_orig, bool strip) {
     }
 
     int n = n_orig;
-    float area = calc_area(&vtxs[0].v, &vtxs[1].v, &vtxs[2].v);
-    if (area < 0 && !gpu->cur_attr.back) n = 0;
-    else if (area > 0 && !gpu->cur_attr.front) n = 0;
-    else n = clip_poly(vtxs, n);
+    // float area = calc_area(&vtxs[0].v, &vtxs[1].v, &vtxs[2].v);
+    // if (area < 0 && !gpu->cur_attr.back) n = 0;
+    // else if (area > 0 && !gpu->cur_attr.front) n = 0;
+    // else n = clip_poly(vtxs, n);
 
-    bool culled = true;
+    bool culled = false;
     if (n == -1) {
         culled = false;
         n = n_orig;
@@ -215,7 +215,7 @@ bool add_poly(GPU* gpu, int n_orig, bool strip) {
                 gpu->vertexram[gpu->n_verts] = vtxs[i];
                 gpu->polygonram[gpu->n_polys].p[i] =
                     &gpu->vertexram[gpu->n_verts];
-                if (!strip && i < 4)
+                if (!culled)
                     gpu->cur_poly_strip[i] = &gpu->vertexram[gpu->n_verts];
                 gpu->n_verts++;
             }
@@ -288,22 +288,33 @@ void add_vtx(GPU* gpu) {
         }
         case POLY_TRI_STRIP: {
             if (gpu->cur_vtx_ct < 2) {
-                gpu->cur_poly_vtxs[gpu->cur_vtx_ct++] = v;
+                gpu->cur_poly_vtxs[gpu->cur_vtx_ct] = v;
+                gpu->cur_poly_strip[gpu->cur_vtx_ct] =
+                    &gpu->cur_poly_vtxs[gpu->cur_vtx_ct];
+                gpu->cur_vtx_ct++;
+                gpu->tri_orient = !gpu->tri_orient;
             } else {
                 gpu->cur_poly_vtxs[2] = v;
                 if (add_poly(gpu, 3, gpu->cur_vtx_ct > 2)) {
-                    if (++gpu->cur_vtx_ct & 1) {
+                    gpu->tri_orient = !gpu->tri_orient;
+                    if (gpu->tri_orient) {
                         gpu->cur_poly_strip[0] = gpu->cur_poly_strip[2];
                     } else {
                         gpu->cur_poly_strip[1] = gpu->cur_poly_strip[2];
                     }
+                    gpu->cur_vtx_ct++;
                 } else {
-                    if (++gpu->cur_vtx_ct & 1) {
+                    gpu->tri_orient = !gpu->tri_orient;
+                    if (gpu->tri_orient) {
                         gpu->cur_poly_vtxs[0] = gpu->cur_poly_vtxs[2];
+                        gpu->cur_poly_strip[0] = &gpu->cur_poly_vtxs[0];
                         gpu->cur_poly_vtxs[1] = *gpu->cur_poly_strip[1];
+                        gpu->cur_poly_strip[1] = &gpu->cur_poly_vtxs[1];
                     } else {
                         gpu->cur_poly_vtxs[0] = *gpu->cur_poly_strip[0];
+                        gpu->cur_poly_strip[0] = &gpu->cur_poly_vtxs[0];
                         gpu->cur_poly_vtxs[1] = gpu->cur_poly_vtxs[2];
+                        gpu->cur_poly_strip[1] = &gpu->cur_poly_vtxs[1];
                     }
                     gpu->cur_vtx_ct = 2;
                 }
@@ -312,7 +323,8 @@ void add_vtx(GPU* gpu) {
         }
         case POLY_QUAD_STRIP: {
             if (gpu->cur_vtx_ct < 2) {
-                gpu->cur_poly_vtxs[gpu->cur_vtx_ct++] = v;
+                gpu->cur_poly_vtxs[gpu->cur_vtx_ct] = v;
+                gpu->cur_vtx_ct++;
             } else {
                 if (++gpu->cur_vtx_ct & 1) {
                     gpu->cur_poly_vtxs[3] = v;
@@ -715,6 +727,7 @@ void gxcmd_execute(GPU* gpu) {
             break;
         case BEGIN_VTXS:
             gpu->cur_vtx_ct = 0;
+            gpu->tri_orient = false;
             gpu->poly_mode = gpu->param_fifo[0] & 3;
             break;
         case END_VTXS:
@@ -977,10 +990,20 @@ void render_polygon(GPU* gpu, poly* p) {
         right[y].x = -1;
     }
 
+    int yMin = NDS_SCREEN_H;
+    int yMax = -1;
+
     for (int i = 0; i < p->n - 1; i++) {
         render_line_attrs(gpu, p->p[i], p->p[i + 1], left, right);
+
+        int y = (1 - p->p[i]->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
+        if (y > yMax) yMax = y;
+        if (y < yMin) yMin = y;
     }
     render_line_attrs(gpu, p->p[p->n - 1], p->p[0], left, right);
+    int y = (1 - p->p[p->n - 1]->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
+    if (y > yMax) yMax = y;
+    if (y < yMin) yMin = y;
 
     if (gpu->master->io9.disp3dcnt.texture && p->texparam.format) {
 
@@ -992,7 +1015,7 @@ void render_polygon(GPU* gpu, poly* p) {
         u32 palbase = p->pltt_base << 3;
         if (format == TEX_2BPP) palbase >>= 1;
 
-        for (int y = 0; y < NDS_SCREEN_H; y++) {
+        for (int y = yMin; y <= yMax; y++) {
             if (left[y].x > right[y].x) continue;
             int h = right[y].x - left[y].x;
 
@@ -1012,8 +1035,11 @@ void render_polygon(GPU* gpu, poly* p) {
                 bool depth_test;
                 if (p->attr.depth_test) {
                     if (gpu->w_buffer)
-                        depth_test = fabsf(i0.w - gpu->depth_buf[y][x]) <= 0.125f;
-                    else depth_test = fabsf(i0.z - gpu->depth_buf[y][x]) <= 0.125f;
+                        depth_test =
+                            fabsf(i0.w - gpu->depth_buf[y][x]) <= 0.125f;
+                    else
+                        depth_test =
+                            fabsf(i0.z - gpu->depth_buf[y][x]) <= 0.125f;
                 } else {
                     if (gpu->w_buffer) depth_test = i0.w > gpu->depth_buf[y][x];
                     else depth_test = i0.z < gpu->depth_buf[y][x];
@@ -1170,9 +1196,11 @@ void render_polygon(GPU* gpu, poly* p) {
 
                     u16 c = 0x8000;
                     c |= (u16) (i0.r / i0.w * (color & 0x1f) / 32) & 0x1f;
-                    c |= ((u16) (i0.g / i0.w * ((color >> 5) & 0x1f) / 32) & 0x1f)
+                    c |= ((u16) (i0.g / i0.w * ((color >> 5) & 0x1f) / 32) &
+                          0x1f)
                          << 5;
-                    c |= ((u16) (i0.b / i0.w * ((color >> 10) & 0x1f) / 32) & 0x1f)
+                    c |= ((u16) (i0.b / i0.w * ((color >> 10) & 0x1f) / 32) &
+                          0x1f)
                          << 10;
                     gpu->screen[y][x] = c;
 
@@ -1207,8 +1235,11 @@ void render_polygon(GPU* gpu, poly* p) {
                 bool depth_test;
                 if (p->attr.depth_test) {
                     if (gpu->w_buffer)
-                        depth_test = fabsf(i0.w - gpu->depth_buf[y][x]) <= 0.125f;
-                    else depth_test = fabsf(i0.z - gpu->depth_buf[y][x]) <= 0.125f;
+                        depth_test =
+                            fabsf(i0.w - gpu->depth_buf[y][x]) <= 0.125f;
+                    else
+                        depth_test =
+                            fabsf(i0.z - gpu->depth_buf[y][x]) <= 0.125f;
                 } else {
                     if (gpu->w_buffer) depth_test = i0.w > gpu->depth_buf[y][x];
                     else depth_test = i0.z < gpu->depth_buf[y][x];
