@@ -192,62 +192,57 @@ bool add_poly(GPU* gpu, int n_orig, bool strip) {
         }
     }
 
-    int n;
-    float area = calc_area(&vtxs[0].v, &vtxs[1].v, &vtxs[2].v);
-    if (area < 0 && !gpu->cur_attr.back) n = 0;
-    else if (area > 0 && !gpu->cur_attr.front) n = 0;
-    else n = clip_poly(vtxs, n_orig);
-
-    bool culled = true;
+    bool clipped = true;
+    int n = clip_poly(vtxs, n_orig);
+    if (!n) return false;
     if (n == -1) {
-        culled = false;
+        clipped = false;
         n = n_orig;
     }
+    float area = calc_area(&vtxs[0].v, &vtxs[1].v, &vtxs[n - 1].v);
+    if ((area < 0 && !gpu->cur_attr.back) || (area > 0 && !gpu->cur_attr.front))
+        return false;
 
-    if (n) {
-        if (!strip || culled) {
-            for (int i = 0; i < n; i++) {
-                if (gpu->n_verts == MAX_VTX) {
-                    gpu->master->io9.disp3dcnt.ram_overflow = 1;
-                    return false;
-                }
-
-                gpu->vertexram[gpu->n_verts] = vtxs[i];
-                gpu->polygonram[gpu->n_polys].p[i] =
-                    &gpu->vertexram[gpu->n_verts];
-                if (!culled)
-                    gpu->cur_poly_strip[i] = &gpu->vertexram[gpu->n_verts];
-                gpu->n_verts++;
+    if (!strip || clipped) {
+        for (int i = 0; i < n; i++) {
+            if (gpu->n_verts == MAX_VTX) {
+                gpu->master->io9.disp3dcnt.ram_overflow = 1;
+                return false;
             }
-        } else {
-            gpu->polygonram[gpu->n_polys].p[0] = gpu->cur_poly_strip[0];
-            gpu->polygonram[gpu->n_polys].p[1] = gpu->cur_poly_strip[1];
 
-            for (int i = 2; i < n; i++) {
-                if (gpu->n_verts == MAX_VTX) {
-                    gpu->master->io9.disp3dcnt.ram_overflow = 1;
-                    return false;
-                }
-
-                gpu->vertexram[gpu->n_verts] = vtxs[i];
-                gpu->polygonram[gpu->n_polys].p[i] =
-                    &gpu->vertexram[gpu->n_verts];
+            gpu->vertexram[gpu->n_verts] = vtxs[i];
+            gpu->polygonram[gpu->n_polys].p[i] = &gpu->vertexram[gpu->n_verts];
+            if (!clipped)
                 gpu->cur_poly_strip[i] = &gpu->vertexram[gpu->n_verts];
-                gpu->n_verts++;
-            }
+            gpu->n_verts++;
         }
+    } else {
+        gpu->polygonram[gpu->n_polys].p[0] = gpu->cur_poly_strip[0];
+        gpu->polygonram[gpu->n_polys].p[1] = gpu->cur_poly_strip[1];
 
-        gpu->polygonram[gpu->n_polys].n = n;
+        for (int i = 2; i < n; i++) {
+            if (gpu->n_verts == MAX_VTX) {
+                gpu->master->io9.disp3dcnt.ram_overflow = 1;
+                return false;
+            }
 
-        gpu->polygonram[gpu->n_polys].attr = gpu->cur_attr;
-        gpu->polygonram[gpu->n_polys].texparam = gpu->cur_texparam;
-        gpu->polygonram[gpu->n_polys].pltt_base = gpu->cur_pltt_base;
-        gpu->n_polys++;
+            gpu->vertexram[gpu->n_verts] = vtxs[i];
+            gpu->polygonram[gpu->n_polys].p[i] = &gpu->vertexram[gpu->n_verts];
+            gpu->cur_poly_strip[i] = &gpu->vertexram[gpu->n_verts];
+            gpu->n_verts++;
+        }
     }
+
+    gpu->polygonram[gpu->n_polys].n = n;
+
+    gpu->polygonram[gpu->n_polys].attr = gpu->cur_attr;
+    gpu->polygonram[gpu->n_polys].texparam = gpu->cur_texparam;
+    gpu->polygonram[gpu->n_polys].pltt_base = gpu->cur_pltt_base;
+    gpu->n_polys++;
 
     gpu->master->io9.ram_count.n_verts = gpu->n_verts;
     gpu->master->io9.ram_count.n_polys = gpu->n_polys;
-    return !culled;
+    return !clipped;
 }
 
 void add_vtx(GPU* gpu) {
