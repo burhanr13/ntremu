@@ -165,10 +165,10 @@ int clip_poly(vertex* vtxs, int n) {
 }
 
 float calc_area(vec4* v0, vec4* v1, vec4* v2) {
-    float ax = v1->p[0] - v0->p[0];
-    float ay = v1->p[1] - v0->p[1];
-    float bx = v2->p[0] - v0->p[0];
-    float by = v2->p[1] - v0->p[1];
+    float ax = v1->p[0] / v1->p[3] - v0->p[0] / v0->p[3];
+    float ay = v1->p[1] / v1->p[3] - v0->p[1] / v0->p[3];
+    float bx = v2->p[0] / v2->p[3] - v0->p[0] / v0->p[3];
+    float by = v2->p[1] / v2->p[3] - v0->p[1] / v0->p[3];
     return ax * by - ay * bx;
 }
 
@@ -273,6 +273,7 @@ void add_vtx(GPU* gpu) {
     } else {
         switch (gpu->poly_mode) {
             case POLY_TRIS: {
+                gpu->cur_poly_vtxs[2] = v;
                 add_poly(gpu, 3, false);
                 gpu->cur_vtx_ct = 0;
                 break;
