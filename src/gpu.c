@@ -837,9 +837,49 @@ void gxcmd_execute(GPU* gpu) {
             gpu->view_h = y1 - y0;
             break;
         }
-        case BOX_TEST:
-            gpu->master->io9.gxstat.boxtest = 1;
+        case BOX_TEST: {
+            update_mtxs(gpu);
+            vec4 p;
+            p.p[0] =
+                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
+            p.p[1] =
+                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
+            p.p[2] =
+                ((s32) (gpu->param_fifo[1] & 0xffff) << 16) / (float) (1 << 28);
+            p.p[3] = 1;
+            float w =
+                (s32) (gpu->param_fifo[1] & 0xffff0000) / (float) (1 << 28);
+            float h =
+                ((s32) (gpu->param_fifo[2] & 0xffff) << 16) / (float) (1 << 28);
+            float d =
+                (s32) (gpu->param_fifo[2] & 0xffff0000) / (float) (1 << 28);
+            vec4 box[8];
+            for (int i = 0; i < 8; i++) {
+                box[i] = p;
+                if (i & 1) box[i].p[0] += w;
+                if (i & 2) box[i].p[1] += h;
+                if (i & 4) box[i].p[2] += d;
+                vecmul(&gpu->clipmtx, &box[i]);
+            }
+
+            vertex face[MAX_POLY_N];
+
+            static const int box_faces[6][4] = {{0, 1, 3, 2}, {0, 2, 6, 4},
+                                                {0, 4, 5, 1}, {7, 6, 4, 5},
+                                                {7, 5, 1, 3}, {7, 3, 2, 6}};
+            gpu->master->io9.gxstat.boxtest = 0;
+            for (int i = 0; i < 6; i++) {
+                face[0].v = box[box_faces[i][0]];
+                face[1].v = box[box_faces[i][1]];
+                face[2].v = box[box_faces[i][2]];
+                face[3].v = box[box_faces[i][3]];
+                if (clip_poly(face, 4)) {
+                    gpu->master->io9.gxstat.boxtest = 1;
+                    break;
+                }
+            }
             break;
+        }
         case POS_TEST:
             gpu->cur_vtx.v.p[0] =
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
