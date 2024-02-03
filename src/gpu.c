@@ -244,7 +244,7 @@ void add_vtx(GPU* gpu) {
     }
     update_mtxs(gpu);
 
-    if (gpu->cur_texparam.transform == 3) {
+    if (gpu->cur_texparam.transform == TEXTF_VTX) {
         gpu->texmtx.p[0][3] = gpu->cur_vtx.vt.p[0];
         gpu->texmtx.p[1][3] = gpu->cur_vtx.vt.p[1];
         gpu->cur_vtx.vt = gpu->cur_vtx.v;
@@ -636,17 +636,75 @@ void gxcmd_execute(GPU* gpu) {
             gpu->cur_vtx.b = (color >> 10) & 0x1f;
             break;
         }
-        case NORMAL:
-            gpu->cur_vtx.r = gpu->cur_mtl0.dif_r;
-            gpu->cur_vtx.g = gpu->cur_mtl0.dif_g;
-            gpu->cur_vtx.b = gpu->cur_mtl0.dif_b;
+        case NORMAL: {
+            vec4 normal;
+            normal.p[0] = ((s32) (gpu->param_fifo[0] & 0x3ff) << 22) /
+                          (float) (u32) (1 << 31);
+            normal.p[1] = ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12) /
+                          (float) (u32) (1 << 31);
+            normal.p[2] = ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2) /
+                          (float) (u32) (1 << 31);
+            normal.p[3] = 0;
+
+            if (gpu->cur_texparam.transform == TEXTF_NORMAL) {
+                gpu->texmtx.p[0][3] = gpu->cur_vtx.vt.p[0];
+                gpu->texmtx.p[1][3] = gpu->cur_vtx.vt.p[1];
+                gpu->cur_vtx.vt = normal;
+                gpu->cur_vtx.vt.p[3] = 1;
+                vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
+            }
+
+            vecmul(&gpu->vecmtx, &normal);
+
+            gpu->cur_vtx.r = gpu->cur_mtl1.emi_r;
+            gpu->cur_vtx.g = gpu->cur_mtl1.emi_g;
+            gpu->cur_vtx.b = gpu->cur_mtl1.emi_b;
+            for (int l = 0; l < 4; l++) {
+                if (!(gpu->cur_attr.light_enable & (1 << l))) continue;
+                float dp = normal.p[0] * gpu->lightvec[l].p[0] +
+                           normal.p[1] * gpu->lightvec[l].p[1] +
+                           normal.p[2] * gpu->lightvec[l].p[2];
+                dp = -dp;
+                if (dp < 0) dp = 0;
+                if (dp > 1) dp = 1;
+                float sh = normal.p[0] * gpu->halfvec[l].p[0] +
+                           normal.p[1] * gpu->halfvec[l].p[1] +
+                           normal.p[2] * gpu->halfvec[l].p[2];
+                if (sh < 0) sh = 0;
+                if (sh > 1) sh = 1;
+                if (gpu->cur_mtl1.shininess)
+                    sh = gpu->shininess[(int) (sh * 255)] / (float) 256;
+
+                u16 lr = gpu->lightcol[l] & 0x1f;
+                u16 lg = (gpu->lightcol[l] >> 5) & 0x1f;
+                u16 lb = (gpu->lightcol[l] >> 10) & 0x1f;
+
+                gpu->cur_vtx.r +=
+                    (gpu->cur_mtl0.dif_r * lr * dp +
+                     gpu->cur_mtl1.spe_r * lr * sh + gpu->cur_mtl0.amb_r * lr) /
+                    32;
+                gpu->cur_vtx.g +=
+                    (gpu->cur_mtl0.dif_g * lg * dp +
+                     gpu->cur_mtl1.spe_g * lg * sh + gpu->cur_mtl0.amb_g * lg) /
+                    32;
+                gpu->cur_vtx.b +=
+                    (gpu->cur_mtl0.dif_b * lb * dp +
+                     gpu->cur_mtl1.spe_b * lb * sh + gpu->cur_mtl0.amb_b * lb) /
+                    32;
+            }
+
+            if (gpu->cur_vtx.r > 31) gpu->cur_vtx.r = 31;
+            if (gpu->cur_vtx.g > 31) gpu->cur_vtx.g = 31;
+            if (gpu->cur_vtx.b > 31) gpu->cur_vtx.b = 31;
+
             break;
+        }
         case TEXCOORD:
             gpu->cur_vtx.vt.p[0] =
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 20);
             gpu->cur_vtx.vt.p[1] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 20);
-            if (gpu->cur_texparam.transform == 1) {
+            if (gpu->cur_texparam.transform == TEXTF_TEXCOORD) {
                 gpu->cur_vtx.vt.p[2] = 0.0625f;
                 gpu->cur_vtx.vt.p[3] = 0.0625f;
                 vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
@@ -718,9 +776,40 @@ void gxcmd_execute(GPU* gpu) {
             break;
         case DIF_AMB:
             gpu->cur_mtl0.w = gpu->param_fifo[0];
+            if (gpu->cur_mtl0.vtx_color) {
+                gpu->cur_vtx.r = gpu->cur_mtl0.dif_r;
+                gpu->cur_vtx.g = gpu->cur_mtl0.dif_g;
+                gpu->cur_vtx.b = gpu->cur_mtl0.dif_b;
+            }
             break;
         case SPE_EMI:
             gpu->cur_mtl1.w = gpu->param_fifo[0];
+            break;
+        case LIGHT_VECTOR: {
+            int l = gpu->param_fifo[0] >> 30;
+            gpu->lightvec[l].p[0] = ((s32) (gpu->param_fifo[0] & 0x3ff) << 22) /
+                                    (float) (u32) (1 << 31);
+            gpu->lightvec[l].p[1] =
+                ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12) /
+                (float) (u32) (1 << 31);
+            gpu->lightvec[l].p[2] =
+                ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2) /
+                (float) (u32) (1 << 31);
+            gpu->lightvec[l].p[3] = 0;
+            vecmul(&gpu->vecmtx, &gpu->lightvec[l]);
+            gpu->halfvec[l].p[0] = gpu->lightvec[l].p[0] / 2;
+            gpu->halfvec[l].p[1] = gpu->lightvec[l].p[1] / 2;
+            gpu->halfvec[l].p[2] = (gpu->lightvec[l].p[2] + 1) / 2;
+
+            break;
+        }
+        case LIGHT_COLOR: {
+            int l = gpu->param_fifo[0] >> 30;
+            gpu->lightcol[l] = gpu->param_fifo[0];
+            break;
+        }
+        case SHININESS:
+            memcpy(gpu->shininess, gpu->param_fifo, sizeof gpu->shininess);
             break;
         case BEGIN_VTXS:
             gpu->cur_vtx_ct = 0;
@@ -767,8 +856,20 @@ void gxcmd_execute(GPU* gpu) {
             gpu->master->io9.pos_result[2] = pos.p[2] * (1 << 12);
             gpu->master->io9.pos_result[3] = pos.p[3] * (1 << 12);
             break;
-        default:
-            break;
+        case VEC_TEST: {
+            vec4 v;
+            v.p[0] = ((s32) (gpu->param_fifo[0] & 0x3ff) << 22) /
+                     (float) (u32) (1 << 31);
+            v.p[1] = ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12) /
+                     (float) (u32) (1 << 31);
+            v.p[2] = ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2) /
+                     (float) (u32) (1 << 31);
+            v.p[3] = 0;
+            vecmul(&gpu->vecmtx, &v);
+            gpu->master->io9.vec_result[0] = v.p[0] * (1 << 12);
+            gpu->master->io9.vec_result[1] = v.p[1] * (1 << 12);
+            gpu->master->io9.vec_result[2] = v.p[2] * (1 << 12);
+        }
     }
 
     u8 h = cmd >> 4;

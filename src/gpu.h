@@ -37,6 +37,9 @@ enum {
     PLTT_BASE,
     DIF_AMB = 0x30,
     SPE_EMI,
+    LIGHT_VECTOR,
+    LIGHT_COLOR,
+    SHININESS = 0x34,
     BEGIN_VTXS = 0x40,
     END_VTXS,
     SWAP_BUFFERS = 0x50,
@@ -59,6 +62,8 @@ enum {
     TEX_A5I3,
     TEX_DIRECT
 };
+
+enum { TEXTF_NONE, TEXTF_TEXCOORD, TEXTF_NORMAL, TEXTF_VTX };
 
 typedef union {
     u32 w;
@@ -208,9 +213,12 @@ typedef struct {
     vertex* cur_poly_strip[4];
 
     vec4 lightvec[4];
+    vec4 halfvec[4];
     u16 lightcol[4];
     Material0 cur_mtl0;
     Material1 cur_mtl1;
+    u8 shininess[256];
+
     TexParam cur_texparam;
     u32 cur_pltt_base;
 
