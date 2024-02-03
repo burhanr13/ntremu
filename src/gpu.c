@@ -104,7 +104,6 @@ void update_mtxs(GPU* gpu) {
 
 void interp_vtxs(vertex* cur, vertex* prev, float diffcur, float diffprev,
                  vertex* dst) {
-
     for (int k = 0; k < 4; k++) {
         dst->v.p[k] = cur->v.p[k] * diffprev + prev->v.p[k] * diffcur;
         dst->v.p[k] /= diffprev + diffcur;
