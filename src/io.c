@@ -186,17 +186,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                 io->romctrl.busy = 0;
                 if (card_write_command(io->master->card, io->romcommand)) {
                     io->romctrl.busy = 1;
-                    io->romctrl.drq = 1;
-
-                    for (int i = 0; i < 4; i++) {
-                        if (io->dma[i].cnt.mode == DMA7_DSCARD &&
-                            io->dma[i].cnt.enable) {
-                            while (io->romctrl.busy) {
-                                dma7_activate(&io->master->dma7, i);
-                            }
-                            break;
-                        }
-                    }
+                    add_event(&io->master->sched, EVENT_CARD_DRQ, 20);
                 }
             }
             break;
@@ -277,11 +267,11 @@ u32 io7_read32(IO* io, u32 addr) {
         case GAMECARDIN: {
             u32 data;
             bool busy = io->romctrl.busy;
+            io->romctrl.drq = 0;
             if (card_read_data(io->master->card, &data)) {
-                io->romctrl.drq = 1;
-                io->romctrl.busy = 1;
+                add_event(&io->master->sched, EVENT_CARD_DRQ,
+                          io->master->sched.now + 20);
             } else {
-                io->romctrl.drq = 0;
                 io->romctrl.busy = 0;
                 if (busy && io->auxspicnt.irq) {
                     io->ifl.gamecardtrans = 1;
@@ -716,17 +706,8 @@ void io9_write16(IO* io, u32 addr, u16 data) {
                 io->romctrl.busy = 0;
                 if (card_write_command(io->master->card, io->romcommand)) {
                     io->romctrl.busy = 1;
-                    io->romctrl.drq = 1;
-
-                    for (int i = 0; i < 4; i++) {
-                        if (io->dma[i].cnt.mode == DMA9_DSCARD &&
-                            io->dma[i].cnt.enable) {
-                            while (io->romctrl.busy) {
-                                dma9_activate(&io->master->dma9, i);
-                            }
-                            break;
-                        }
-                    }
+                    add_event(&io->master->sched, EVENT_CARD_DRQ,
+                              io->master->sched.now + 20);
                 }
             }
             break;
@@ -803,11 +784,11 @@ u32 io9_read32(IO* io, u32 addr) {
         case GAMECARDIN: {
             u32 data;
             bool busy = io->romctrl.busy;
+            io->romctrl.drq = 0;
             if (card_read_data(io->master->card, &data)) {
-                io->romctrl.drq = 1;
-                io->romctrl.busy = 1;
+                add_event(&io->master->sched, EVENT_CARD_DRQ,
+                          io->master->sched.now + 20);
             } else {
-                io->romctrl.drq = 0;
                 io->romctrl.busy = 0;
                 if (busy && io->auxspicnt.irq) {
                     io->ifl.gamecardtrans = 1;
