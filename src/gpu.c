@@ -104,25 +104,21 @@ void update_mtxs(GPU* gpu) {
 
 void interp_vtxs(vertex* cur, vertex* prev, float diffcur, float diffprev,
                  vertex* dst) {
-    if (diffcur - diffprev == 0) {
-        *dst = *cur;
-        return;
-    }
 
     for (int k = 0; k < 4; k++) {
-        dst->v.p[k] = cur->v.p[k] * diffprev - prev->v.p[k] * diffcur;
-        dst->v.p[k] /= diffprev - diffcur;
+        dst->v.p[k] = cur->v.p[k] * diffprev + prev->v.p[k] * diffcur;
+        dst->v.p[k] /= diffprev + diffcur;
     }
     for (int k = 0; k < 2; k++) {
-        dst->vt.p[k] = cur->vt.p[k] * diffprev - prev->vt.p[k] * diffcur;
-        dst->vt.p[k] /= diffprev - diffcur;
+        dst->vt.p[k] = cur->vt.p[k] * diffprev + prev->vt.p[k] * diffcur;
+        dst->vt.p[k] /= diffprev + diffcur;
     }
-    dst->r = cur->r * diffprev - prev->r * diffcur;
-    dst->r /= diffprev - diffcur;
-    dst->g = cur->g * diffprev - prev->g * diffcur;
-    dst->g /= diffprev - diffcur;
-    dst->b = cur->b * diffprev - prev->b * diffcur;
-    dst->b /= diffprev - diffcur;
+    dst->r = cur->r * diffprev + prev->r * diffcur;
+    dst->r /= diffprev + diffcur;
+    dst->g = cur->g * diffprev + prev->g * diffcur;
+    dst->g /= diffprev + diffcur;
+    dst->b = cur->b * diffprev + prev->b * diffcur;
+    dst->b /= diffprev + diffcur;
 }
 
 int clip_poly(vertex* vtxs, int n) {
@@ -144,18 +140,12 @@ int clip_poly(vertex* vtxs, int n) {
                 diffprev += vtxs[prev].v.p[i / 2];
             }
 
-            if (diffcur >= 0) {
-                if (diffprev < 0) {
-                    interp_vtxs(&vtxs[cur], &vtxs[prev], diffcur, diffprev,
-                                &dst[n_new++]);
-                    clip = true;
-                }
-                dst[n_new++] = vtxs[cur];
-            } else if (diffprev >= 0) {
-                interp_vtxs(&vtxs[cur], &vtxs[prev], diffcur, diffprev,
-                            &dst[n_new++]);
-                clip = true;
+            if (diffcur * diffprev < 0) {
+                interp_vtxs(&vtxs[cur], &vtxs[prev], fabsf(diffcur),
+                            fabsf(diffprev), &dst[n_new++]);
             }
+            if (diffcur >= 0) dst[n_new++] = vtxs[cur];
+            else clip = true;
         }
         n = n_new;
 
