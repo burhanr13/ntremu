@@ -82,6 +82,9 @@ void vecmul(mat4* src, vec4* dst) {
 }
 
 void update_mtxs(GPU* gpu) {
+    if (!gpu->mtx_dirty) return;
+    gpu->mtx_dirty = false;
+
     gpu->clipmtx = gpu->projmtx;
     matmul(&gpu->clipmtx, &gpu->posmtx);
 
@@ -391,6 +394,7 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->texmtx = gpu->texmtx_stack[0];
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         case MTX_STORE:
             switch (gpu->mtx_mode) {
@@ -425,6 +429,7 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->texmtx = gpu->texmtx_stack[0];
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         case MTX_IDENTITY: {
             mat4 m = {0};
@@ -447,6 +452,7 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->texmtx = m;
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         }
         case MTX_LOAD_44: {
@@ -472,6 +478,7 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->texmtx = m;
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         }
         case MTX_LOAD_43: {
@@ -499,6 +506,7 @@ void gxcmd_execute(GPU* gpu) {
                     gpu->texmtx = m;
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         }
         case MTX_MULT_44: {
@@ -524,6 +532,7 @@ void gxcmd_execute(GPU* gpu) {
                     matmul(&gpu->texmtx, &m);
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         }
         case MTX_MULT_43: {
@@ -551,6 +560,7 @@ void gxcmd_execute(GPU* gpu) {
                     matmul(&gpu->texmtx, &m);
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         }
         case MTX_MULT_33: {
@@ -579,6 +589,7 @@ void gxcmd_execute(GPU* gpu) {
                     matmul(&gpu->texmtx, &m);
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         }
         case MTX_SCALE: {
@@ -599,6 +610,7 @@ void gxcmd_execute(GPU* gpu) {
                     matmul(&gpu->texmtx, &m);
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         }
         case MTX_TRANS: {
@@ -625,6 +637,7 @@ void gxcmd_execute(GPU* gpu) {
                     matmul(&gpu->texmtx, &m);
                     break;
             }
+            gpu->mtx_dirty = true;
             break;
         }
         case COLOR: {
@@ -979,8 +992,18 @@ void render_polygon(GPU* gpu, poly* p) {
 
     if (p->attr.mode == 3) return;
 
+    int yMin = NDS_SCREEN_H;
+    int yMax = -1;
+    for (int i = 0; i < p->n; i++) {
+        int y = (1 - p->p[i]->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
+        if (y > yMax) yMax = y;
+        if (y < yMin) yMin = y;
+    }
+    if (yMin < 0) yMin = 0;
+    if (yMax > NDS_SCREEN_H) yMax = NDS_SCREEN_H;
+
     struct interp_attrs left[NDS_SCREEN_H], right[NDS_SCREEN_H];
-    for (int y = 0; y < NDS_SCREEN_H; y++) {
+    for (int y = yMin; y < yMax; y++) {
         left[y].x = NDS_SCREEN_W;
         right[y].x = -1;
     }
@@ -1000,8 +1023,7 @@ void render_polygon(GPU* gpu, poly* p) {
         u32 palbase = p->pltt_base << 3;
         if (format == TEX_2BPP) palbase >>= 1;
 
-        for (int y = 0; y < NDS_SCREEN_H; y++) {
-            if (left[y].x > right[y].x) continue;
+        for (int y = yMin; y < yMax; y++) {
             int h = right[y].x - left[y].x;
 
             struct interp_attrs i = left[y];
@@ -1049,7 +1071,7 @@ void render_polygon(GPU* gpu, poly* p) {
                     }
                     u32 ofs = (tt << s_shift) + ss;
 
-                    u16 color;
+                    u16 color = 0;
                     u8 alpha = 31;
                     switch (format) {
                         case TEX_2BPP: {
@@ -1190,8 +1212,7 @@ void render_polygon(GPU* gpu, poly* p) {
             }
         }
     } else {
-        for (int y = 0; y < NDS_SCREEN_H; y++) {
-            if (left[y].x > right[y].x) continue;
+        for (int y = yMin; y < yMax; y++) {
             int h = right[y].x - left[y].x;
 
             float z = left[y].z;
@@ -1216,7 +1237,7 @@ void render_polygon(GPU* gpu, poly* p) {
                     if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
                     else depth_test = z < gpu->depth_buf[y][x];
                 }
-                if (0 < w && depth_test) {
+                if (depth_test) {
                     if (gpu->w_buffer) gpu->depth_buf[y][x] = w;
                     else gpu->depth_buf[y][x] = z;
 
@@ -1232,11 +1253,12 @@ void render_polygon(GPU* gpu, poly* p) {
 }
 
 void gpu_render(GPU* gpu) {
-    memset(gpu->screen, 0, sizeof gpu->screen);
     for (int y = 0; y < NDS_SCREEN_H; y++) {
         for (int x = 0; x < NDS_SCREEN_W; x++) {
             if (gpu->master->io9.clear_color.alpha) {
                 gpu->screen[y][x] = 0x8000 | gpu->master->io9.clear_color.color;
+            } else {
+                gpu->screen[y][x] = 0;
             }
             if (gpu->w_buffer) {
                 gpu->depth_buf[y][x] = 0;

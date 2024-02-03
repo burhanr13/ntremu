@@ -189,6 +189,8 @@ typedef struct {
     int mtx_mode;
     mat4 clipmtx;
 
+    bool mtx_dirty;
+
     vertex vertexram[MAX_VTX];
     u16 n_verts;
 
