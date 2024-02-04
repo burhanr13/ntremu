@@ -16,6 +16,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->tmc7.io = &nds->io7;
     nds->tmc7.tm0_event = EVENT_TM07_RELOAD;
 
+    nds->spu.master = nds;
+
     nds->cpu9.master = nds;
     nds->dma9.master = nds;
     nds->tmc9.master = nds;
@@ -163,6 +165,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     }
 
     lcd_hdraw(nds);
+    spu_sample(&nds->spu);
     add_event(&nds->sched, EVENT_FORCESYNC, 32);
 }
 

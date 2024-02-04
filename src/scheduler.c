@@ -50,8 +50,12 @@ void run_next_event(Scheduler* sched) {
         }
     } else if (e.type < EVENT_TM09_RELOAD) {
         reload_timer(&sched->master->tmc7, e.type - EVENT_TM07_RELOAD);
-    } else if (e.type < EVENT_MAX) {
+    } else if (e.type < EVENT_SPU_SAMPLE) {
         reload_timer(&sched->master->tmc9, e.type - EVENT_TM09_RELOAD);
+    } else if (e.type == EVENT_SPU_SAMPLE) {
+        spu_sample(&sched->master->spu);
+    } else if (e.type < EVENT_MAX) {
+        spu_reload_channel(&sched->master->spu, e.type - EVENT_SPU_CH0);
     }
 
     if (run_time > sched->now) sched->now = run_time;
@@ -88,14 +92,18 @@ void remove_event(Scheduler* sched, EventType t) {
 
 void print_scheduled_events(Scheduler* sched) {
     static char* event_names[EVENT_MAX] = {
-        "Force Sync",   "LCD HDraw",    "LCD HBlank",   "TM0-7 Reload",
-        "TM1-7 Reload", "TM2-7 Reload", "TM3-7 Reload", "TM0-9 Reload",
-        "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload",
-    };
+        "Force Sync",   "LCD HDraw",    "LCD HBlank",   "GameCard DRQ",
+        "TM0-7 Reload", "TM1-7 Reload", "TM2-7 Reload", "TM3-7 Reload",
+        "TM0-9 Reload", "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload"};
 
     printf("Now: %ld\n", sched->now);
     for (int i = 0; i < sched->n_events; i++) {
-        printf("%ld => %s\n", sched->event_queue[i].time,
-               event_names[sched->event_queue[i].type]);
+        if (sched->event_queue[i].type < EVENT_SPU_CH0) {
+            printf("%ld => %s\n", sched->event_queue[i].time,
+                   event_names[sched->event_queue[i].type]);
+        } else {
+            printf("%ld => SPU CH%x Reload\n", sched->event_queue[i].time,
+                   sched->event_queue[i].type - EVENT_SPU_CH0);
+        }
     }
 }

@@ -9,6 +9,7 @@
 #include "io.h"
 #include "ppu.h"
 #include "scheduler.h"
+#include "spu.h"
 #include "timer.h"
 
 #define RAMSIZE (1 << 22)
@@ -78,11 +79,11 @@ typedef struct _NDS {
     Arm7TDMI cpu7;
     DMAController dma7;
     TimerController tmc7;
+    SPU spu;
 
     Arm946E cpu9;
     DMAController dma9;
     TimerController tmc9;
-
     PPU ppuA;
     PPU ppuB;
     GPU gpu;
@@ -101,8 +102,8 @@ typedef struct _NDS {
     IO io7;
     IO io9;
 
-    u8 wifiram[WIFIRAMSIZE];
     u8 wifi_io[WIFIIOSIZE];
+    u8 wifiram[WIFIRAMSIZE];
 
     union {
         struct {
@@ -191,6 +192,7 @@ typedef struct _NDS {
     u64 last_event;
     bool half_tick;
     bool frame_complete;
+    bool samples_full;
 
     bool memerr;
     bool cpuerr;

@@ -157,15 +157,25 @@ enum {
     RAM_COUNT = 0x604,
     DISP_1DOT_DEPTH = 0x610,
     POS_RESULT = 0x620,
-    VEC_RESULT  = 0x630,
+    VEC_RESULT = 0x630,
     CLIPMTX_RESULT = 0x640,
     VECMTX_RESULT = 0x680,
+
+    // sound control
+    SOUND0CNT = 0x400,
+    SOUND0SAD = 0x404,
+    SOUND0TMR = 0x408,
+    SOUND0PNT = 0x40a,
+    SOUND0LEN = 0x40c,
+    // repeat 16x
+    SOUNDCNT = 0x500,
+    SOUNDBIAS = 0x504,
 
     PPUB_OFF = 0x1000,
 
     // wifi
-    WIFIRAM = 0x804000,
-    WIFI_OFF = 0x808000
+    WIFI_OFF = 0x800000,
+    WIFIRAM = 0x804000
 };
 
 typedef struct _NDS NDS;
@@ -663,7 +673,49 @@ typedef struct _IO {
             u8 fog_table[0x20];
             u16 toon_table[0x20];
             u8 unused_3cx[GXFIFO - TOON_TABLE - 0x40];
-            u32 gxfifo[0x80];
+            union {
+                u32 gxfifo[0x80];
+                struct {
+                    struct {
+                        union {
+                            u32 w;
+                            struct {
+                                u32 volume : 7;
+                                u32 unused : 1;
+                                u32 volume_div : 2;
+                                u32 unused1 : 5;
+                                u32 hold : 1;
+                                u32 pan : 7;
+                                u32 unused2 : 1;
+                                u32 duty : 3;
+                                u32 repeat : 2;
+                                u32 format : 2;
+                                u32 start : 1;
+                            };
+                        } cnt;
+                        u32 sad;
+                        u16 tmr;
+                        u16 pnt;
+                        u32 len;
+                    } sound[16];
+                    union {
+                        u32 w;
+                        struct {
+                            u32 volume : 7;
+                            u32 unused : 1;
+                            u32 left : 2;
+                            u32 right : 2;
+                            u32 ch1 : 1;
+                            u32 ch3 : 1;
+                            u32 unused1 : 1;
+                            u32 enable : 1;
+                            u32 unused2 : 16;
+                        };
+                    } soundcnt;
+                    u32 soundbias;
+                    u8 unused_5xx[GXSTAT - SOUNDBIAS - 4];
+                };
+            };
             union {
                 u32 w;
                 struct {

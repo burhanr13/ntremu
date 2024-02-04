@@ -46,11 +46,12 @@ u16 io7_read16(IO* io, u32 addr) {
             if (addr & 2) return w >> 16;
             else return w;
         }
-        if (WIFIRAM <= addr && addr < WIFIRAM + WIFIRAMSIZE) {
-            return *(u16*) &io->master->wifiram[addr - WIFIRAM];
-        }
+        addr &= ~0x8000;
         if (WIFI_OFF <= addr && addr < WIFI_OFF + WIFIIOSIZE) {
             return *(u16*) &io->master->wifi_io[addr - WIFI_OFF];
+        }
+        if (WIFIRAM <= addr && addr < WIFIRAM + WIFIRAMSIZE) {
+            return *(u16*) &io->master->wifiram[addr - WIFIRAM];
         }
         return 0;
     }
@@ -84,16 +85,29 @@ u16 io7_read16(IO* io, u32 addr) {
 }
 
 void io7_write16(IO* io, u32 addr, u16 data) {
-    if (addr >= IO_SIZE) return;
-    if (addr == POSTFLG) {
-        io7_write8(io, addr, data);
-        io7_write8(io, addr | 1, data >> 8);
-        if (WIFIRAM <= addr && addr < WIFIRAM + WIFIRAMSIZE) {
-            *(u16*) &io->master->wifiram[addr - WIFIRAM] = data;
-        }
+    if (addr >= IO_SIZE) {
+        addr &= ~0x8000;
         if (WIFI_OFF <= addr && addr < WIFI_OFF + WIFIIOSIZE) {
             *(u16*) &io->master->wifi_io[addr - WIFI_OFF] = data;
             *(u16*) &io->master->wifi_io[0x03c] = 0x0200;
+        }
+        if (WIFIRAM <= addr && addr < WIFIRAM + WIFIRAMSIZE) {
+            *(u16*) &io->master->wifiram[addr - WIFIRAM] = data;
+        }
+        return;
+    }
+    if (addr == POSTFLG) {
+        io7_write8(io, addr, data);
+        io7_write8(io, addr | 1, data >> 8);
+        return;
+    }
+    if (SOUND0CNT <= addr && addr < SOUNDCNT) {
+        int i = (addr >> 4) & 0xf;
+        bool prev_ena = io->sound[i].cnt.start;
+        io->h[addr >> 1] = data;
+        if(!prev_ena && io->sound[i].cnt.start) {
+            io->master->spu.sample_ptrs[i] = io->sound[i].sad;
+            spu_reload_channel(&io->master->spu, i);
         }
         return;
     }

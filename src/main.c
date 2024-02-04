@@ -49,6 +49,14 @@ int main(int argc, char** argv) {
                                              SDL_TEXTUREACCESS_STREAMING,
                                              NDS_SCREEN_W, 2 * NDS_SCREEN_H);
 
+    SDL_AudioSpec audio_spec = {.freq = SAMPLE_FREQ,
+                                .format = AUDIO_F32,
+                                .channels = 2,
+                                .samples = SAMPLE_BUF_LEN / 2};
+    SDL_AudioDeviceID audio =
+        SDL_OpenAudioDevice(NULL, 0, &audio_spec, NULL, 0);
+    SDL_PauseAudioDevice(audio, 0);
+
     Uint64 prev_time = SDL_GetPerformanceCounter();
     Uint64 prev_fps_update = prev_time;
     Uint64 prev_fps_frame = 0;
@@ -65,26 +73,31 @@ int main(int argc, char** argv) {
 
             bkpthit = false;
 
+            bool play_audio = !(ntremu.mute || ntremu.uncap);
+
             if (!(ntremu.pause)) {
                 do {
                     while (!ntremu.nds->frame_complete) {
                         if (ntremu.debugger) {
-                            if (ntremu.nds->cur_cpu) {
-                                if (ntremu.nds->cpu7.cur_instr_addr ==
-                                    ntremu.breakpoint) {
-                                    bkpthit = true;
-                                    break;
-                                }
-                            } else {
-                                if (ntremu.nds->cpu9.cur_instr_addr ==
-                                    ntremu.breakpoint) {
-                                    bkpthit = true;
-                                    break;
-                                }
+                            u32 cur_instr_addr =
+                                ntremu.nds->cur_cpu
+                                    ? ntremu.nds->cpu7.cur_instr_addr
+                                    : ntremu.nds->cpu9.cur_instr_addr;
+                            if (cur_instr_addr == ntremu.breakpoint) {
+                                bkpthit = true;
+                                break;
                             }
                         }
                         nds_step(ntremu.nds);
                         if (ntremu.nds->cpuerr) break;
+                        if (ntremu.nds->samples_full) {
+                            ntremu.nds->samples_full = false;
+                            if (play_audio) {
+                                SDL_QueueAudio(audio,
+                                               ntremu.nds->spu.sample_buf,
+                                               SAMPLE_BUF_LEN * 4);
+                            }
+                        }
                     }
                     if (bkpthit || ntremu.nds->cpuerr) break;
                     ntremu.nds->frame_complete = false;
@@ -131,13 +144,20 @@ int main(int argc, char** argv) {
             dst.y += dst.h;
             update_input_touch(ntremu.nds, &dst);
 
-            cur_time = SDL_GetPerformanceCounter();
-            elapsed = cur_time - prev_time;
-            Sint64 wait = frame_ticks - elapsed;
-            Sint64 waitMS =
-                wait * 1000 / (Sint64) SDL_GetPerformanceFrequency();
-            if (waitMS > 1 && !ntremu.uncap) {
-                SDL_Delay(waitMS - 1);
+            if (!ntremu.uncap) {
+                if (play_audio) {
+                    while (SDL_GetQueuedAudioSize(audio) >= 16 * SAMPLE_BUF_LEN)
+                        SDL_Delay(1);
+                } else {
+                    cur_time = SDL_GetPerformanceCounter();
+                    elapsed = cur_time - prev_time;
+                    Sint64 wait = frame_ticks - elapsed;
+                    Sint64 waitMS =
+                        wait * 1000 / (Sint64) SDL_GetPerformanceFrequency();
+                    if (waitMS > 1 && !ntremu.uncap) {
+                        SDL_Delay(waitMS);
+                    }
+                }
             }
             cur_time = SDL_GetPerformanceCounter();
             elapsed = cur_time - prev_fps_update;
@@ -172,6 +192,8 @@ int main(int argc, char** argv) {
     emulator_quit();
 
     if (controller) SDL_GameControllerClose(controller);
+
+    SDL_CloseAudioDevice(audio);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
