@@ -100,6 +100,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 
     *(u16*) &nds->wifi_io[0x000] = 0x1440;
     *(u16*) &nds->wifi_io[0x03c] = 0x0200;
+    nds->wifi_bb_regs[0] = 0x6d;
 
     if (bootbios) {
         cpu7_handle_interrupt(&nds->cpu7, I_RESET);

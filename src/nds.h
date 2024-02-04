@@ -104,6 +104,7 @@ typedef struct _NDS {
 
     u8 wifi_io[WIFIIOSIZE];
     u8 wifiram[WIFIRAMSIZE];
+    u8 wifi_bb_regs[256];
 
     union {
         struct {

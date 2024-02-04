@@ -245,10 +245,13 @@ void add_vtx(GPU* gpu) {
     update_mtxs(gpu);
 
     if (gpu->cur_texparam.transform == TEXTF_VTX) {
-        gpu->texmtx.p[0][3] = gpu->cur_vtx.vt.p[0];
-        gpu->texmtx.p[1][3] = gpu->cur_vtx.vt.p[1];
+        float s = gpu->cur_vtx.vt.p[0];
+        float t = gpu->cur_vtx.vt.p[1];
         gpu->cur_vtx.vt = gpu->cur_vtx.v;
+        gpu->cur_vtx.vt.p[3] = 0;
         vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
+        gpu->cur_vtx.vt.p[0] += s;
+        gpu->cur_vtx.vt.p[1] += t;
     }
 
     vertex v = gpu->cur_vtx;
@@ -647,11 +650,12 @@ void gxcmd_execute(GPU* gpu) {
             normal.p[3] = 0;
 
             if (gpu->cur_texparam.transform == TEXTF_NORMAL) {
-                gpu->texmtx.p[0][3] = gpu->cur_vtx.vt.p[0];
-                gpu->texmtx.p[1][3] = gpu->cur_vtx.vt.p[1];
+                float s = gpu->cur_vtx.vt.p[0];
+                float t = gpu->cur_vtx.vt.p[1];
                 gpu->cur_vtx.vt = normal;
-                gpu->cur_vtx.vt.p[3] = 1;
                 vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
+                gpu->cur_vtx.vt.p[0] += s;
+                gpu->cur_vtx.vt.p[1] += t;
             }
 
             vecmul(&gpu->vecmtx, &normal);

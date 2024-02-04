@@ -112,18 +112,53 @@ void spu_reload_channel(SPU* spu, int i) {
 void spu_sample(SPU* spu) {
     if (spu->master->io7.soundcnt.enable) {
 
-        float l_sample = 0, r_sample = 0;
+        float l_mixer = 0, r_mixer = 0;
 
         for (int i = 0; i < 16; i++) {
             if (!spu->master->io7.sound[i].cnt.start) continue;
+            if (i == 1 && spu->master->io7.soundcnt.ch1) continue;
+            if (i == 3 && spu->master->io7.soundcnt.ch3) continue;
 
             float pan = spu->master->io7.sound[i].cnt.pan / (float) 128;
-            l_sample += spu->channel_samples[i] * (1 - pan);
-            r_sample += spu->channel_samples[i] * pan;
+            l_mixer += spu->channel_samples[i] * (1 - pan);
+            r_mixer += spu->channel_samples[i] * pan;
         }
+        l_mixer /= 16;
+        r_mixer /= 16;
 
-        l_sample /= 16;
-        r_sample /= 16;
+        float l_sample = 0, r_sample = 0;
+        // switch (spu->master->io7.soundcnt.left) {
+        //     case 0:
+        //         l_sample = l_mixer;
+        //         break;
+        //     case 1:
+        //         l_sample = spu->channel_samples[1];
+        //         break;
+        //     case 2:
+        //         l_sample = spu->channel_samples[3];
+        //         break;
+        //     case 3:
+        //         l_sample =
+        //             (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
+        //         break;
+        // }
+        // switch (spu->master->io7.soundcnt.right) {
+        //     case 0:
+        //         r_sample = r_mixer;
+        //         break;
+        //     case 1:
+        //         r_sample = spu->channel_samples[1];
+        //         break;
+        //     case 2:
+        //         r_sample = spu->channel_samples[3];
+        //         break;
+        //     case 3:
+        //         r_sample =
+        //             (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
+        //         break;
+        // }
+        l_sample = l_mixer;
+        r_sample = r_mixer;
 
         l_sample *= spu->master->io7.soundcnt.volume / (float) 128;
         r_sample *= spu->master->io7.soundcnt.volume / (float) 128;

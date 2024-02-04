@@ -91,6 +91,14 @@ void io7_write16(IO* io, u32 addr, u16 data) {
         if (WIFI_OFF <= addr && addr < WIFI_OFF + WIFIIOSIZE) {
             *(u16*) &io->master->wifi_io[addr - WIFI_OFF] = data;
             *(u16*) &io->master->wifi_io[0x03c] = 0x0200;
+            if (addr - WIFI_OFF == 0x158) {
+                u8 idx = data & 0xff;
+                if (data >> 12 == 5) {
+                    io->master->wifi_bb_regs[idx] = io->master->wifi_io[0x15a];
+                } else if (data >> 12 == 6) {
+                    io->master->wifi_io[0x15c] = io->master->wifi_bb_regs[idx];
+                }
+            }
         }
         if (WIFIRAM <= addr && addr < WIFIRAM + WIFIRAMSIZE) {
             *(u16*) &io->master->wifiram[addr - WIFIRAM] = data;
