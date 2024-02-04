@@ -105,9 +105,12 @@ void io7_write16(IO* io, u32 addr, u16 data) {
         int i = (addr >> 4) & 0xf;
         bool prev_ena = io->sound[i].cnt.start;
         io->h[addr >> 1] = data;
-        if(!prev_ena && io->sound[i].cnt.start) {
-            io->master->spu.sample_ptrs[i] = io->sound[i].sad;
-            spu_reload_channel(&io->master->spu, i);
+        if (prev_ena != io->sound[i].cnt.start) {
+            remove_event(&io->master->sched, EVENT_SPU_CH0 + i);
+            if (!prev_ena && io->sound[i].cnt.start) {
+                io->master->spu.sample_ptrs[i] = io->sound[i].sad & 0xffffffc;
+                spu_reload_channel(&io->master->spu, i);
+            }
         }
         return;
     }

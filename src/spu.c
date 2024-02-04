@@ -61,9 +61,10 @@ void spu_sample(SPU* spu) {
             float pan = spu->master->io7.sound[i].cnt.pan / (float) 128;
             l_sample += spu->channel_samples[i] * (1 - pan);
             r_sample += spu->channel_samples[i] * pan;
-            l_sample /= 2;
-            r_sample /= 2;
         }
+
+        l_sample /= 16;
+        r_sample /= 16;
 
         l_sample *= spu->master->io7.soundcnt.volume / (float) 128;
         r_sample *= spu->master->io7.soundcnt.volume / (float) 128;
