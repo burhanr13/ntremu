@@ -19,9 +19,16 @@ typedef struct {
     int sample_idx;
 
     u32 sample_ptrs[16];
+    float adpcm_sample[16];
+    bool adpcm_hi[16];
+    int adpcm_idx[16];
+    u8 psg_ctr[6];
+
     float channel_samples[16];
 
 } SPU;
+
+void generate_adpcm_table();
 
 void spu_reload_channel(SPU* spu, int i);
 void spu_sample(SPU* spu);

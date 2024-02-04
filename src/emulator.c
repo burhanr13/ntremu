@@ -62,6 +62,7 @@ int emulator_init(int argc, char** argv) {
     thumb1_generate_lookup();
     arm5_generate_lookup();
     thumb2_generate_lookup();
+    generate_adpcm_table();
 
     emulator_reset();
 

@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 
+#include "bus7.h"
 #include "nds.h"
 
 #define UPDATE_IRQ(x)                                                          \
@@ -109,6 +110,17 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             remove_event(&io->master->sched, EVENT_SPU_CH0 + i);
             if (!prev_ena && io->sound[i].cnt.start) {
                 io->master->spu.sample_ptrs[i] = io->sound[i].sad & 0xffffffc;
+                if (io->sound[i].cnt.format == SND_ADPCM) {
+                    io->master->spu.adpcm_hi[i] = false;
+                    u32 adpcm_init =
+                        bus7_read32(io->master, io->master->spu.sample_ptrs[i]);
+                    io->master->spu.sample_ptrs[i] += 4;
+                    io->master->spu.adpcm_sample[i] =
+                        (s16) adpcm_init / (float) 0x8000;
+                    int ind = (adpcm_init >> 16) & 0x7f;
+                    if (ind > 88) ind = 88;
+                    io->master->spu.adpcm_idx[i] = ind;
+                }
                 spu_reload_channel(&io->master->spu, i);
             }
         }
