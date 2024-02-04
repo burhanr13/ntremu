@@ -182,8 +182,7 @@ void debugger_run() {
                             if (n & 7) printf("\n");
                         } else {
                             for (int i = 0; i < n; i++) {
-                                if (i > 0 && !(i & 7))
-                                    printf("             ");
+                                if (i > 0 && !(i & 7)) printf("             ");
                                 printf("0x%08x ",
                                        bus9_read32(ntremu.nds, addr + 4 * i));
                                 if ((i & 7) == 7) printf("\n");
@@ -263,7 +262,7 @@ void debugger_run() {
                 ntremu.running = true;
                 ntremu.frame_adv = true;
                 return;
-            case 'l':
+            case 'l': {
                 u32 lines;
                 if (read_num(strtok(NULL, " \t\n"), &lines) < 0) lines = 5;
                 if (ntremu.nds->cur_cpu) {
@@ -312,6 +311,7 @@ void debugger_run() {
                     }
                 }
                 break;
+            }
             case 't':
                 printf("ITCM: base=%08x, size=%08x\n", 0,
                        ntremu.nds->cpu9.itcm_virtsize);
