@@ -187,15 +187,16 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
             card->eepromst.addr <<= 8;
             card->eepromst.addr |= data;
             if (++card->eepromst.i == card->addrtype) {
-                card->eepromst.i = 0;
                 card->eeprom_state =
                     card->eepromst.read ? CARDEEPROM_READ : CARDEEPROM_WRITE;
             }
             break;
         case CARDEEPROM_READ:
+            card->eepromst.i++;
             card->spidata = card->eeprom[card->eepromst.addr++];
             break;
         case CARDEEPROM_WRITE:
+            card->eepromst.i++;
             card->eeprom[card->eepromst.addr++] = data;
             break;
         case CARDEEPROM_STAT:
@@ -207,5 +208,32 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
     }
     if (!hold) {
         card->eeprom_state = CARDEEPROM_IDLE;
+        if (!card->eeprom_detected) {
+            card->eeprom_detected = true;
+            switch (card->eepromst.i) {
+                case 17:
+                    card->addrtype = 1;
+                    card->eeprom_size = 512;
+                    break;
+                case 34:
+                    card->addrtype = 2;
+                    card->eeprom_size = 1 << 13;
+                    break;
+                case 130:
+                    card->addrtype = 2;
+                    card->eeprom_size = 1 << 16;
+                    break;
+                case 259:
+                    card->addrtype = 3;
+                    card->eeprom_size = 1 << 20;
+                    break;
+                default:
+                    card->eeprom_detected = false;
+            }
+            if (card->eeprom_detected) {
+                card->eeprom = realloc(card->eeprom, card->eeprom_size);z
+            }
+        }
+        card->eepromst.i = 0;
     }
 }
