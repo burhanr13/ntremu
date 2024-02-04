@@ -46,9 +46,9 @@ void spu_reload_channel(SPU* spu, int i) {
 
             float diff = ((data & 7) * 2 + 1) * adpcm_table[spu->adpcm_idx[i]];
             cur_sample = spu->adpcm_sample[i];
-            if(data & 8) {
+            if (data & 8) {
                 cur_sample -= diff;
-            }else{
+            } else {
                 cur_sample += diff;
             }
             spu->adpcm_idx[i] += adpcm_ind_table[data & 7];
@@ -65,6 +65,14 @@ void spu_reload_channel(SPU* spu, int i) {
                                      ? 1
                                      : -1;
                 } else {
+                    if (spu->psg_lfsr[i - 14] & 1) {
+                        cur_sample = -1;
+                        spu->psg_lfsr[i - 14] >>= 1;
+                        spu->psg_lfsr[i - 14] ^= 0x6000;
+                    } else {
+                        cur_sample = 1;
+                        spu->psg_lfsr[i - 14] >>= 1;
+                    }
                 }
             }
             break;

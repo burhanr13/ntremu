@@ -23,6 +23,7 @@ typedef struct {
     bool adpcm_hi[16];
     int adpcm_idx[16];
     u8 psg_ctr[6];
+    u16 psg_lfsr[2];
 
     float channel_samples[16];
 

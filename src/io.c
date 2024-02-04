@@ -120,6 +120,8 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                     int ind = (adpcm_init >> 16) & 0x7f;
                     if (ind > 88) ind = 88;
                     io->master->spu.adpcm_idx[i] = ind;
+                } else if (i >= 14) {
+                    io->master->spu.psg_lfsr[i - 14] = 0x7fff;
                 }
                 spu_reload_channel(&io->master->spu, i);
             }
