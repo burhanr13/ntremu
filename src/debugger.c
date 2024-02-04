@@ -168,7 +168,7 @@ void debugger_run() {
                                    bus9_read32(ntremu.nds, addr));
                         }
                         break;
-                    case 'm':
+                    case 'm': {
                         u32 n;
                         if (read_num(strtok(NULL, " \t\n"), &n) < 0) n = 8;
                         printf("[%08x] = ", addr);
@@ -190,6 +190,7 @@ void debugger_run() {
                             if (n & 7) printf("\n");
                         }
                         break;
+                    }
                     default:
                         printf("Invalid read command.\n");
                         break;
