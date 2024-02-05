@@ -42,4 +42,6 @@ void update_input_keyboard(NDS* nds);
 void update_input_controller(NDS* nds, SDL_GameController* controller);
 void update_input_touch(NDS* nds, SDL_Rect* ts_bounds);
 
+void update_input_freecam();
+
 #endif

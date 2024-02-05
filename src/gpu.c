@@ -7,6 +7,8 @@
 #include "nds.h"
 
 extern bool wireframe;
+extern bool freecam;
+extern mat4 freecam_mtx;
 
 const int cmd_parms[8][16] = {{0},
                               {1, 0, 1, 1, 1, 0, 16, 12, 16, 12, 9, 3, 3},
@@ -99,6 +101,11 @@ void update_mtxs(GPU* gpu) {
             gpu->master->io9.vecmtx_result[j][i] =
                 gpu->vecmtx.p[i][j] * (1 << 12);
         }
+    }
+
+    if (freecam) {
+        gpu->clipmtx = freecam_mtx;
+        matmul(&gpu->clipmtx, &gpu->posmtx);
     }
 }
 

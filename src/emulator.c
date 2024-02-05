@@ -1,6 +1,7 @@
 #include "emulator.h"
 
 #include <SDL2/SDL.h>
+#include <math.h>
 
 #include "arm4_isa.h"
 #include "arm5_isa.h"
@@ -8,9 +9,16 @@
 #include "thumb1_isa.h"
 #include "thumb2_isa.h"
 
+#define TRANSLATE_SPEED 5
+#define ROTATE_SPEED 0.02
+
 EmulatorState ntremu;
 
 bool wireframe;
+bool freecam;
+mat4 freecam_posmtx;
+mat4 freecam_projmtx;
+mat4 freecam_mtx;
 
 const char usage[] = "ntremu [options] <romfile>\n"
                      "-u -- run at uncapped speed\n"
@@ -129,6 +137,20 @@ void hotkey_press(SDL_KeyCode key) {
         case SDLK_o:
             wireframe = !wireframe;
             break;
+        case SDLK_c:
+            if (freecam) {
+                freecam = false;
+            } else {
+                freecam = true;
+                freecam_posmtx = (mat4){0};
+                freecam_posmtx.p[0][0] = 1;
+                freecam_posmtx.p[1][1] = 1;
+                freecam_posmtx.p[2][2] = 1;
+                freecam_posmtx.p[3][3] = 1;
+                freecam_projmtx = ntremu.nds->gpu.projmtx;
+                freecam_mtx = ntremu.nds->gpu.projmtx;
+            }
+            break;
         default:
             break;
     }
@@ -197,4 +219,145 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds) {
     nds->io7.extkeyin.pen = !pressed;
     nds->tsc.x = x;
     nds->tsc.y = y;
+}
+
+void matmul_left(mat4* a, mat4* b, mat4* dst) {
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            float sum = 0;
+            for (int k = 0; k < 4; k++) {
+                sum += a->p[i][k] * b->p[k][j];
+            }
+            dst->p[i][j] = sum;
+        }
+    }
+}
+
+void update_input_freecam() {
+    const Uint8* keys = SDL_GetKeyboardState(NULL);
+
+    if (keys[SDL_SCANCODE_W]) {
+        mat4 m = {0};
+        m.p[0][0] = 1;
+        m.p[1][1] = 1;
+        m.p[2][2] = 1;
+        m.p[3][3] = 1;
+        m.p[2][3] = TRANSLATE_SPEED;
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_S]) {
+        mat4 m = {0};
+        m.p[0][0] = 1;
+        m.p[1][1] = 1;
+        m.p[2][2] = 1;
+        m.p[3][3] = 1;
+        m.p[2][3] = -TRANSLATE_SPEED;
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_Q]) {
+        mat4 m = {0};
+        m.p[0][0] = 1;
+        m.p[1][1] = 1;
+        m.p[2][2] = 1;
+        m.p[3][3] = 1;
+        m.p[1][3] = TRANSLATE_SPEED;
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_E]) {
+        mat4 m = {0};
+        m.p[0][0] = 1;
+        m.p[1][1] = 1;
+        m.p[2][2] = 1;
+        m.p[3][3] = 1;
+        m.p[1][3] = -TRANSLATE_SPEED;
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_A]) {
+        mat4 m = {0};
+        m.p[0][0] = 1;
+        m.p[1][1] = 1;
+        m.p[2][2] = 1;
+        m.p[3][3] = 1;
+        m.p[0][3] = TRANSLATE_SPEED;
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_D]) {
+        mat4 m = {0};
+        m.p[0][0] = 1;
+        m.p[1][1] = 1;
+        m.p[2][2] = 1;
+        m.p[3][3] = 1;
+        m.p[0][3] = -TRANSLATE_SPEED;
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_LEFT]) {
+        mat4 m = {0};
+        m.p[3][3] = 1;
+        m.p[1][1] = 1;
+        m.p[2][2] = cosf(-ROTATE_SPEED);
+        m.p[2][0] = -sinf(-ROTATE_SPEED);
+        m.p[0][2] = sinf(-ROTATE_SPEED);
+        m.p[0][0] = cosf(-ROTATE_SPEED);
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_RIGHT]) {
+        mat4 m = {0};
+        m.p[3][3] = 1;
+        m.p[1][1] = 1;
+        m.p[2][2] = cosf(ROTATE_SPEED);
+        m.p[2][0] = -sinf(ROTATE_SPEED);
+        m.p[0][2] = sinf(ROTATE_SPEED);
+        m.p[0][0] = cosf(ROTATE_SPEED);
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_UP]) {
+        mat4 m = {0};
+        m.p[3][3] = 1;
+        m.p[0][0] = 1;
+        m.p[1][1] = cosf(-ROTATE_SPEED);
+        m.p[1][2] = -sinf(-ROTATE_SPEED);
+        m.p[2][1] = sinf(-ROTATE_SPEED);
+        m.p[2][2] = cosf(-ROTATE_SPEED);
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
+    if (keys[SDL_SCANCODE_DOWN]) {
+        mat4 m = {0};
+        m.p[3][3] = 1;
+        m.p[0][0] = 1;
+        m.p[1][1] = cosf(ROTATE_SPEED);
+        m.p[1][2] = -sinf(ROTATE_SPEED);
+        m.p[2][1] = sinf(ROTATE_SPEED);
+        m.p[2][2] = cosf(ROTATE_SPEED);
+        mat4 tmp;
+        matmul_left(&m, &freecam_posmtx, &tmp);
+        freecam_posmtx = tmp;
+        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+    }
 }
