@@ -828,6 +828,36 @@ void draw_scanline(PPU* ppu) {
         case 3:
             break;
     }
+    switch (ppu->io->masterbright.mode) {
+        case 1: {
+            u16 factor = ppu->io->masterbright.factor;
+            if (factor > 16) factor = 16;
+            for (int x = 0; x < NDS_SCREEN_W; x++) {
+                u16 r = ppu->screen[ppu->ly][x] & 0x1f;
+                u16 g = (ppu->screen[ppu->ly][x] >> 5) & 0x1f;
+                u16 b = (ppu->screen[ppu->ly][x] >> 10) & 0x1f;
+                r += (31 - r) * factor / 16;
+                g += (31 - g) * factor / 16;
+                b += (31 - b) * factor / 16;
+                ppu->screen[ppu->ly][x] = r | g << 5 | b << 10;
+            }
+            break;
+        }
+        case 2: {
+            u16 factor = ppu->io->masterbright.factor;
+            if (factor > 16) factor = 16;
+            for (int x = 0; x < NDS_SCREEN_W; x++) {
+                u16 r = ppu->screen[ppu->ly][x] & 0x1f;
+                u16 g = (ppu->screen[ppu->ly][x] >> 5) & 0x1f;
+                u16 b = (ppu->screen[ppu->ly][x] >> 10) & 0x1f;
+                r -= r * factor / 16;
+                g -= g * factor / 16;
+                b -= b * factor / 16;
+                ppu->screen[ppu->ly][x] = r | g << 5 | b << 10;
+            }
+            break;
+        }
+    }
 }
 
 void ppu_check_window(PPU* ppu) {

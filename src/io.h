@@ -292,7 +292,15 @@ typedef struct {
         };
     } bldy;
     u8 gap[MASTERBRIGHT - BLDY - 4];
-    u32 masterbright;
+    union {
+        u32 w;
+        struct {
+            u32 factor : 5;
+            u32 unused1 : 9;
+            u32 mode : 2;
+            u32 unused2 : 16;
+        };
+    } masterbright;
 } PPUIO;
 
 typedef struct _IO {
