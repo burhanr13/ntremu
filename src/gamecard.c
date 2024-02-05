@@ -33,14 +33,14 @@ GameCard* create_card(char* filename) {
     } else {
         fseek(fp, 0, SEEK_END);
         card->eeprom_size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-        card->eeprom = malloc(card->eeprom_size);
-        fread(card->eeprom, 1, card->eeprom_size, fp);
-        fclose(fp);
         if (card->eeprom_size == 512) card->addrtype = 1;
         else if (card->eeprom_size <= (1 << 16)) card->addrtype = 2;
         else card->addrtype = 3;
         card->eeprom_detected = true;
+        fseek(fp, 0, SEEK_SET);
+        card->eeprom = malloc(card->eeprom_size);
+        fread(card->eeprom, 1, card->eeprom_size, fp);
+        fclose(fp);
     }
 
     return card;
@@ -231,7 +231,7 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
                     card->eeprom_detected = false;
             }
             if (card->eeprom_detected) {
-                card->eeprom = realloc(card->eeprom, card->eeprom_size);z
+                card->eeprom = realloc(card->eeprom, card->eeprom_size);
             }
         }
         card->eepromst.i = 0;
