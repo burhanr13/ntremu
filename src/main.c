@@ -142,6 +142,10 @@ int main(int argc, char** argv) {
             }
             if (freecam) {
                 update_input_freecam();
+                ntremu.nds->io7.keyinput.keys = 0x3ff;
+                ntremu.nds->io9.keyinput.keys = 0x3ff;
+                ntremu.nds->io7.extkeyin.x = 1;
+                ntremu.nds->io7.extkeyin.y = 1;
             } else {
                 update_input_keyboard(ntremu.nds);
             }

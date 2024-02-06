@@ -104,7 +104,8 @@ void update_mtxs(GPU* gpu) {
     }
 
     if (freecam) {
-        gpu->clipmtx = freecam_mtx;
+        gpu->clipmtx = gpu->projmtx;
+        matmul(&gpu->clipmtx, &freecam_mtx);
         matmul(&gpu->clipmtx, &gpu->posmtx);
     }
 }

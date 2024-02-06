@@ -16,8 +16,6 @@ EmulatorState ntremu;
 
 bool wireframe;
 bool freecam;
-mat4 freecam_posmtx;
-mat4 freecam_projmtx;
 mat4 freecam_mtx;
 
 const char usage[] = "ntremu [options] <romfile>\n"
@@ -137,18 +135,25 @@ void hotkey_press(SDL_KeyCode key) {
         case SDLK_o:
             wireframe = !wireframe;
             break;
+        case SDLK_BACKSPACE:
+            if (ntremu.nds->io7.extkeyin.hinge) {
+                ntremu.nds->io7.extkeyin.hinge = 0;
+                ntremu.nds->io7.ifl.unfold = 1;
+                ntremu.nds->io9.ifl.unfold = 1;
+            } else {
+                ntremu.nds->io7.extkeyin.hinge = 1;
+            }
+            break;
         case SDLK_c:
             if (freecam) {
                 freecam = false;
             } else {
                 freecam = true;
-                freecam_posmtx = (mat4){0};
-                freecam_posmtx.p[0][0] = 1;
-                freecam_posmtx.p[1][1] = 1;
-                freecam_posmtx.p[2][2] = 1;
-                freecam_posmtx.p[3][3] = 1;
-                freecam_projmtx = ntremu.nds->gpu.projmtx;
-                freecam_mtx = ntremu.nds->gpu.projmtx;
+                freecam_mtx = (mat4){0};
+                freecam_mtx.p[0][0] = 1;
+                freecam_mtx.p[1][1] = 1;
+                freecam_mtx.p[2][2] = 1;
+                freecam_mtx.p[3][3] = 1;
             }
             break;
         default:
@@ -172,7 +177,6 @@ void update_input_keyboard(NDS* nds) {
 
     nds->io7.extkeyin.x = ~keys[SDL_SCANCODE_A];
     nds->io7.extkeyin.y = ~keys[SDL_SCANCODE_S];
-    nds->io7.extkeyin.hinge = 0;
 }
 
 void update_input_controller(NDS* nds, SDL_GameController* controller) {
@@ -221,7 +225,7 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds) {
     nds->tsc.y = y;
 }
 
-void matmul_left(mat4* a, mat4* b, mat4* dst) {
+void matmul2(mat4* a, mat4* b, mat4* dst) {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             float sum = 0;
@@ -244,9 +248,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[2][3] = TRANSLATE_SPEED;
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_S]) {
         mat4 m = {0};
@@ -256,9 +259,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[2][3] = -TRANSLATE_SPEED;
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_Q]) {
         mat4 m = {0};
@@ -268,9 +270,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[1][3] = TRANSLATE_SPEED;
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_E]) {
         mat4 m = {0};
@@ -280,9 +281,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[1][3] = -TRANSLATE_SPEED;
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_A]) {
         mat4 m = {0};
@@ -292,9 +292,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[0][3] = TRANSLATE_SPEED;
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_D]) {
         mat4 m = {0};
@@ -304,9 +303,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[0][3] = -TRANSLATE_SPEED;
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_LEFT]) {
         mat4 m = {0};
@@ -317,9 +315,8 @@ void update_input_freecam() {
         m.p[0][2] = sinf(-ROTATE_SPEED);
         m.p[0][0] = cosf(-ROTATE_SPEED);
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_RIGHT]) {
         mat4 m = {0};
@@ -330,9 +327,8 @@ void update_input_freecam() {
         m.p[0][2] = sinf(ROTATE_SPEED);
         m.p[0][0] = cosf(ROTATE_SPEED);
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_UP]) {
         mat4 m = {0};
@@ -343,9 +339,8 @@ void update_input_freecam() {
         m.p[2][1] = sinf(-ROTATE_SPEED);
         m.p[2][2] = cosf(-ROTATE_SPEED);
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_DOWN]) {
         mat4 m = {0};
@@ -356,8 +351,7 @@ void update_input_freecam() {
         m.p[2][1] = sinf(ROTATE_SPEED);
         m.p[2][2] = cosf(ROTATE_SPEED);
         mat4 tmp;
-        matmul_left(&m, &freecam_posmtx, &tmp);
-        freecam_posmtx = tmp;
-        matmul_left(&freecam_projmtx, &freecam_posmtx, &freecam_mtx);
+        matmul2(&m, &freecam_mtx, &tmp);
+        freecam_mtx = tmp;
     }
 }
