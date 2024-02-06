@@ -9,7 +9,7 @@
 #include "thumb1_isa.h"
 #include "thumb2_isa.h"
 
-#define TRANSLATE_SPEED 5
+#define TRANSLATE_SPEED 5.0
 #define ROTATE_SPEED 0.02
 
 EmulatorState ntremu;
@@ -240,13 +240,16 @@ void matmul2(mat4* a, mat4* b, mat4* dst) {
 void update_input_freecam() {
     const Uint8* keys = SDL_GetKeyboardState(NULL);
 
+    float speed = TRANSLATE_SPEED;
+    if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) speed /= 20;
+
     if (keys[SDL_SCANCODE_W]) {
         mat4 m = {0};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[2][3] = TRANSLATE_SPEED;
+        m.p[2][3] = speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
@@ -257,7 +260,7 @@ void update_input_freecam() {
         m.p[1][1] = 1;
         m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[2][3] = -TRANSLATE_SPEED;
+        m.p[2][3] = -speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
@@ -268,7 +271,7 @@ void update_input_freecam() {
         m.p[1][1] = 1;
         m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[1][3] = TRANSLATE_SPEED;
+        m.p[1][3] = speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
@@ -279,7 +282,7 @@ void update_input_freecam() {
         m.p[1][1] = 1;
         m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[1][3] = -TRANSLATE_SPEED;
+        m.p[1][3] = -speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
@@ -290,7 +293,7 @@ void update_input_freecam() {
         m.p[1][1] = 1;
         m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[0][3] = TRANSLATE_SPEED;
+        m.p[0][3] = speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
@@ -301,7 +304,7 @@ void update_input_freecam() {
         m.p[1][1] = 1;
         m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[0][3] = -TRANSLATE_SPEED;
+        m.p[0][3] = -speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
