@@ -929,13 +929,6 @@ void lcd_hdraw(NDS* nds) {
     nds->io7.vcount++;
     if (nds->io7.vcount == LINES_H) {
         nds->io7.vcount = 0;
-        if (nds->io9.powcnt.screenswap) {
-            nds->ppuA.screen = nds->screen_top;
-            nds->ppuB.screen = nds->screen_bottom;
-        } else {
-            nds->ppuA.screen = nds->screen_bottom;
-            nds->ppuB.screen = nds->screen_top;
-        }
     }
     nds->io9.vcount = nds->io7.vcount;
     nds->ppuA.ly = nds->io7.vcount;
@@ -1011,6 +1004,14 @@ void lcd_vblank(NDS* nds) {
 
     ppu_vblank(&nds->ppuA);
     ppu_vblank(&nds->ppuB);
+
+    if (nds->io9.powcnt.screenswap) {
+        nds->ppuA.screen = nds->screen_top;
+        nds->ppuB.screen = nds->screen_bottom;
+    } else {
+        nds->ppuA.screen = nds->screen_bottom;
+        nds->ppuB.screen = nds->screen_top;
+    }
 
     for (int i = 0; i < 4; i++) {
         if (nds->io7.dma[i].cnt.mode == DMA7_VBLANK) {
