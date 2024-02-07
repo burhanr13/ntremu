@@ -845,8 +845,8 @@ void gxcmd_execute(GPU* gpu) {
             y1 = (gpu->param_fifo[0] >> 0x18) & 0xff;
             gpu->view_x = x0;
             gpu->view_y = y0;
-            gpu->view_w = x1 - x0;
-            gpu->view_h = y1 - y0;
+            gpu->view_w = x1 - x0 + 1;
+            gpu->view_h = y1 - y0 + 1;
             break;
         }
         case BOX_TEST: {
@@ -1335,7 +1335,7 @@ void render_polygon(GPU* gpu, poly* p) {
                             break;
                         }
                     }
-                    if (alpha == 0) continue;
+                    if (!alpha) continue;
 
                     if (alpha == 31 || p->attr.depth_transparent) {
                         if (gpu->w_buffer) gpu->depth_buf[y][x] = i.w;
@@ -1395,17 +1395,31 @@ void render_polygon(GPU* gpu, poly* p) {
 }
 
 void gpu_render(GPU* gpu) {
-    for (int y = 0; y < NDS_SCREEN_H; y++) {
-        for (int x = 0; x < NDS_SCREEN_W; x++) {
-            if (gpu->master->io9.clear_color.alpha) {
-                gpu->screen[y][x] = 0x8000 | gpu->master->io9.clear_color.color;
-            } else {
-                gpu->screen[y][x] = 0;
+    if (gpu->master->io9.disp3dcnt.rearplane_mode) {
+        for (int y = 0; y < NDS_SCREEN_H; y++) {
+            for (int x = 0; x < NDS_SCREEN_W; x++) {
+                gpu->screen[y][x] =
+                    *(u16*) &gpu->texram[2][(y * NDS_SCREEN_W + x) << 1];
+                float depth =
+                    (*(u16*) &gpu->texram[3][(y * NDS_SCREEN_W + x) << 1] &
+                     0x7fff) /
+                    (float) 0x8000;
+                depth *= 1 << 12;
+                if (gpu->w_buffer) depth = 1 / depth;
+                gpu->depth_buf[y][x] = depth;
             }
-            if (gpu->w_buffer) {
-                gpu->depth_buf[y][x] = 0;
-            } else {
-                gpu->depth_buf[y][x] = 1;
+        }
+    } else {
+        u16 clear_color = gpu->master->io9.clear_color.color;
+        if (gpu->master->io9.clear_color.alpha) clear_color |= 0x8000;
+        float clear_depth =
+            (gpu->master->io9.clear_depth & 0x7fff) / (float) 0x8000;
+        clear_depth *= 1 << 12;
+        if (gpu->w_buffer) clear_depth = 1 / clear_depth;
+        for (int y = 0; y < NDS_SCREEN_H; y++) {
+            for (int x = 0; x < NDS_SCREEN_W; x++) {
+                gpu->screen[y][x] = clear_color;
+                gpu->depth_buf[y][x] = clear_depth;
             }
         }
     }
