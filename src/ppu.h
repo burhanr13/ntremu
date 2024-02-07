@@ -81,7 +81,7 @@ typedef struct {
     VRAMRegion bgReg;
     VRAMRegion objReg;
 
-    u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
+    u16 (*screen)[NDS_SCREEN_W];
     u16 cur_line[NDS_SCREEN_W];
     u16 ly;
 

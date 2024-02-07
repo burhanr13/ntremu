@@ -25,6 +25,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->tmc9.tm0_event = EVENT_TM09_RELOAD;
 
     nds->ppuA.master = nds;
+    nds->ppuA.screen = nds->screen_top;
     nds->ppuA.io = &nds->io9.ppuA;
     nds->ppuA.pal = nds->palA;
     nds->ppuA.extPalBg[0] = (u16*) nds->vramE;
@@ -37,6 +38,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->ppuA.objReg = VRAMOBJA;
 
     nds->ppuB.master = nds;
+    nds->ppuB.screen = nds->screen_bottom;
     nds->ppuB.io = &nds->io9.ppuB;
     nds->ppuB.pal = nds->palB;
     nds->ppuB.extPalBg[0] = (u16*) nds->vramH;

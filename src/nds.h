@@ -155,6 +155,9 @@ typedef struct _NDS {
         VRAMBank arm7[2];
     } vramstate;
 
+    u16 screen_top[NDS_SCREEN_H][NDS_SCREEN_W];
+    u16 screen_bottom[NDS_SCREEN_H][NDS_SCREEN_W];
+
     union {
         struct {
             ObjAttr oamA[OAMOBJS];

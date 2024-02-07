@@ -114,17 +114,10 @@ int main(int argc, char** argv) {
             void* pixels;
             int pitch;
             SDL_LockTexture(texture, NULL, &pixels, &pitch);
-            if (ntremu.nds->io9.powcnt.screenswap) {
-                memcpy(pixels, ntremu.nds->ppuA.screen,
-                       sizeof ntremu.nds->ppuA.screen);
-                memcpy(pixels + sizeof ntremu.nds->ppuA.screen,
-                       ntremu.nds->ppuB.screen, sizeof ntremu.nds->ppuB.screen);
-            } else {
-                memcpy(pixels, ntremu.nds->ppuB.screen,
-                       sizeof ntremu.nds->ppuB.screen);
-                memcpy(pixels + sizeof ntremu.nds->ppuB.screen,
-                       ntremu.nds->ppuA.screen, sizeof ntremu.nds->ppuA.screen);
-            }
+            memcpy(pixels, ntremu.nds->screen_top,
+                   sizeof ntremu.nds->screen_top);
+            memcpy(pixels + sizeof ntremu.nds->screen_top,
+                   ntremu.nds->screen_bottom, sizeof ntremu.nds->screen_bottom);
             SDL_UnlockTexture(texture);
 
             int windowW, windowH;
