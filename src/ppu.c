@@ -13,6 +13,8 @@ const int SCLAYOUT[4][2][2] = {
 
 const int BMLAYOUT[4][2] = {{128, 128}, {256, 256}, {512, 256}, {512, 512}};
 
+const int DISPCAPLAYOUT[4][2] = {{128, 128}, {256, 64}, {256, 128}, {256, 192}};
+
 // size: sqr, short, long
 const int OBJLAYOUT[4][3] = {
     {8, 8, 16}, {16, 8, 32}, {32, 16, 32}, {64, 32, 64}};
@@ -322,8 +324,6 @@ void render_bgs(PPU* ppu) {
 void render_obj_line(PPU* ppu, int i) {
     ObjAttr o = ppu->oam[i];
 
-    if (o.mode == OBJ_MODE_BITMAP) return;
-
     bool extPal = ppu->io->dispcnt.obj_extpal;
     u16* bpp8Pal = ppu->pal + 0x100;
     if (extPal) {
@@ -366,7 +366,35 @@ void render_obj_line(PPU* ppu, int i) {
                                              ? ppu->io->dispcnt.obj_boundary
                                              : 0));
 
-    if (o.aff) {
+    if (o.mode == OBJ_MODE_BITMAP) {
+        u32 bm_start;
+        if (ppu->io->dispcnt.obj_bm_mapmode) {
+            bm_start = o.tilenum * (128 << ppu->io->dispcnt.obj_bm_boundary);
+            bm_start += yofs * w * 2;
+        } else {
+            u32 bm_w = 128 << ppu->io->dispcnt.obj_bm_dim;
+            u32 x_mask = (bm_w >> 3) - 1;
+            bm_start =
+                (o.tilenum & ~x_mask) * 0x80 + (o.tilenum & x_mask) * 0x10;
+            bm_start += yofs * 2 * bm_w;
+        }
+
+        for (int x = 0; x < w; x++, bm_start += 2) {
+            u16 sx = (o.x + x) % 512;
+            if (sx >= NDS_SCREEN_W) continue;
+
+            u16 col = vram_read16(ppu->master, ppu->objReg, bm_start);
+            if (o.priority < ppu->objdotattrs[sx].priority ||
+                !(ppu->layerlines[LOBJ][sx] & (1 << 15))) {
+                if (col & (1 << 15)) {
+                    ppu->draw_obj = true;
+                    ppu->layerlines[LOBJ][sx] = col;
+                    ppu->objdotattrs[sx].mosaic = o.mosaic;
+                    ppu->objdotattrs[sx].priority = o.priority;
+                }
+            }
+        }
+    } else if (o.aff) {
         u8 ow = w;
         u8 oh = h;
         if (o.disable_double) {
@@ -737,9 +765,9 @@ void compose_lines(PPU* ppu) {
                         break;
                     }
                 }
-                ppu->screen[ppu->ly][x] = (b1 << 10) | (g1 << 5) | r1;
+                ppu->cur_line[x] = (b1 << 10) | (g1 << 5) | r1;
             } else {
-                ppu->screen[ppu->ly][x] = color1;
+                ppu->cur_line[x] = color1;
             }
         }
     } else {
@@ -771,7 +799,7 @@ void compose_lines(PPU* ppu) {
             }
             layers[l++] = LBD;
 
-            ppu->screen[ppu->ly][x] = ppu->layerlines[layers[0]][x];
+            ppu->cur_line[x] = ppu->layerlines[layers[0]][x];
         }
     }
 }
@@ -812,12 +840,14 @@ void draw_scanline(PPU* ppu) {
         return;
     }
 
+    draw_scanline_normal(ppu);
+
     switch (ppu->io->dispcnt.disp_mode) {
         case 0:
             memset(ppu->screen[ppu->ly], 0, sizeof ppu->screen[0]);
             break;
         case 1:
-            draw_scanline_normal(ppu);
+            memcpy(ppu->screen[ppu->ly], ppu->cur_line, sizeof ppu->cur_line);
             break;
         case 2:
             memcpy(ppu->screen[ppu->ly],
@@ -867,6 +897,34 @@ void ppu_check_window(PPU* ppu) {
     }
 }
 
+void lcd_capture_line(NDS* nds) {
+    int w = DISPCAPLAYOUT[nds->io9.dispcapcnt.size][0];
+
+    u16* source = NULL;
+    switch (nds->io9.dispcapcnt.source) {
+        case 0:
+            source = nds->io9.dispcapcnt.srcA ? nds->gpu.screen[nds->io7.vcount]
+                                              : nds->ppuA.cur_line;
+            break;
+        case 1:
+            source = (u16*) &nds->vrambanks[nds->io9.ppuA.dispcnt.vram_block]
+                                           [2 * NDS_SCREEN_W * nds->io7.vcount];
+            if (nds->io9.ppuA.dispcnt.disp_mode != 2)
+                source += 0x4000 * nds->io9.dispcapcnt.vram_r_off;
+            break;
+        case 2:
+        case 3:
+            source = nds->io9.dispcapcnt.srcA ? nds->gpu.screen[nds->io7.vcount]
+                                              : nds->ppuA.cur_line;
+            break;
+    }
+    u16* dest = (u16*) &nds->vrambanks[nds->io9.dispcapcnt.vram_w_block]
+                                      [0x8000 * nds->io9.dispcapcnt.vram_w_off +
+                                       2 * NDS_SCREEN_W * nds->io7.vcount];
+
+    memcpy(dest, source, 2 * w);
+}
+
 void lcd_hdraw(NDS* nds) {
     nds->io7.vcount++;
     if (nds->io7.vcount == LINES_H) {
@@ -897,13 +955,18 @@ void lcd_hdraw(NDS* nds) {
         draw_scanline(&nds->ppuA);
         draw_scanline(&nds->ppuB);
 
+        if (nds->io9.dispcapcnt.enable &&
+            nds->io7.vcount < DISPCAPLAYOUT[nds->io9.dispcapcnt.size][1]) {
+            lcd_capture_line(nds);
+        }
+
         for (int i = 0; i < 4; i++) {
             if (nds->io9.dma[i].cnt.mode == DMA9_DISPLAY) {
                 dma9_activate(&nds->dma9, i);
             }
         }
     } else if (nds->io7.vcount == NDS_SCREEN_H) {
-        nds->io9.dispcapcnt &= ~(1 << 31);
+        nds->io9.dispcapcnt.enable = 0;
         lcd_vblank(nds);
         nds->frame_complete = true;
     } else if (nds->io7.vcount == LINES_H - 1) {

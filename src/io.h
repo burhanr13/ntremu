@@ -348,9 +348,27 @@ typedef struct _IO {
                             u32 unused : 17;
                         };
                     } disp3dcnt;
-                    u32 dispcapcnt;
+                    union {
+                        u32 w;
+                        struct {
+                            u32 eva : 5;
+                            u32 unuseda : 3;
+                            u32 evb : 5;
+                            u32 unusedb : 3;
+                            u32 vram_w_block : 2;
+                            u32 vram_w_off : 2;
+                            u32 size : 2;
+                            u32 unused1 : 2;
+                            u32 srcA : 1;
+                            u32 srcB : 1;
+                            u32 vram_r_off : 2;
+                            u32 unused2 : 1;
+                            u32 source : 2;
+                            u32 enable : 1;
+                        };
+                    } dispcapcnt;
                     u32 disp_mmem_fifo;
-                    u32 masterbright;
+                    u32 masterbrightA;
                 };
             };
             u8 gap_0xx[DMA0SAD - MASTERBRIGHT - 4];
