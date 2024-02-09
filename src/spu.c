@@ -23,10 +23,10 @@ void generate_adpcm_table() {
 }
 
 void spu_tick_channel(SPU* spu, int i) {
-    if (i == 1 && spu->master->io7.soundcapcnt[0].start) {
+    if (i == 1 && spu->master->io7.sndcapcnt[0].start) {
         spu_tick_capture(spu, 0);
     }
-    if (i == 3 && spu->master->io7.soundcapcnt[1].start) {
+    if (i == 3 && spu->master->io7.sndcapcnt[1].start) {
         spu_tick_capture(spu, 1);
     }
 
@@ -117,19 +117,18 @@ void spu_tick_channel(SPU* spu, int i) {
 }
 
 void spu_tick_capture(SPU* spu, int i) {
-    u32 loopstart = spu->master->io7.soundcap[i].dad & 0x7fffffc;
-    u32 loopend =
-        loopstart + ((spu->master->io7.soundcap[i].len << 2) & 0x3ffff);
+    u32 loopstart = spu->master->io7.sndcap[i].dad & 0x7fffffc;
+    u32 loopend = loopstart + ((spu->master->io7.sndcap[i].len << 2) & 0x3ffff);
 
-    if (spu->master->io7.soundcapcnt[i].add) {
+    if (spu->master->io7.sndcapcnt[i].add) {
         spu->channel_samples[i << 1] += spu->channel_samples[2 * i + 1];
     }
 
-    float sample = spu->master->io7.soundcapcnt[i].src
+    float sample = spu->master->io7.sndcapcnt[i].src
                        ? spu->channel_samples[i << 1]
                        : spu->mixer_sample[i];
 
-    if (spu->master->io7.soundcapcnt[i].format) {
+    if (spu->master->io7.sndcapcnt[i].format) {
         bus7_write8(spu->master, spu->capture_ptrs[i], (s8) (sample * 0x80));
         spu->capture_ptrs[i] += 1;
     } else {
@@ -138,8 +137,8 @@ void spu_tick_capture(SPU* spu, int i) {
         spu->capture_ptrs[i] += 2;
     }
     if (spu->capture_ptrs[i] >= loopend) {
-        if (spu->master->io7.soundcapcnt[i].repeat) {
-            spu->master->io7.soundcapcnt[i].start = 0;
+        if (spu->master->io7.sndcapcnt[i].repeat) {
+            spu->master->io7.sndcapcnt[i].start = 0;
         } else {
             spu->capture_ptrs[i] = loopstart;
         }

@@ -268,15 +268,14 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             break;
         case VRAMSTAT:
             break;
-        case SOUNDCAP0CNT: {
-            bool prev_ena[2] = {io->soundcapcnt[0].start,
-                                io->soundcapcnt[1].start};
+        case SNDCAP0CNT: {
+            bool prev_ena[2] = {io->sndcapcnt[0].start, io->sndcapcnt[1].start};
             io->h[addr >> 1] = data;
             for (int i = 0; i < 2; i++) {
-                if (prev_ena[i] != io->soundcapcnt[i].start) {
+                if (prev_ena[i] != io->sndcapcnt[i].start) {
                     if (!prev_ena[i]) {
                         io->master->spu.capture_ptrs[i] =
-                            io->soundcap[i].dad & 0xffffffc;
+                            io->sndcap[i].dad & 0xffffffc;
                     }
                 }
             }

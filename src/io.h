@@ -170,12 +170,12 @@ enum {
     // repeat 16x
     SOUNDCNT = 0x500,
     SOUNDBIAS = 0x504,
-    SOUNDCAP0CNT = 0x508,
-    SOUNDCAP1CNT = 0x509,
-    SOUNDCAP0DAD = 0x510,
-    SOUNDCAP0LEN = 0x514,
-    SOUNDCAP1DAD = 0x518,
-    SOUNDCAP1LEN = 0x51c,
+    SNDCAP0CNT = 0x508,
+    SNDCAP1CNT = 0x509,
+    SNDCAP0DAD = 0x510,
+    SNDCAP0LEN = 0x514,
+    SNDCAP1DAD = 0x518,
+    SNDCAP1LEN = 0x51c,
 
     PPUB_OFF = 0x1000,
 
@@ -755,12 +755,13 @@ typedef struct _IO {
                             u8 unused : 3;
                             u8 start : 1;
                         };
-                    } soundcapcnt[2];
+                    } sndcapcnt[2];
+                    u8 unused_50x[SNDCAP0DAD - SNDCAP1CNT - 1];
                     struct {
                         u32 dad;
                         u32 len;
-                    } soundcap[2];
-                    u8 unused_5xx[GXSTAT - SOUNDCAP1LEN - 4];
+                    } sndcap[2];
+                    u8 unused_5xx[GXSTAT - SNDCAP1LEN - 4];
                 };
             };
             union {
