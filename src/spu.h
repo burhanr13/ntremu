@@ -24,14 +24,19 @@ typedef struct {
     int adpcm_idx[16];
     u8 psg_ctr[6];
     u16 psg_lfsr[2];
+    
+    u32 capture_ptrs[2];
 
     float channel_samples[16];
+    float mixer_sample[2];
 
 } SPU;
 
 void generate_adpcm_table();
 
-void spu_reload_channel(SPU* spu, int i);
+void spu_tick_channel(SPU* spu, int i);
+void spu_tick_capture(SPU* spu, int i);
+
 void spu_sample(SPU* spu);
 
 #endif

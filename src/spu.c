@@ -22,7 +22,7 @@ void generate_adpcm_table() {
     }
 }
 
-void spu_reload_channel(SPU* spu, int i) {
+void spu_tick_channel(SPU* spu, int i) {
     u32 loopstart = (spu->master->io7.sound[i].sad & 0x7fffffc) +
                     (spu->master->io7.sound[i].pnt << 2);
     u32 loopend = loopstart + ((spu->master->io7.sound[i].len << 2) & 0xffffff);
@@ -109,6 +109,43 @@ void spu_reload_channel(SPU* spu, int i) {
     }
 }
 
+void spu_tick_capture(SPU* spu, int i) {
+    u32 loopstart = spu->master->io7.soundcap[i].dad & 0x7fffffc;
+    u32 loopend =
+        loopstart + ((spu->master->io7.soundcap[i].len << 2) & 0x3ffff);
+
+    if (spu->master->io7.soundcapcnt[i].add) {
+        spu->channel_samples[i << 1] += spu->channel_samples[2 * i + 1];
+    }
+
+    float sample = spu->master->io7.soundcapcnt[i].src
+                       ? spu->channel_samples[i << 1]
+                       : spu->mixer_sample[i];
+    if (spu->master->io7.soundcapcnt[i].format) {
+        bus7_write8(spu->master, spu->capture_ptrs[i], (s8) (sample * 0x80));
+        spu->capture_ptrs[i] += 1;
+    } else {
+        bus7_write16(spu->master, spu->capture_ptrs[i],
+                     (s16) (sample * 0x8000));
+        spu->capture_ptrs[i] += 2;
+    }
+    if (spu->sample_ptrs[i] >= loopend) {
+        if (spu->master->io7.soundcapcnt[i].repeat) {
+            spu->master->io7.soundcapcnt[i].start = 0;
+        } else {
+            spu->sample_ptrs[i] = loopstart;
+        }
+    }
+
+    spu->channel_samples[2 * i + 1] = sample;
+
+    int tmr = 0x10000 - spu->master->io7.sound[2 * i + 1].tmr;
+    if (spu->master->io7.soundcapcnt[i].start) {
+        add_event(&spu->master->sched, EVENT_SPU_CAP0 + i,
+                  spu->master->sched.now + 2 * tmr);
+    }
+}
+
 void spu_sample(SPU* spu) {
     if (spu->master->io7.soundcnt.enable) {
 
@@ -125,40 +162,42 @@ void spu_sample(SPU* spu) {
         }
         l_mixer /= 16;
         r_mixer /= 16;
+        spu->mixer_sample[0] = l_mixer;
+        spu->mixer_sample[1] = r_mixer;
 
         float l_sample = 0, r_sample = 0;
-        // switch (spu->master->io7.soundcnt.left) {
-        //     case 0:
-        //         l_sample = l_mixer;
-        //         break;
-        //     case 1:
-        //         l_sample = spu->channel_samples[1];
-        //         break;
-        //     case 2:
-        //         l_sample = spu->channel_samples[3];
-        //         break;
-        //     case 3:
-        //         l_sample =
-        //             (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
-        //         break;
-        // }
-        // switch (spu->master->io7.soundcnt.right) {
-        //     case 0:
-        //         r_sample = r_mixer;
-        //         break;
-        //     case 1:
-        //         r_sample = spu->channel_samples[1];
-        //         break;
-        //     case 2:
-        //         r_sample = spu->channel_samples[3];
-        //         break;
-        //     case 3:
-        //         r_sample =
-        //             (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
-        //         break;
-        // }
-        l_sample = l_mixer;
-        r_sample = r_mixer;
+        switch (spu->master->io7.soundcnt.left) {
+            case 0:
+                l_sample = l_mixer;
+                break;
+            case 1:
+                l_sample = spu->channel_samples[1];
+                break;
+            case 2:
+                l_sample = spu->channel_samples[3];
+                break;
+            case 3:
+                l_sample =
+                    (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
+                break;
+        }
+        switch (spu->master->io7.soundcnt.right) {
+            case 0:
+                r_sample = r_mixer;
+                break;
+            case 1:
+                r_sample = spu->channel_samples[1];
+                break;
+            case 2:
+                r_sample = spu->channel_samples[3];
+                break;
+            case 3:
+                r_sample =
+                    (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
+                break;
+        }
+        // l_sample = l_mixer;
+        // r_sample = r_mixer;
 
         l_sample *= spu->master->io7.soundcnt.volume / (float) 128;
         r_sample *= spu->master->io7.soundcnt.volume / (float) 128;
