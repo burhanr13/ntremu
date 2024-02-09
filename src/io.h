@@ -170,6 +170,12 @@ enum {
     // repeat 16x
     SOUNDCNT = 0x500,
     SOUNDBIAS = 0x504,
+    SOUNDCAP0CNT = 0x508,
+    SOUNDCAP1CNT = 0x509,
+    SOUNDCAP0DAD = 0x510,
+    SOUNDCAP0LEN = 0x514,
+    SOUNDCAP1DAD = 0x518,
+    SOUNDCAP1LEN = 0x51c,
 
     PPUB_OFF = 0x1000,
 
@@ -739,7 +745,22 @@ typedef struct _IO {
                         };
                     } soundcnt;
                     u32 soundbias;
-                    u8 unused_5xx[GXSTAT - SOUNDBIAS - 4];
+                    union {
+                        u8 b;
+                        struct {
+                            u8 add : 1;
+                            u8 src : 1;
+                            u8 repeat : 1;
+                            u8 format : 1;
+                            u8 unused : 3;
+                            u8 start : 1;
+                        };
+                    } soundcapcnt[2];
+                    struct {
+                        u32 dad;
+                        u32 len;
+                    } soundcap[2];
+                    u8 unused_5xx[GXSTAT - SOUNDCAP1LEN - 4];
                 };
             };
             union {

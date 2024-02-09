@@ -54,8 +54,10 @@ void run_next_event(Scheduler* sched) {
         reload_timer(&sched->master->tmc9, e.type - EVENT_TM09_RELOAD);
     } else if (e.type == EVENT_SPU_SAMPLE) {
         spu_sample(&sched->master->spu);
+    } else if (e.type < EVENT_SPU_CAP0) {
+        spu_tick_channel(&sched->master->spu, e.type - EVENT_SPU_CH0);
     } else if (e.type < EVENT_MAX) {
-        spu_reload_channel(&sched->master->spu, e.type - EVENT_SPU_CH0);
+        spu_tick_capture(&sched->master->spu, e.type - EVENT_SPU_CAP0);
     }
 
     if (run_time > sched->now) sched->now = run_time;

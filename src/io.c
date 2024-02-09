@@ -116,7 +116,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
         io->h[addr >> 1] = data;
         if (prev_ena != io->sound[i].cnt.start) {
             remove_event(&io->master->sched, EVENT_SPU_CH0 + i);
-            if (!prev_ena && io->sound[i].cnt.start) {
+            if (!prev_ena) {
                 io->master->spu.sample_ptrs[i] = io->sound[i].sad & 0xffffffc;
                 if (io->sound[i].cnt.format == SND_ADPCM) {
                     io->master->spu.adpcm_hi[i] = false;
@@ -131,7 +131,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                 } else if (i >= 14) {
                     io->master->spu.psg_lfsr[i - 14] = 0x7fff;
                 }
-                spu_reload_channel(&io->master->spu, i);
+                spu_tick_channel(&io->master->spu, i);
             }
         }
         return;
@@ -268,6 +268,22 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             break;
         case VRAMSTAT:
             break;
+        case SOUNDCAP0CNT: {
+            bool prev_ena[2] = {io->soundcapcnt[0].start,
+                                io->soundcapcnt[1].start};
+            io->h[addr >> 1] = data;
+            for (int i = 0; i < 2; i++) {
+                if (prev_ena[i] != io->soundcapcnt[i].start) {
+                    remove_event(&io->master->sched, EVENT_SPU_CAP0 + i);
+                    if (!prev_ena[i]) {
+                        io->master->spu.capture_ptrs[i] =
+                            io->soundcap[i].dad & 0xffffffc;
+                        spu_tick_capture(&io->master->spu, i);
+                    }
+                }
+            }
+            break;
+        }
         default:
             io->h[addr >> 1] = data;
     }
