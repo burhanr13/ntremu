@@ -121,14 +121,13 @@ void spu_tick_capture(SPU* spu, int i) {
     float sample = spu->master->io7.soundcapcnt[i].src
                        ? spu->channel_samples[i << 1]
                        : spu->mixer_sample[i];
-    s32 pcm = sample * 0x8000;
-    if (pcm > 0x7fff) pcm = 0x7fff;
-    if (pcm < 0xffff8000) pcm = 0xffff8000;
+
     if (spu->master->io7.soundcapcnt[i].format) {
-        bus7_write8(spu->master, spu->capture_ptrs[i], pcm >> 8);
+        bus7_write8(spu->master, spu->capture_ptrs[i], (s8) (sample * 0x80));
         spu->capture_ptrs[i] += 1;
     } else {
-        bus7_write16(spu->master, spu->capture_ptrs[i], pcm);
+        bus7_write16(spu->master, spu->capture_ptrs[i],
+                     (s16) (sample * 0x8000));
         spu->capture_ptrs[i] += 2;
     }
     if (spu->capture_ptrs[i] >= loopend) {
