@@ -18,9 +18,7 @@ typedef enum {
     EVENT_TM39_RELOAD,
     EVENT_SPU_SAMPLE,
     EVENT_SPU_CH0,
-    EVENT_SPU_CAP0 = EVENT_SPU_CH0 + 16,
-    EVENT_SPU_CAP1,
-    EVENT_MAX
+    EVENT_MAX = EVENT_SPU_CH0 + 16
 } EventType;
 
 typedef struct {

@@ -23,6 +23,13 @@ void generate_adpcm_table() {
 }
 
 void spu_tick_channel(SPU* spu, int i) {
+    if (i == 1 && spu->master->io7.soundcapcnt[0].start) {
+        spu_tick_capture(spu, 0);
+    }
+    if (i == 3 && spu->master->io7.soundcapcnt[1].start) {
+        spu_tick_capture(spu, 1);
+    }
+
     u32 loopstart = (spu->master->io7.sound[i].sad & 0x7fffffc) +
                     (spu->master->io7.sound[i].pnt << 2);
     u32 loopend = loopstart + ((spu->master->io7.sound[i].len << 2) & 0xffffff);
@@ -136,12 +143,6 @@ void spu_tick_capture(SPU* spu, int i) {
         } else {
             spu->capture_ptrs[i] = loopstart;
         }
-    }
-
-    int tmr = 0x10000 - spu->master->io7.sound[2 * i + 1].tmr;
-    if (spu->master->io7.soundcapcnt[i].start) {
-        add_event(&spu->master->sched, EVENT_SPU_CAP0 + i,
-                  spu->master->sched.now + 2 * tmr);
     }
 }
 

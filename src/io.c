@@ -274,11 +274,9 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             io->h[addr >> 1] = data;
             for (int i = 0; i < 2; i++) {
                 if (prev_ena[i] != io->soundcapcnt[i].start) {
-                    remove_event(&io->master->sched, EVENT_SPU_CAP0 + i);
                     if (!prev_ena[i]) {
                         io->master->spu.capture_ptrs[i] =
                             io->soundcap[i].dad & 0xffffffc;
-                        spu_tick_capture(&io->master->spu, i);
                     }
                 }
             }
