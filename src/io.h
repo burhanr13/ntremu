@@ -756,6 +756,7 @@ typedef struct _IO {
                             u8 start : 1;
                         };
                     } soundcapcnt[2];
+                    u8 unused_50x[SOUNDCAP0DAD - SOUNDCAP1CNT - 1];
                     struct {
                         u32 dad;
                         u32 len;
