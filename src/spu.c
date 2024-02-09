@@ -195,8 +195,6 @@ void spu_sample(SPU* spu) {
                     (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
                 break;
         }
-        // l_sample = l_mixer;
-        // r_sample = r_mixer;
 
         l_sample *= spu->master->io7.soundcnt.volume / (float) 128;
         r_sample *= spu->master->io7.soundcnt.volume / (float) 128;
