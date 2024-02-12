@@ -27,7 +27,8 @@ typedef struct {
     
     u32 capture_ptrs[2];
 
-    float channel_samples[16];
+    float channel_samples[16][2];
+    float cap_channel_samples[4];
     float mixer_sample[2];
 
 } SPU;

@@ -16,6 +16,8 @@ float adpcm_table[89] = {
     15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767};
 const int adpcm_ind_table[8] = {-1, -1, -1, -1, 2, 4, 6, 8};
 
+#define CLAMP_SAMPLE(x) (x = (x < -1) ? -1 : ((x > 1) ? 1 : x))
+
 void generate_adpcm_table() {
     for (int i = 0; i < 89; i++) {
         adpcm_table[i] /= 0x8000;
@@ -23,6 +25,15 @@ void generate_adpcm_table() {
 }
 
 void spu_tick_channel(SPU* spu, int i) {
+    if (!spu->master->io7.sound[i].cnt.start) {
+        if (!spu->master->io7.sound[i].cnt.hold) {
+            if (i < 4) spu->cap_channel_samples[i] = 0;
+            spu->channel_samples[i][0] = 0;
+            spu->channel_samples[i][1] = 0;
+        }
+        return;
+    }
+    
     u32 loopstart = (spu->master->io7.sound[i].sad & 0x7fffffc) +
                     (spu->master->io7.sound[i].pnt << 2);
     u32 loopend = loopstart + ((spu->master->io7.sound[i].len << 2) & 0xffffff);
@@ -58,8 +69,7 @@ void spu_tick_channel(SPU* spu, int i) {
             } else {
                 cur_sample += diff;
             }
-            if (cur_sample < -1) cur_sample = -1;
-            if (cur_sample > 1) cur_sample = 1;
+            CLAMP_SAMPLE(cur_sample);
             spu->adpcm_idx[i] += adpcm_ind_table[data & 7];
             if (spu->adpcm_idx[i] < 0) spu->adpcm_idx[i] = 0;
             if (spu->adpcm_idx[i] > 88) spu->adpcm_idx[i] = 88;
@@ -100,25 +110,34 @@ void spu_tick_channel(SPU* spu, int i) {
     if (vol_div == 3) cur_sample /= 2;
     cur_sample *= spu->master->io7.sound[i].cnt.volume / (float) 128;
 
-    spu->channel_samples[i] = cur_sample;
+    if (i == 0 && spu->master->io7.sndcapcnt[0].add &&
+        spu->master->io7.sndcapcnt[0].start) {
+        cur_sample += spu->cap_channel_samples[1];
+        CLAMP_SAMPLE(cur_sample);
+    }
+    if (i == 2 && spu->master->io7.sndcapcnt[1].add &&
+        spu->master->io7.sndcapcnt[1].start) {
+        cur_sample += spu->cap_channel_samples[3];
+        CLAMP_SAMPLE(cur_sample);
+    }
+
+    if (i < 4) spu->cap_channel_samples[i] = cur_sample;
+
+    float pan = spu->master->io7.sound[i].cnt.pan / (float) 128;
+    spu->channel_samples[i][0] = cur_sample * (1 - pan);
+    spu->channel_samples[i][1] = cur_sample * pan;
 
     int tmr = 0x10000 - spu->master->io7.sound[i].tmr;
-    if (spu->master->io7.sound[i].cnt.start) {
-        add_event(&spu->master->sched, EVENT_SPU_CH0 + i,
-                  spu->master->sched.now + 2 * tmr);
-    }
+    add_event(&spu->master->sched, EVENT_SPU_CH0 + i,
+              spu->master->sched.now + 2 * tmr);
 }
 
 void spu_tick_capture(SPU* spu, int i) {
     u32 loopstart = spu->master->io7.sndcap[i].dad & 0x7fffffc;
     u32 loopend = loopstart + ((spu->master->io7.sndcap[i].len << 2) & 0x3ffff);
 
-    if (spu->master->io7.sndcapcnt[i].add) {
-        spu->channel_samples[i << 1] += spu->channel_samples[2 * i + 1];
-    }
-
     float sample = spu->master->io7.sndcapcnt[i].src
-                       ? spu->channel_samples[i << 1]
+                       ? spu->cap_channel_samples[i << 1]
                        : spu->mixer_sample[i];
 
     if (spu->master->io7.sndcapcnt[i].format) {
@@ -147,51 +166,50 @@ void spu_tick_capture(SPU* spu, int i) {
 void spu_sample(SPU* spu) {
     if (spu->master->io7.soundcnt.enable) {
 
-        float l_mixer = 0, r_mixer = 0;
-
+        spu->mixer_sample[0] = 0;
+        spu->mixer_sample[1] = 0;
         for (int i = 0; i < 16; i++) {
             if (!spu->master->io7.sound[i].cnt.start) continue;
             if (i == 1 && spu->master->io7.soundcnt.ch1) continue;
             if (i == 3 && spu->master->io7.soundcnt.ch3) continue;
 
-            float pan = spu->master->io7.sound[i].cnt.pan / (float) 128;
-            l_mixer += spu->channel_samples[i] * (1 - pan);
-            r_mixer += spu->channel_samples[i] * pan;
+            spu->mixer_sample[0] += spu->channel_samples[i][0];
+            spu->mixer_sample[1] += spu->channel_samples[i][1];
         }
-        l_mixer /= 16;
-        r_mixer /= 16;
-        spu->mixer_sample[0] = l_mixer;
-        spu->mixer_sample[1] = r_mixer;
+        CLAMP_SAMPLE(spu->mixer_sample[0]);
+        CLAMP_SAMPLE(spu->mixer_sample[1]);
 
         float l_sample = 0, r_sample = 0;
         switch (spu->master->io7.soundcnt.left) {
             case 0:
-                l_sample = l_mixer;
+                l_sample = spu->mixer_sample[0];
                 break;
             case 1:
-                l_sample = spu->channel_samples[1];
+                l_sample = spu->channel_samples[1][0];
                 break;
             case 2:
-                l_sample = spu->channel_samples[3];
+                l_sample = spu->channel_samples[3][0];
                 break;
             case 3:
                 l_sample =
-                    (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
+                    spu->channel_samples[1][0] + spu->channel_samples[3][0];
+                CLAMP_SAMPLE(l_sample);
                 break;
         }
         switch (spu->master->io7.soundcnt.right) {
             case 0:
-                r_sample = r_mixer;
+                r_sample = spu->mixer_sample[1];
                 break;
             case 1:
-                r_sample = spu->channel_samples[1];
+                r_sample = spu->channel_samples[1][1];
                 break;
             case 2:
-                r_sample = spu->channel_samples[3];
+                r_sample = spu->channel_samples[3][1];
                 break;
             case 3:
                 r_sample =
-                    (spu->channel_samples[1] + spu->channel_samples[3]) / 2;
+                    spu->channel_samples[1][1] + spu->channel_samples[3][1];
+                CLAMP_SAMPLE(r_sample);
                 break;
         }
 
