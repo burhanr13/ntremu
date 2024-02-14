@@ -105,6 +105,9 @@ bool card_write_command(GameCard* card, u8* command) {
                 card->state = CARD_DATA;
                 card->addr = command[1] << 24 | command[2] << 16 |
                              command[3] << 8 | command[4];
+                if (card->addr < 0x8000) {
+                    card->addr = 0x8000 + (card->addr & 0x1ff);
+                }
                 card->i = 0;
                 card->len = 0x200;
                 return true;
