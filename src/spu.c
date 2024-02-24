@@ -33,7 +33,7 @@ void spu_tick_channel(SPU* spu, int i) {
         }
         return;
     }
-    
+
     u32 loopstart = (spu->master->io7.sound[i].sad & 0x7fffffc) +
                     (spu->master->io7.sound[i].pnt << 2);
     u32 loopend = loopstart + ((spu->master->io7.sound[i].len << 2) & 0xffffff);
@@ -139,13 +139,14 @@ void spu_tick_capture(SPU* spu, int i) {
     float sample = spu->master->io7.sndcapcnt[i].src
                        ? spu->cap_channel_samples[i << 1]
                        : spu->mixer_sample[i];
-
+    int pcm = sample * 0x8000;
+    if (pcm > 0x7fff) pcm = 0x7fff;
+    if (pcm < -0x8000) pcm = -0x8000;
     if (spu->master->io7.sndcapcnt[i].format) {
-        bus7_write8(spu->master, spu->capture_ptrs[i], (s8) (sample * 0x80));
+        bus7_write8(spu->master, spu->capture_ptrs[i], pcm >> 8);
         spu->capture_ptrs[i] += 1;
     } else {
-        bus7_write16(spu->master, spu->capture_ptrs[i],
-                     (s16) (sample * 0x8000));
+        bus7_write16(spu->master, spu->capture_ptrs[i], pcm);
         spu->capture_ptrs[i] += 2;
     }
     if (spu->capture_ptrs[i] >= loopend) {
@@ -179,7 +180,7 @@ void spu_sample(SPU* spu) {
         CLAMP_SAMPLE(spu->mixer_sample[0]);
         CLAMP_SAMPLE(spu->mixer_sample[1]);
 
-        float l_sample = 0, r_sample = 0;
+        float l_sample = spu->mixer_sample[0], r_sample = spu->mixer_sample[1];
         switch (spu->master->io7.soundcnt.left) {
             case 0:
                 l_sample = spu->mixer_sample[0];

@@ -6,23 +6,23 @@
 #include "ppu.h"
 #include "timer.h"
 
-void run_scheduler(Scheduler* sched, int cycles) {
-    u64 end_time = sched->now + cycles;
+void run_to_present(Scheduler* sched) {
+    u64 end_time = sched->now;
     while (sched->n_events && sched->event_queue[0].time <= end_time) {
         run_next_event(sched);
+        if (sched->now > end_time) end_time = sched->now;
     }
     sched->now = end_time;
 }
 
-void run_next_event(Scheduler* sched) {
-    if (sched->n_events == 0) return;
+int run_next_event(Scheduler* sched) {
+    if (sched->n_events == 0) return 0;
 
     Event e = sched->event_queue[0];
     sched->n_events--;
     for (int i = 0; i < sched->n_events; i++) {
         sched->event_queue[i] = sched->event_queue[i + 1];
     }
-    u64 run_time = sched->now;
     sched->now = e.time;
 
     if (e.type == EVENT_FORCESYNC) {
@@ -56,11 +56,11 @@ void run_next_event(Scheduler* sched) {
         spu_sample(&sched->master->spu);
     } else if (e.type < EVENT_SPU_CAP0) {
         spu_tick_channel(&sched->master->spu, e.type - EVENT_SPU_CH0);
-    }else if(e.type < EVENT_MAX) {
+    } else if (e.type < EVENT_MAX) {
         spu_tick_capture(&sched->master->spu, e.type - EVENT_SPU_CAP0);
     }
 
-    if (run_time > sched->now) sched->now = run_time;
+    return sched->now - e.time;
 }
 
 void add_event(Scheduler* sched, EventType t, u64 time) {
