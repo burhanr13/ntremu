@@ -38,6 +38,11 @@ void spu_tick_channel(SPU* spu, int i) {
                     (spu->master->io7.sound[i].pnt << 2);
     u32 loopend = loopstart + ((spu->master->io7.sound[i].len << 2) & 0xffffff);
 
+    if (spu->sample_ptrs[i] == loopstart && !spu->adpcm_hi[i]) {
+        spu->adpcm_sample_loopstart[i] = spu->adpcm_sample[i];
+        spu->adpcm_idx_loopstart[i] = spu->adpcm_idx[i];
+    }
+
     float cur_sample = 0;
 
     switch (spu->master->io7.sound[i].cnt.format) {
@@ -99,6 +104,8 @@ void spu_tick_channel(SPU* spu, int i) {
     if (spu->sample_ptrs[i] >= loopend) {
         if (spu->master->io7.sound[i].cnt.repeat == REP_LOOP) {
             spu->sample_ptrs[i] = loopstart;
+            spu->adpcm_sample[i] = spu->adpcm_sample_loopstart[i];
+            spu->adpcm_idx[i] = spu->adpcm_idx_loopstart[i];
         }
         if (spu->master->io7.sound[i].cnt.repeat == REP_ONESHOT) {
             spu->master->io7.sound[i].cnt.start = 0;

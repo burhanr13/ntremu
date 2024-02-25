@@ -19,9 +19,11 @@ typedef struct {
     int sample_idx;
 
     u32 sample_ptrs[16];
-    float adpcm_sample[16];
     bool adpcm_hi[16];
+    float adpcm_sample[16];
     int adpcm_idx[16];
+    float adpcm_sample_loopstart[16];
+    int adpcm_idx_loopstart[16];
     u8 psg_ctr[6];
     u16 psg_lfsr[2];
     
