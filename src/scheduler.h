@@ -39,7 +39,8 @@ typedef struct {
     int n_events;
 } Scheduler;
 
-void run_next_event(Scheduler* sched);
+void run_to_present(Scheduler* sched);
+int run_next_event(Scheduler* sched);
 
 static inline bool event_pending(Scheduler* sched) {
     return sched->n_events && sched->now >= sched->event_queue[0].time;

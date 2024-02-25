@@ -200,7 +200,7 @@ bool nds_step(NDS* nds) {
     }
     if (event_pending(&nds->sched)) {
         if (nds->cur_cpu) {
-            run_scheduler(&nds->sched, run_next_event(&nds->sched));
+            run_to_present(&nds->sched);
             nds->cpu7.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
             nds->cpu9.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
 

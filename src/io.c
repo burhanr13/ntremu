@@ -160,10 +160,9 @@ void io7_write16(IO* io, u32 addr, u16 data) {
         case TM1CNT + 2:
         case TM2CNT + 2:
         case TM3CNT + 2: {
-            io->h[addr >> 1] = data;
             int i = (addr - TM0CNT - 2) / (TM1CNT - TM0CNT);
-            if (i == 0) io->tm[0].cnt.countup = 0;
             update_timer_count(&io->master->tmc7, i);
+            io->h[addr >> 1] = data;
             update_timer_reload(&io->master->tmc7, i);
             break;
         }
@@ -694,10 +693,9 @@ void io9_write16(IO* io, u32 addr, u16 data) {
         case TM1CNT + 2:
         case TM2CNT + 2:
         case TM3CNT + 2: {
-            io->h[addr >> 1] = data;
             int i = (addr - TM0CNT - 2) / (TM1CNT - TM0CNT);
-            if (i == 0) io->tm[0].cnt.countup = 0;
             update_timer_count(&io->master->tmc9, i);
+            io->h[addr >> 1] = data;
             update_timer_reload(&io->master->tmc9, i);
             break;
         }
