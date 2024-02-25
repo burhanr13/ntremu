@@ -184,19 +184,23 @@ bool nds_step(NDS* nds) {
             }
         } else {
             cpu7_step(&nds->cpu7);
-            nds->sched.now += 1;
+            nds->sched.now += nds->cpu7.cycles;
         }
     } else {
         if (cpu9_step(&nds->cpu9)) {
-            nds->half_tick = !nds->half_tick;
-            if (nds->half_tick) nds->sched.now += 1;
+            nds->sched.now += nds->cpu9.cycles >> 1;
+            if (nds->cpu9.cycles & 1) {
+                if (nds->half_tick ^= 1) {
+                    nds->sched.now++;
+                }
+            }
         } else {
             nds->sched.now = nds->sched.event_queue[0].time;
         }
     }
     if (event_pending(&nds->sched)) {
         if (nds->cur_cpu) {
-            run_next_event(&nds->sched);
+            run_scheduler(&nds->sched, run_next_event(&nds->sched));
             nds->cpu7.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
             nds->cpu9.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
 

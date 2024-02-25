@@ -10,6 +10,7 @@
 #include "types.h"
 
 void cpu7_step(Arm7TDMI* cpu) {
+    cpu->cycles = 0;
     if (!cpu->cpsr.i && cpu->irq) {
         cpu7_handle_interrupt(cpu, I_IRQ);
         return;
@@ -108,12 +109,14 @@ void cpu7_handle_interrupt(Arm7TDMI* cpu, CpuInterrupt intr) {
 }
 
 u32 cpu7_read8(Arm7TDMI* cpu, u32 addr, bool sx) {
+    cpu->cycles++;
     u32 data = bus7_read8(cpu->master, addr);
     if (sx) data = (s8) data;
     return data;
 }
 
 u32 cpu7_read16(Arm7TDMI* cpu, u32 addr, bool sx) {
+    cpu->cycles++;
     u32 data = bus7_read16(cpu->master, addr & ~1);
     if (addr & 1) {
         if (sx) {
@@ -124,6 +127,7 @@ u32 cpu7_read16(Arm7TDMI* cpu, u32 addr, bool sx) {
 }
 
 u32 cpu7_read32(Arm7TDMI* cpu, u32 addr) {
+    cpu->cycles++;
     u32 data = bus7_read32(cpu->master, addr & ~3);
     if (addr & 0b11) {
         data = (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
@@ -132,26 +136,32 @@ u32 cpu7_read32(Arm7TDMI* cpu, u32 addr) {
 }
 
 u32 cpu7_read32m(Arm7TDMI* cpu, u32 addr, int i) {
+    cpu->cycles++;
     return bus7_read32(cpu->master, (addr & ~3) + 4 * i);
 }
 
 void cpu7_write8(Arm7TDMI* cpu, u32 addr, u8 b) {
+    cpu->cycles++;
     bus7_write8(cpu->master, addr, b);
 }
 
 void cpu7_write16(Arm7TDMI* cpu, u32 addr, u16 h) {
+    cpu->cycles++;
     bus7_write16(cpu->master, addr & ~1, h);
 }
 
 void cpu7_write32(Arm7TDMI* cpu, u32 addr, u32 w) {
+    cpu->cycles++;
     bus7_write32(cpu->master, addr & ~3, w);
 }
 
 void cpu7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w) {
+    cpu->cycles++;
     bus7_write32(cpu->master, (addr & ~3) + 4 * i, w);
 }
 
 u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr) {
+    cpu->cycles++;
     u16 data = bus7_read16(cpu->master, addr & ~1);
     if (cpu->master->memerr) {
         printf("Invalid CPU7 (thumb) instruction fetch at 0x%08x\n", addr);
@@ -161,6 +171,7 @@ u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr) {
 }
 
 u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr) {
+    cpu->cycles++;
     u32 data = bus7_read32(cpu->master, addr & ~3);
     if (cpu->master->memerr) {
         printf("Invalid CPU7 instruction fetch at 0x%08x\n", addr);

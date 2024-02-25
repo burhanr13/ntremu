@@ -10,6 +10,7 @@
 #include "types.h"
 
 bool cpu9_step(Arm946E* cpu) {
+    cpu->cycles = 0;
     if (cpu->halt) {
         if (cpu->irq) {
             cpu->halt = false;
@@ -22,6 +23,7 @@ bool cpu9_step(Arm946E* cpu) {
     } else {
         arm5_exec_instr(cpu);
     }
+    if (cpu->cycles == 0) cpu->cycles = 1;
     return true;
 }
 
@@ -115,6 +117,7 @@ void cpu9_handle_interrupt(Arm946E* cpu, CpuInterrupt intr) {
 }
 
 u32 cpu9_read8(Arm946E* cpu, u32 addr, bool sx) {
+    cpu->cycles++;
     u32 data;
     if (addr < cpu->itcm_virtsize) data = *(u8*) &cpu->itcm[addr % ITCMSIZE];
     else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
@@ -125,6 +128,7 @@ u32 cpu9_read8(Arm946E* cpu, u32 addr, bool sx) {
 }
 
 u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx) {
+    cpu->cycles++;
     u32 data;
     if (addr < cpu->itcm_virtsize)
         data = *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE];
@@ -136,6 +140,7 @@ u32 cpu9_read16(Arm946E* cpu, u32 addr, bool sx) {
 }
 
 u32 cpu9_read32(Arm946E* cpu, u32 addr) {
+    cpu->cycles++;
     u32 data;
     if (addr < cpu->itcm_virtsize)
         data = *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE];
@@ -150,6 +155,7 @@ u32 cpu9_read32(Arm946E* cpu, u32 addr) {
 }
 
 u32 cpu9_read32m(Arm946E* cpu, u32 addr, int i) {
+    cpu->cycles++;
     if (addr < cpu->itcm_virtsize)
         return *(u32*) &cpu->itcm[((addr & ~3) + 4 * i) % ITCMSIZE];
     else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
@@ -158,6 +164,7 @@ u32 cpu9_read32m(Arm946E* cpu, u32 addr, int i) {
 }
 
 void cpu9_write8(Arm946E* cpu, u32 addr, u8 b) {
+    cpu->cycles++;
     if (addr < cpu->itcm_virtsize) *(u8*) &cpu->itcm[addr % ITCMSIZE] = b;
     else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
         *(u8*) &cpu->dtcm[addr % DTCMSIZE] = b;
@@ -165,6 +172,7 @@ void cpu9_write8(Arm946E* cpu, u32 addr, u8 b) {
 }
 
 void cpu9_write16(Arm946E* cpu, u32 addr, u16 h) {
+    cpu->cycles++;
     if (addr < cpu->itcm_virtsize)
         *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE] = h;
     else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
@@ -173,6 +181,7 @@ void cpu9_write16(Arm946E* cpu, u32 addr, u16 h) {
 }
 
 void cpu9_write32(Arm946E* cpu, u32 addr, u32 w) {
+    cpu->cycles++;
     if (addr < cpu->itcm_virtsize)
         *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE] = w;
     else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
@@ -181,6 +190,7 @@ void cpu9_write32(Arm946E* cpu, u32 addr, u32 w) {
 }
 
 void cpu9_write32m(Arm946E* cpu, u32 addr, int i, u32 w) {
+    cpu->cycles++;
     if (addr < cpu->itcm_virtsize)
         *(u32*) &cpu->itcm[((addr & ~3) + 4 * i) % ITCMSIZE] = w;
     else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)

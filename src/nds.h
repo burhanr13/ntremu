@@ -194,7 +194,7 @@ typedef struct _NDS {
 
     CPUType cur_cpu;
     u64 last_event;
-    bool half_tick;
+    int half_tick;
     bool frame_complete;
     bool samples_full;
 

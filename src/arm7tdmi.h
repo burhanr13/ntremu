@@ -45,6 +45,8 @@ typedef struct _Arm7TDMI {
     Arm4Instr next_instr;
     u32 cur_instr_addr;
 
+    int cycles;
+
     bool irq;
 
 } Arm7TDMI;
