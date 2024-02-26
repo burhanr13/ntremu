@@ -322,10 +322,10 @@ void rtc_write(NDS* nds) {
 
             struct tm* t = localtime(&(time_t){time(NULL)});
             u8 year = (t->tm_year / 10 % 10) << 4 | t->tm_year % 10;
-            u8 month = (t->tm_mon / 10) << 4 | t->tm_mon % 10;
+            u8 month = ((t->tm_mon + 1) / 10) << 4 | (t->tm_mon + 1) % 10;
             u8 day = (t->tm_mday / 10) << 4 | t->tm_mday % 10;
-            u8 wday = (t->tm_wday + 6) % 7;
-            u8 hour = (t->tm_hour % 12 / 10) << 4 | t->tm_hour % 12 % 10;
+            u8 wday = t->tm_wday;
+            u8 hour = (t->tm_hour / 10) << 4 | t->tm_hour % 10;
             if (t->tm_hour >= 12) hour |= 1 << 6;
             u8 min = (t->tm_min / 10) << 4 | t->tm_min % 10;
             u8 sec = (t->tm_sec / 10) << 4 | t->tm_sec % 10;
