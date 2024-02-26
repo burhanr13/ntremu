@@ -90,12 +90,12 @@ bool card_write_command(GameCard* card, u8* command) {
                 return true;
                 break;
             case 2: {
-                card->state = CARD_SECUREAREA;
+                card->state = CARD_DATA;
                 int block = command[2] >> 4 | command[1] << 4 |
                             (command[0] & 0xf) << 12;
                 card->addr = block << 12;
                 card->i = 0;
-                card->secure_gap = 0;
+                card->len = 0x1018;
                 return true;
                 break;
             }
@@ -153,10 +153,13 @@ bool card_read_data(GameCard* card, u32* data) {
             *data = -1;
             return false;
         case CARD_CHIPID:
-            *data = 0x00001fc2;
+            *data = CHIPID;
             return false;
         case CARD_DATA:
-            *data = *(u32*) &card->rom[(card->addr + card->i) % card->rom_size];
+            if (card->i >= 0x1000) *data = 0;
+            else
+                *data =
+                    *(u32*) &card->rom[(card->addr + card->i) % card->rom_size];
             card->i += 4;
             if (card->i < card->len) {
                 return true;
@@ -164,23 +167,6 @@ bool card_read_data(GameCard* card, u32* data) {
                 card->state = CARD_IDLE;
                 return false;
             }
-        case CARD_SECUREAREA:
-            if (card->secure_gap > 0) {
-                *data = 0;
-                if (--card->secure_gap == 0) {
-                    if (card->i < 0x1000) {
-                        card->state = CARD_IDLE;
-                        return false;
-                    } else return true;
-                }
-                return true;
-            }
-            *data = *(u32*) &card->rom[(card->addr + card->i) % card->rom_size];
-            card->i += 4;
-            if (card->i % 0x200 == 0) {
-                card->secure_gap = 0x18;
-            }
-            return true;
         default:
             return false;
     }

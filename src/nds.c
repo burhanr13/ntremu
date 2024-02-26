@@ -129,15 +129,15 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 
         CardHeader* header = (CardHeader*) card->rom;
 
-        *(u32*) &nds->ram[0x3ff800] = 0x00001fc2;
-        *(u32*) &nds->ram[0x3ff804] = 0x00001fc2;
+        *(u32*) &nds->ram[0x3ff800] = CHIPID;
+        *(u32*) &nds->ram[0x3ff804] = CHIPID;
         *(u16*) &nds->ram[0x3ff808] = header->header_crc;
         *(u16*) &nds->ram[0x3ff80a] = header->secure_crc;
         *(u16*) &nds->ram[0x3ff850] = 0x5835;
         *(u32*) &nds->ram[0x3ff868] = (*(u16*) &firmware[0x20]) << 3;
         *(u16*) &nds->ram[0x3ff874] = 0x359a;
-        *(u32*) &nds->ram[0x3ffc00] = 0x00001fc2;
-        *(u32*) &nds->ram[0x3ffc04] = 0x00001fc2;
+        *(u32*) &nds->ram[0x3ffc00] = CHIPID;
+        *(u32*) &nds->ram[0x3ffc04] = CHIPID;
         *(u16*) &nds->ram[0x3ffc08] = header->header_crc;
         *(u16*) &nds->ram[0x3ffc0a] = header->secure_crc;
         *(u16*) &nds->ram[0x3ffc10] = 0x5835;

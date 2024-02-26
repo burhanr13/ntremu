@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+#define CHIPID 0x00001fc2
+
 typedef struct {
     char title[12];
     char gamecode[4];
@@ -37,7 +39,7 @@ typedef struct {
     u8 reserved[0x10];
 } CardHeader;
 
-typedef enum { CARD_IDLE, CARD_CHIPID, CARD_SECUREAREA, CARD_DATA } CardState;
+typedef enum { CARD_IDLE, CARD_CHIPID, CARD_DATA } CardState;
 typedef enum {
     CARDEEPROM_IDLE,
     CARDEEPROM_ADDR,
