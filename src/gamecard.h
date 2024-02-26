@@ -37,7 +37,7 @@ typedef struct {
     u8 reserved[0x10];
 } CardHeader;
 
-typedef enum { CARD_IDLE, CARD_CHIPID, CARD_DATA } CardState;
+typedef enum { CARD_IDLE, CARD_CHIPID, CARD_SECUREAREA, CARD_DATA } CardState;
 typedef enum {
     CARDEEPROM_IDLE,
     CARDEEPROM_ADDR,
@@ -61,6 +61,7 @@ typedef struct {
 
     u32 addr;
     u32 i;
+    u32 secure_gap;
     u32 len;
     bool key1mode;
 

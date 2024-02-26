@@ -312,12 +312,14 @@ void rtc_write(NDS* nds) {
         nds->rtc.com = 0;
         return;
     }
-    if (nds->io7.rtc.clk) return;
 
     if (nds->rtc.i == 0) {
+        if (nds->io7.rtc.clk) return;
+
         nds->rtc.com |= nds->io7.rtc.data << nds->rtc.bi;
+
         if (++nds->rtc.bi == 8) {
-            nds->rtc.bi = 0;
+            nds->rtc.bi = -1;
             nds->rtc.i++;
 
             struct tm* t = localtime(&(time_t){time(NULL)});
@@ -355,9 +357,11 @@ void rtc_write(NDS* nds) {
                 (nds->rtc.data[nds->rtc.i - 1] >> nds->rtc.bi) & 1;
         }
 
-        if (++nds->rtc.bi == 8) {
-            nds->rtc.bi = 0;
-            nds->rtc.i++;
+        if (nds->io7.rtc.clk) {
+            if (++nds->rtc.bi == 8) {
+                nds->rtc.bi = 0;
+                nds->rtc.i++;
+            }
         }
     }
 }

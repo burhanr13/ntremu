@@ -75,7 +75,6 @@ void encrypt_securearea(GameCard* card, u32* keys) {
 
 bool card_write_command(GameCard* card, u8* command) {
     if (card->key1mode) {
-
         u8 dec[8];
         for (int i = 0; i < 8; i++) {
             dec[i] = command[7 - i];
@@ -91,11 +90,12 @@ bool card_write_command(GameCard* card, u8* command) {
                 return true;
                 break;
             case 2: {
+                card->state = CARD_SECUREAREA;
                 int block = command[2] >> 4 | command[1] << 4 |
                             (command[0] & 0xf) << 12;
                 card->addr = block << 12;
                 card->i = 0;
-                card->len = 0x1000;
+                card->secure_gap = 0;
                 return true;
                 break;
             }
@@ -164,6 +164,23 @@ bool card_read_data(GameCard* card, u32* data) {
                 card->state = CARD_IDLE;
                 return false;
             }
+        case CARD_SECUREAREA:
+            if (card->secure_gap > 0) {
+                *data = 0;
+                if (--card->secure_gap == 0) {
+                    if (card->i < 0x1000) {
+                        card->state = CARD_IDLE;
+                        return false;
+                    } else return true;
+                }
+                return true;
+            }
+            *data = *(u32*) &card->rom[(card->addr + card->i) % card->rom_size];
+            card->i += 4;
+            if (card->i % 0x200 == 0) {
+                card->secure_gap = 0x18;
+            }
+            return true;
         default:
             return false;
     }
