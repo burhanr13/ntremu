@@ -374,7 +374,7 @@ void* get_vram(NDS* nds, VRAMRegion region, u32 addr) {
             VRAMBank abcd = nds->vramstate.bgA.abcd[(addr >> 17) & 3];
             if (abcd) return &nds->vrambanks[abcd - 1][addr % VRAMABCDSIZE];
             VRAMBank fg =
-                nds->vramstate.bgA.fg[((addr >> 1) & 1) | ((addr >> 15) & 2)];
+                nds->vramstate.bgA.fg[((addr >> 14) & 1) | ((addr >> 15) & 2)];
             if (fg) return &nds->vrambanks[fg - 1][addr % VRAMFGISIZE];
             break;
         }
