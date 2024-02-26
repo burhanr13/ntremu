@@ -55,6 +55,8 @@ typedef struct {
     u8* rom;
     u32 rom_size;
 
+    bool encrypted;
+
     CardState state;
 
     u32 addr;
@@ -81,6 +83,8 @@ typedef struct {
 
 GameCard* create_card(char* filename);
 void destroy_card(GameCard* card);
+
+void encrypt_securearea(GameCard* card, u32* keys);
 
 bool card_write_command(GameCard* card, u8* command);
 bool card_read_data(GameCard* card, u32* data);

@@ -83,6 +83,12 @@ void emulator_quit() {
     free(ntremu.nds);
     free(ntremu.bios7);
     free(ntremu.bios9);
+    FILE* f = fopen("firmware.bin", "wb");
+    if (f) {
+        fwrite(ntremu.firmware, 1, FIRMSIZE, f);
+        fclose(f);
+    }
+    free(ntremu.firmware);
 }
 
 void emulator_reset() {

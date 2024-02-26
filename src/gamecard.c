@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "key1.h"
+
 GameCard* create_card(char* filename) {
     FILE* fp = fopen(filename, "rb");
     if (!fp) return NULL;
@@ -57,10 +59,32 @@ void destroy_card(GameCard* card) {
     free(card);
 }
 
+void encrypt_securearea(GameCard* card, u32* keys) {
+    if (card->encrypted) return;
+    card->encrypted = true;
+
+    memcpy(&card->rom[0x4000], "encryObj", 8);
+
+    init_keycode(*(u32*) &card->rom[0xc], 3, 2, keys);
+    for (int i = 0; i < 0x800; i += 8) {
+        encrypt64((u32*) &card->rom[0x4000 + i]);
+    }
+    init_keycode(*(u32*) &card->rom[0xc], 2, 2, keys);
+    encrypt64((u32*) &card->rom[0x4000]);
+}
+
 bool card_write_command(GameCard* card, u8* command) {
-    // printf("%02x\n", command[0]);
     if (card->key1mode) {
-        // TODO: decrypt the command
+
+        u8 dec[8];
+        for (int i = 0; i < 8; i++) {
+            dec[i] = command[7 - i];
+        }
+        decrypt64((u32*) dec);
+        for (int i = 0; i < 8; i++) {
+            command[i] = dec[7 - i];
+        }
+
         switch (command[0] >> 4) {
             case 1:
                 card->state = CARD_CHIPID;
@@ -75,9 +99,12 @@ bool card_write_command(GameCard* card, u8* command) {
                 return true;
                 break;
             }
+            case 4:
+                return false;
+                break;
             case 0xa:
                 card->key1mode = false;
-                return true;
+                return false;
                 break;
             default:
                 return false;
@@ -85,7 +112,6 @@ bool card_write_command(GameCard* card, u8* command) {
     } else {
         switch (command[0]) {
             case 0x00:
-                return false;
                 card->state = CARD_DATA;
                 card->addr = 0;
                 card->len = 0x200;
@@ -97,7 +123,6 @@ bool card_write_command(GameCard* card, u8* command) {
                 return false;
                 break;
             case 0x90:
-                return false;
                 card->state = CARD_CHIPID;
                 return true;
                 break;

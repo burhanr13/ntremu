@@ -83,6 +83,7 @@ enum {
     KEYINPUT = 0x130,
     KEYCNT = 0x132,
     EXTKEYIN = 0x136,
+    RTC = 0x138,
 
     // ipc control
     IPCSYNC = 0x180,
@@ -456,7 +457,21 @@ typedef struct _IO {
                     u16 unused : 8;
                 };
             } extkeyin;
-            u8 gap15x[IPCSYNC - EXTKEYIN - 2];
+            union {
+                u32 w;
+                struct {
+                    u32 data : 1;
+                    u32 clk : 1;
+                    u32 sel : 1;
+                    u32 unused3 : 1;
+                    u32 data_dir : 1;
+                    u32 clk_dir : 1;
+                    u32 sel_dir : 1;
+                    u32 unused3_dir : 1;
+                    u32 unused : 24;
+                };
+            } rtc;
+            u8 gap15x[IPCSYNC - RTC - 4];
             union {
                 u32 w;
                 struct {

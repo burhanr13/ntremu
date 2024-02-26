@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bus7.h"
+#include "bus9.h"
 #include "ppu.h"
 
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
@@ -105,6 +106,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     nds->wifi_bb_regs[0] = 0x6d;
 
     if (bootbios) {
+        encrypt_securearea(card, (u32*) &bios7[0x30]);
+
         cpu7_handle_interrupt(&nds->cpu7, I_RESET);
         cpu9_handle_interrupt(&nds->cpu9, I_RESET);
     } else {
@@ -144,8 +147,10 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 
         memcpy(&nds->ram[0x3ffe00], header, sizeof *header);
 
-        memcpy(&nds->ram[header->arm9_ram_offset % RAMSIZE],
-               &card->rom[header->arm9_rom_offset], header->arm9_size);
+        for (int i = 0; i < header->arm9_size; i += 4) {
+            bus9_write32(nds, header->arm9_ram_offset + i,
+                         *(u32*) &card->rom[header->arm9_rom_offset + i]);
+        }
         nds->cpu9.itcm_virtsize = 0x2000000;
         nds->cpu9.dtcm_base = 0x3000000;
         nds->cpu9.dtcm_virtsize = DTCMSIZE;
@@ -153,14 +158,9 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
         nds->cpu9.cpsr.m = M_SYSTEM;
         cpu9_flush(&nds->cpu9);
 
-        if (header->arm7_ram_offset >> 24 == 3) {
-            for (int i = 0; i < header->arm7_size; i += 4) {
-                bus7_write32(nds, header->arm7_ram_offset + i,
-                             *(u32*) &card->rom[header->arm7_rom_offset + i]);
-            }
-        } else {
-            memcpy(&nds->ram[header->arm7_ram_offset % RAMSIZE],
-                   &card->rom[header->arm7_rom_offset], header->arm7_size);
+        for (int i = 0; i < header->arm7_size; i += 4) {
+            bus7_write32(nds, header->arm7_ram_offset + i,
+                         *(u32*) &card->rom[header->arm7_rom_offset + i]);
         }
         nds->cpu7.pc = header->arm7_entry;
         nds->cpu7.cpsr.m = M_SYSTEM;

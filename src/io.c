@@ -68,16 +68,12 @@ u16 io7_read16(IO* io, u32 addr) {
         }
         case AUXSPIDATA: {
             if (io->master->card) {
-                u8 data = io->master->card->spidata;
-                io->master->card->spidata = 0;
-                return data;
+                return io->master->card->spidata;
             } else return 0;
             break;
         }
         case SPIDATA: {
-            u8 data = io->spidata;
-            io->spidata = 0;
-            return data;
+            return io->spidata;
             break;
         }
         default:
@@ -222,9 +218,13 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             io->romctrl.drq = 0;
             if (io->romctrl.busy) {
                 io->romctrl.busy = 0;
+                bool key1com = io->master->card->key1mode;
                 if (card_write_command(io->master->card, io->romcommand)) {
                     io->romctrl.busy = 1;
                     add_event(&io->master->sched, EVENT_CARD_DRQ, 20);
+                } else if (key1com) {
+                    io->ifl.gamecardtrans = 1;
+                    UPDATE_IRQ(7);
                 }
             }
             break;
@@ -593,9 +593,7 @@ u16 io9_read16(IO* io, u32 addr) {
         }
         case AUXSPIDATA: {
             if (io->master->card) {
-                u8 data = io->master->card->spidata;
-                io->master->card->spidata = 0;
-                return data;
+                return io->master->card->spidata;
             } else return 0;
             break;
         }
