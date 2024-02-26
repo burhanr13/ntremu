@@ -1,6 +1,7 @@
 #include "nds.h"
 
 #include <string.h>
+#include <time.h>
 
 #include "bus7.h"
 #include "bus9.h"
@@ -304,6 +305,63 @@ void tsc_spi_write(NDS* nds, u8 data) {
     }
 }
 
+void rtc_write(NDS* nds) {
+    if (!nds->io7.rtc.sel) {
+        nds->rtc.i = 0;
+        nds->rtc.bi = 0;
+        nds->rtc.com = 0;
+        return;
+    }
+    if (nds->io7.rtc.clk) return;
+
+    if (nds->rtc.i == 0) {
+        nds->rtc.com |= nds->io7.rtc.data << nds->rtc.bi;
+        if (++nds->rtc.bi == 8) {
+            nds->rtc.bi = 0;
+            nds->rtc.i++;
+
+            struct tm* t = localtime(&(time_t){time(NULL)});
+            u8 year = (t->tm_year / 10 % 10) << 4 | t->tm_year % 10;
+            u8 month = (t->tm_mon / 10) << 4 | t->tm_mon % 10;
+            u8 day = (t->tm_mday / 10) << 4 | t->tm_mday % 10;
+            u8 wday = (t->tm_wday + 6) % 7;
+            u8 hour = (t->tm_hour % 12 / 10) << 4 | t->tm_hour % 12 % 10;
+            if (t->tm_hour >= 12) hour |= 1 << 6;
+            u8 min = (t->tm_min / 10) << 4 | t->tm_min % 10;
+            u8 sec = (t->tm_sec / 10) << 4 | t->tm_sec % 10;
+
+            switch ((nds->rtc.com >> 4) & 7) {
+                case 2:
+                    nds->rtc.data[0] = year;
+                    nds->rtc.data[1] = month;
+                    nds->rtc.data[2] = day;
+                    nds->rtc.data[3] = wday;
+                    nds->rtc.data[4] = hour;
+                    nds->rtc.data[5] = min;
+                    nds->rtc.data[6] = sec;
+                    break;
+                case 6:
+                    nds->rtc.data[0] = hour;
+                    nds->rtc.data[1] = min;
+                    nds->rtc.data[2] = sec;
+                    break;
+                default:
+                    nds->rtc.data[0] = 0;
+            }
+        }
+    } else {
+        if (nds->rtc.i < 8) {
+            nds->io7.rtc.data =
+                (nds->rtc.data[nds->rtc.i - 1] >> nds->rtc.bi) & 1;
+        }
+
+        if (++nds->rtc.bi == 8) {
+            nds->rtc.bi = 0;
+            nds->rtc.i++;
+        }
+    }
+}
+
 void* get_vram(NDS* nds, VRAMRegion region, u32 addr) {
     switch (region) {
         case VRAMBGA: {
@@ -312,7 +370,7 @@ void* get_vram(NDS* nds, VRAMRegion region, u32 addr) {
             VRAMBank abcd = nds->vramstate.bgA.abcd[(addr >> 17) & 3];
             if (abcd) return &nds->vrambanks[abcd - 1][addr % VRAMABCDSIZE];
             VRAMBank fg =
-                nds->vramstate.bgA.fg[((addr >> 14) & 1) | ((addr >> 15) & 2)];
+                nds->vramstate.bgA.fg[((addr >> 1) & 1) | ((addr >> 15) & 2)];
             if (fg) return &nds->vrambanks[fg - 1][addr % VRAMFGISIZE];
             break;
         }

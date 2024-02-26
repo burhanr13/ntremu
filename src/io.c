@@ -163,6 +163,11 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             break;
         }
         case KEYINPUT:
+        case EXTKEYIN:
+            break;
+        case RTC:
+            io->rtc.w = data;
+            rtc_write(io->master);
             break;
         case IPCSYNC:
             data &= ~0xf;

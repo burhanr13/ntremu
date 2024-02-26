@@ -183,6 +183,13 @@ typedef struct _NDS {
         u16 data;
     } tsc;
 
+    struct {
+        int i;
+        int bi;
+        u8 com;
+        u8 data[7];
+    } rtc;
+
     GameCard* card;
 
     u32 ipcfifo7to9[16];
@@ -209,6 +216,7 @@ bool nds_step(NDS* nds);
 
 void firmware_spi_write(NDS* nds, u8 data, bool hold);
 void tsc_spi_write(NDS* nds, u8 data);
+void rtc_write(NDS* nds);
 
 u8 vram_read8(NDS* nds, VRAMRegion region, u32 addr);
 u16 vram_read16(NDS* nds, VRAMRegion region, u32 addr);
