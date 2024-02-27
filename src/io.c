@@ -40,6 +40,8 @@ void io7_write8(IO* io, u32 addr, u8 data) {
 }
 
 u16 io7_read16(IO* io, u32 addr) {
+    if (AUXSPICNT <= addr && addr <= SEED1HI && !io->exmemcnt.ndscardrights)
+        return 0;
     if (addr >= IO_SIZE) {
         if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2 ||
             addr == GAMECARDIN || addr == GAMECARDIN + 2) {
@@ -82,6 +84,8 @@ u16 io7_read16(IO* io, u32 addr) {
 }
 
 void io7_write16(IO* io, u32 addr, u16 data) {
+    if (AUXSPICNT <= addr && addr <= SEED1HI && !io->exmemcnt.ndscardrights)
+        return;
     if (addr >= IO_SIZE) {
         addr &= ~0x8000;
         if (WIFI_OFF <= addr && addr < WIFI_OFF + WIFIIOSIZE) {
@@ -323,6 +327,8 @@ u32 io7_read32(IO* io, u32 addr) {
             }
             break;
         case GAMECARDIN: {
+            if (!io->exmemcnt.ndscardrights) return -1;
+
             u32 data = -1;
             if (io->romctrl.drq) {
                 io->romctrl.drq = 0;
@@ -577,6 +583,8 @@ void io9_write8(IO* io, u32 addr, u8 data) {
 }
 
 u16 io9_read16(IO* io, u32 addr) {
+    if (AUXSPICNT <= addr && addr <= SEED1HI && io->exmemcnt.ndscardrights)
+        return 0;
     if (addr >= IO_SIZE) {
         if (addr == IPCFIFORECV || addr == IPCFIFORECV + 2 ||
             addr == GAMECARDIN || addr == GAMECARDIN + 2) {
@@ -608,6 +616,8 @@ u16 io9_read16(IO* io, u32 addr) {
 }
 
 void io9_write16(IO* io, u32 addr, u16 data) {
+    if (AUXSPICNT <= addr && addr <= SEED1HI && io->exmemcnt.ndscardrights)
+        return;
     if (addr >= IO_SIZE) return;
     if (VRAMCNT_A <= addr && addr <= VRAMCNT_I) {
         io9_write8(io, addr, data & 0xff);
@@ -836,6 +846,8 @@ u32 io9_read32(IO* io, u32 addr) {
             }
             break;
         case GAMECARDIN: {
+            if (io->exmemcnt.ndscardrights) return -1;
+
             u32 data = -1;
             if (io->romctrl.drq) {
                 io->romctrl.drq = 0;

@@ -36,16 +36,19 @@ int run_next_event(Scheduler* sched) {
     } else if (e.type == EVENT_LCD_HBLANK) {
         lcd_hblank(sched->master);
     } else if (e.type == EVENT_CARD_DRQ) {
-        sched->master->io7.romctrl.drq = 1;
-        for (int i = 0; i < 4; i++) {
-            if (sched->master->io7.dma[i].cnt.mode == DMA7_DSCARD) {
-                dma7_activate(&sched->master->dma7, i);
+        if (sched->master->io7.exmemcnt.ndscardrights) {
+            sched->master->io7.romctrl.drq = 1;
+            for (int i = 0; i < 4; i++) {
+                if (sched->master->io7.dma[i].cnt.mode == DMA7_DSCARD) {
+                    dma7_activate(&sched->master->dma7, i);
+                }
             }
-        }
-        sched->master->io9.romctrl.drq = 1;
-        for (int i = 0; i < 4; i++) {
-            if (sched->master->io9.dma[i].cnt.mode == DMA9_DSCARD) {
-                dma9_activate(&sched->master->dma9, i);
+        } else {
+            sched->master->io9.romctrl.drq = 1;
+            for (int i = 0; i < 4; i++) {
+                if (sched->master->io9.dma[i].cnt.mode == DMA9_DSCARD) {
+                    dma9_activate(&sched->master->dma9, i);
+                }
             }
         }
     } else if (e.type < EVENT_TM09_RELOAD) {
