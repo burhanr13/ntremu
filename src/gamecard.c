@@ -63,6 +63,8 @@ void encrypt_securearea(GameCard* card, u32* keys) {
     if (card->encrypted) return;
     card->encrypted = true;
 
+    if (card->rom_size < 0x4800) return;
+
     memcpy(&card->rom[0x4000], "encryObj", 8);
 
     init_keycode(*(u32*) &card->rom[0xc], 3, 2, keys);
