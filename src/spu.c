@@ -68,7 +68,7 @@ void spu_tick_channel(SPU* spu, int i) {
                 data &= 0xf;
             }
 
-            float diff = ((data & 7) * 2 + 1) * adpcm_table[spu->adpcm_idx[i]];
+            float diff = ((data & 7) * 2 + 1) * adpcm_table[spu->adpcm_idx[i]] / 8;
             cur_sample = spu->adpcm_sample[i];
             if (data & 8) {
                 cur_sample -= diff;
