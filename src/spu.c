@@ -185,10 +185,8 @@ void spu_sample(SPU* spu) {
             spu->mixer_sample[0] += spu->channel_samples[i][0];
             spu->mixer_sample[1] += spu->channel_samples[i][1];
         }
-        CLAMP_SAMPLE(spu->mixer_sample[0]);
-        CLAMP_SAMPLE(spu->mixer_sample[1]);
 
-        float l_sample = spu->mixer_sample[0], r_sample = spu->mixer_sample[1];
+        float l_sample = 0, r_sample = 0;
         switch (spu->master->io7.soundcnt.left) {
             case 0:
                 l_sample = spu->mixer_sample[0];
@@ -224,6 +222,9 @@ void spu_sample(SPU* spu) {
 
         l_sample *= spu->master->io7.soundcnt.volume / (float) 128;
         r_sample *= spu->master->io7.soundcnt.volume / (float) 128;
+
+        CLAMP_SAMPLE(l_sample);
+        CLAMP_SAMPLE(r_sample);
 
         spu->sample_buf[spu->sample_idx++] = l_sample;
         spu->sample_buf[spu->sample_idx++] = r_sample;
