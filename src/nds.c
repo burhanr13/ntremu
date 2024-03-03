@@ -106,6 +106,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     *(u16*) &nds->wifi_io[0x03c] = 0x0200;
     nds->wifi_bb_regs[0] = 0x6d;
 
+    nds->next_vblank = NDS_SCREEN_H * DOTS_W * 6;
+
     if (bootbios) {
         encrypt_securearea(card, (u32*) &bios7[0x30]);
 

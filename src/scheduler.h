@@ -47,6 +47,7 @@ static inline bool event_pending(Scheduler* sched) {
 
 void add_event(Scheduler* sched, EventType t, u64 time);
 void remove_event(Scheduler* sched, EventType t);
+u64 find_event(Scheduler* sched, EventType t);
 
 void print_scheduled_events(Scheduler* sched);
 

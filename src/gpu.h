@@ -175,6 +175,7 @@ typedef struct {
     u8 cmd_fifosize;
     u8 param_fifosize;
     u8 params_pending;
+    bool blocked;
 
     mat4 projmtx;
     mat4 projmtx_stk[1];
@@ -233,6 +234,7 @@ typedef struct {
 
 void gxfifo_write(GPU* gpu, u32 command);
 void gxcmd_execute(GPU* gpu);
+void gxcmd_execute_all(GPU* gpu);
 
 void update_mtxs(GPU* gpu);
 

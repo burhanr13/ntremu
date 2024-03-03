@@ -22,6 +22,11 @@ const int cmd_parms[8][16] = {{0},
 const int texformat_bpp[8] = {0, 8, 2, 4, 8, 2, 8, 16};
 
 void gxfifo_write(GPU* gpu, u32 command) {
+    if (gpu->master->io9.gxstat.gxfifo_size == 256) {
+        gpu->master->sched.now = gpu->master->next_vblank;
+        run_to_present(&gpu->master->sched);
+    }
+
     if (gpu->params_pending) {
         gpu->param_fifo[gpu->param_fifosize++] = command;
         gpu->params_pending--;
@@ -41,10 +46,8 @@ void gxfifo_write(GPU* gpu, u32 command) {
         }
     }
 
-    if (!gpu->params_pending) {
-        while (gpu->cmd_fifosize) {
-            gxcmd_execute(gpu);
-        }
+    if (!gpu->blocked) {
+        gxcmd_execute_all(gpu);
     }
 
     gpu->master->io9.gxstat.gxfifo_empty =
@@ -55,6 +58,14 @@ void gxfifo_write(GPU* gpu, u32 command) {
                                    gpu->master->io9.gxstat.gxfifo_empty) ||
                                   (gpu->master->io9.gxstat.irq_half &&
                                    gpu->master->io9.gxstat.gxfifo_half);
+}
+
+void gxcmd_execute_all(GPU* gpu) {
+    if (!gpu->params_pending) {
+        while (gpu->cmd_fifosize) {
+            gxcmd_execute(gpu);
+        }
+    }
 }
 
 void matmul(mat4* dst, mat4* src) {
@@ -831,10 +842,7 @@ void gxcmd_execute(GPU* gpu) {
         case END_VTXS:
             break;
         case SWAP_BUFFERS:
-            gpu_render(gpu);
-            gpu->n_verts = 0;
-            gpu->n_polys = 0;
-            gpu->master->io9.ram_count.w = 0;
+            gpu->blocked = true;
             gpu->w_buffer = gpu->param_fifo[0] & 2;
             break;
         case VIEWPORT: {
@@ -1433,4 +1441,8 @@ void gpu_render(GPU* gpu) {
             render_polygon(gpu, &gpu->polygonram[i]);
         }
     }
+
+    gpu->n_verts = 0;
+    gpu->n_polys = 0;
+    gpu->master->io9.ram_count.w = 0;
 }

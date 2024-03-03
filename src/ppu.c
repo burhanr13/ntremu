@@ -952,6 +952,16 @@ void lcd_hdraw(NDS* nds) {
     ppu_check_window(&nds->ppuB);
 
     if (nds->io7.vcount < NDS_SCREEN_H) {
+        if(nds->io7.vcount == 0) {
+            if (nds->io9.powcnt.screenswap) {
+                nds->ppuA.screen = nds->screen_top;
+                nds->ppuB.screen = nds->screen_bottom;
+            } else {
+                nds->ppuA.screen = nds->screen_bottom;
+                nds->ppuB.screen = nds->screen_top;
+            }
+        }
+
         draw_scanline(&nds->ppuA);
         draw_scanline(&nds->ppuB);
 
@@ -1005,12 +1015,10 @@ void lcd_vblank(NDS* nds) {
     ppu_vblank(&nds->ppuA);
     ppu_vblank(&nds->ppuB);
 
-    if (nds->io9.powcnt.screenswap) {
-        nds->ppuA.screen = nds->screen_top;
-        nds->ppuB.screen = nds->screen_bottom;
-    } else {
-        nds->ppuA.screen = nds->screen_bottom;
-        nds->ppuB.screen = nds->screen_top;
+    if(nds->gpu.blocked) {
+        nds->gpu.blocked = false;
+        gpu_render(&nds->gpu);
+        gxcmd_execute_all(&nds->gpu);
     }
 
     for (int i = 0; i < 4; i++) {
@@ -1023,6 +1031,8 @@ void lcd_vblank(NDS* nds) {
             dma9_activate(&nds->dma9, i);
         }
     }
+
+    nds->next_vblank = nds->sched.now + LINES_H * DOTS_W * 6;
 }
 
 void ppu_hblank(PPU* ppu) {

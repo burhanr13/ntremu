@@ -89,11 +89,20 @@ void remove_event(Scheduler* sched, EventType t) {
     }
 }
 
+u64 find_event(Scheduler* sched, EventType t) {
+    for (int i = 0; i < sched->n_events; i++) {
+        if (sched->event_queue[i].type == t) {
+            return sched->event_queue[i].time;
+        }
+    }
+    return -1;
+}
+
 void print_scheduled_events(Scheduler* sched) {
     static char* event_names[EVENT_MAX] = {
-        "Force Sync",   "LCD HDraw",    "LCD HBlank",   "GameCard DRQ",
-        "TM0-7 Reload", "TM1-7 Reload", "TM2-7 Reload", "TM3-7 Reload",
-        "TM0-9 Reload", "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload"};
+        "LCD HDraw",    "LCD HBlank",   "GameCard DRQ", "TM0-7 Reload",
+        "TM1-7 Reload", "TM2-7 Reload", "TM3-7 Reload", "TM0-9 Reload",
+        "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload", "SPU Sample"};
 
     printf("Now: %ld\n", sched->now);
     for (int i = 0; i < sched->n_events; i++) {
