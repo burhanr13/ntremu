@@ -725,7 +725,7 @@ void compose_lines(PPU* ppu) {
                 if (g1 > 31) g1 = 31;
                 b1 = (eva * b1 + evb * b2) / 16;
                 if (b1 > 31) b1 = 31;
-                ppu->screen[ppu->ly][x] = (b1 << 10) | (g1 << 5) | r1;
+                ppu->cur_line[x] = (b1 << 10) | (g1 << 5) | r1;
             } else if ((ppu->io->bldcnt.target1 & (1 << layers[0])) &&
                        (!win_ena || ppu->io->wincnt[win].effects_enable)) {
                 u8 r1 = color1 & 0x1f;
