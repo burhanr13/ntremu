@@ -25,13 +25,7 @@ int run_next_event(Scheduler* sched) {
     }
     sched->now = e.time;
 
-    if (e.type == EVENT_FORCESYNC) {
-        if (sched->master->halt7 || sched->master->cpu9.halt) {
-            add_event(sched, EVENT_FORCESYNC, sched->event_queue[0].time + 32);
-        } else {
-            add_event(sched, EVENT_FORCESYNC, sched->now + 32);
-        }
-    } else if (e.type == EVENT_LCD_HDRAW) {
+    if (e.type == EVENT_LCD_HDRAW) {
         lcd_hdraw(sched->master);
     } else if (e.type == EVENT_LCD_HBLANK) {
         lcd_hblank(sched->master);

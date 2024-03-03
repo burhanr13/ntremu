@@ -170,7 +170,6 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 
     lcd_hdraw(nds);
     spu_sample(&nds->spu);
-    add_event(&nds->sched, EVENT_FORCESYNC, 32);
 }
 
 bool nds_step(NDS* nds) {

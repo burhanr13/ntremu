@@ -4,7 +4,6 @@
 #include "types.h"
 
 typedef enum {
-    EVENT_FORCESYNC,
     EVENT_LCD_HDRAW,
     EVENT_LCD_HBLANK,
     EVENT_CARD_DRQ,
