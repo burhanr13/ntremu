@@ -4,6 +4,7 @@
 *.bin.*
 roms
 build
+release
 
 ntremu*
 
