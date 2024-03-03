@@ -65,6 +65,8 @@ enum {
 
 enum { TEXTF_NONE, TEXTF_TEXCOORD, TEXTF_NORMAL, TEXTF_VTX };
 
+enum { POLYMODE_MOD, POLYMODE_DECAL, POLYMODE_TOON, POLYMODE_SHADOW };
+
 typedef union {
     u32 w;
     struct {

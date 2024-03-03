@@ -19,8 +19,6 @@ const int cmd_parms[8][16] = {{0},
                               {1},
                               {3, 2, 1}};
 
-const int texformat_bpp[8] = {0, 8, 2, 4, 8, 2, 8, 16};
-
 void gxfifo_write(GPU* gpu, u32 command) {
     if (gpu->master->io9.gxstat.gxfifo_size == 256) {
         gpu->master->sched.now = gpu->master->next_vblank;
@@ -1140,7 +1138,7 @@ void render_polygon(GPU* gpu, poly* p) {
         return;
     }
 
-    if (p->attr.mode == 3) return;
+    if (p->attr.mode == POLYMODE_SHADOW) return;
 
     int yMin = NDS_SCREEN_H;
     int yMax = -1;
@@ -1350,14 +1348,55 @@ void render_polygon(GPU* gpu, poly* p) {
                         else gpu->depth_buf[y][x] = i.z;
                     }
 
-                    u16 c = 0x8000;
-                    c |= (u16) (i.r / i.w * (color & 0x1f) / 32) & 0x1f;
-                    c |= ((u16) (i.g / i.w * ((color >> 5) & 0x1f) / 32) & 0x1f)
-                         << 5;
-                    c |=
-                        ((u16) (i.b / i.w * ((color >> 10) & 0x1f) / 32) & 0x1f)
-                        << 10;
-                    gpu->screen[y][x] = c;
+                    u16 tr = color & 0x1f;
+                    u16 tg = color >> 5 & 0x1f;
+                    u16 tb = color >> 10 & 0x1f;
+
+                    u16 r = 0, g = 0, b = 0, a = 0;
+                    switch (p->attr.mode) {
+                        case POLYMODE_MOD:
+                            r = ((i.r / i.w + 1) * (tr + 1) - 1) / 32;
+                            g = ((i.g / i.w + 1) * (tg + 1) - 1) / 32;
+                            b = ((i.b / i.w + 1) * (tb + 1) - 1) / 32;
+                            a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
+                            break;
+                        case POLYMODE_DECAL:
+                            r = (tr * alpha) + (i.r / i.w * (31 - alpha)) / 32;
+                            g = (tg * alpha) + (i.g / i.w * (31 - alpha)) / 32;
+                            b = (tb * alpha) + (i.b / i.w * (31 - alpha)) / 32;
+                            a = p->attr.alpha;
+                            break;
+                        case POLYMODE_TOON: {
+                            u16 tooncolor =
+                                gpu->master->io9.toon_table[(int) (i.r / i.w)];
+                            u16 shr = tooncolor & 0x1f;
+                            u16 shg = tooncolor >> 5 & 0x1f;
+                            u16 shb = tooncolor >> 10 & 0x1f;
+                            r = ((shr + 1) * (tr + 1) - 1) / 32;
+                            g = ((shg + 1) * (tg + 1) - 1) / 32;
+                            b = ((shb + 1) * (tb + 1) - 1) / 32;
+                            a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
+                            if (gpu->master->io9.disp3dcnt.shading_mode) {
+                                r += shr;
+                                if (r > 31) r = 31;
+                                g += shg;
+                                if (g > 31) g = 31;
+                                b += shb;
+                                if (b > 31) b = 31;
+                            }
+                            break;
+                        }
+                    }
+                    if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
+                        (gpu->screen[y][x] & (1 << 15))) {
+                        u16 sr = gpu->screen[y][x] & 0x1f;
+                        u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
+                        u16 sb = gpu->screen[y][x] >> 10 & 0x1f;
+                        r = (r * a + sr * (31 - a)) / 32;
+                        g = (g * a + sg * (31 - a)) / 32;
+                        b = (b * a + sb * (31 - a)) / 32;
+                    }
+                    gpu->screen[y][x] = r | g << 5 | b << 10 | 1 << 15;
                 }
             }
         }

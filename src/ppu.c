@@ -900,7 +900,7 @@ void ppu_check_window(PPU* ppu) {
 void lcd_capture_line(NDS* nds) {
     int w = DISPCAPLAYOUT[nds->io9.dispcapcnt.size][0];
 
-    u16* source = NULL;
+    u16* source = nds->ppuA.cur_line;
     switch (nds->io9.dispcapcnt.source) {
         case 0:
             source = nds->io9.dispcapcnt.srcA ? nds->gpu.screen[nds->io7.vcount]
