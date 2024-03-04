@@ -252,7 +252,7 @@ void update_input_freecam() {
         m.p[1][1] = 1;
         m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[2][3] = speed;
+        m.p[1][3] = -speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
@@ -263,29 +263,31 @@ void update_input_freecam() {
         m.p[1][1] = 1;
         m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[2][3] = -speed;
+        m.p[1][3] = speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_Q]) {
         mat4 m = {0};
-        m.p[0][0] = 1;
-        m.p[1][1] = 1;
-        m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[1][3] = speed;
+        m.p[0][0] = 1;
+        m.p[1][1] = cosf(ROTATE_SPEED);
+        m.p[1][2] = -sinf(ROTATE_SPEED);
+        m.p[2][1] = sinf(ROTATE_SPEED);
+        m.p[2][2] = cosf(ROTATE_SPEED);
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_E]) {
         mat4 m = {0};
-        m.p[0][0] = 1;
-        m.p[1][1] = 1;
-        m.p[2][2] = 1;
         m.p[3][3] = 1;
-        m.p[1][3] = -speed;
+        m.p[0][0] = 1;
+        m.p[1][1] = cosf(-ROTATE_SPEED);
+        m.p[1][2] = -sinf(-ROTATE_SPEED);
+        m.p[2][1] = sinf(-ROTATE_SPEED);
+        m.p[2][2] = cosf(-ROTATE_SPEED);
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
@@ -338,24 +340,22 @@ void update_input_freecam() {
     }
     if (keys[SDL_SCANCODE_UP]) {
         mat4 m = {0};
-        m.p[3][3] = 1;
         m.p[0][0] = 1;
-        m.p[1][1] = cosf(-ROTATE_SPEED);
-        m.p[1][2] = -sinf(-ROTATE_SPEED);
-        m.p[2][1] = sinf(-ROTATE_SPEED);
-        m.p[2][2] = cosf(-ROTATE_SPEED);
+        m.p[1][1] = 1;
+        m.p[2][2] = 1;
+        m.p[3][3] = 1;
+        m.p[2][3] = speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_DOWN]) {
         mat4 m = {0};
-        m.p[3][3] = 1;
         m.p[0][0] = 1;
-        m.p[1][1] = cosf(ROTATE_SPEED);
-        m.p[1][2] = -sinf(ROTATE_SPEED);
-        m.p[2][1] = sinf(ROTATE_SPEED);
-        m.p[2][2] = cosf(ROTATE_SPEED);
+        m.p[1][1] = 1;
+        m.p[2][2] = 1;
+        m.p[3][3] = 1;
+        m.p[2][3] = -speed;
         mat4 tmp;
         matmul2(&m, &freecam_mtx, &tmp);
         freecam_mtx = tmp;
