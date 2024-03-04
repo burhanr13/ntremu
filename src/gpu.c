@@ -1144,8 +1144,6 @@ void render_polygon(GPU* gpu, poly* p) {
         return;
     }
 
-    if (p->attr.mode == POLYMODE_SHADOW) return;
-
     int yMin = NDS_SCREEN_H;
     int yMax = -1;
     for (int i = 0; i < p->n; i++) {
@@ -1199,7 +1197,12 @@ void render_polygon(GPU* gpu, poly* p) {
                 if (gpu->w_buffer) depth_test = i.w > gpu->depth_buf[y][x];
                 else depth_test = i.z < gpu->depth_buf[y][x];
             }
-            if (!depth_test) continue;
+            if (!depth_test) {
+                if (!p->attr.id && p->attr.mode == POLYMODE_SHADOW) {
+                    gpu->stencil_buf[y][x] = true;
+                }
+                continue;
+            }
 
             u16 color = 0xffff;
             u8 alpha = 31;
@@ -1378,6 +1381,21 @@ void render_polygon(GPU* gpu, poly* p) {
                         if (b > 31) b = 31;
                     }
                     break;
+                    case POLYMODE_SHADOW:
+                        if (p->attr.id) {
+                            if (!gpu->stencil_buf[y][x]) continue;
+                            if (gpu->polyid_buf[y][x] == p->attr.id) continue;
+                            if (!(gpu->master->io9.disp3dcnt.texture &&
+                                  p->texparam.format))
+                                alpha = 0;
+                            r = (tr * alpha) + (i.r / i.w * (31 - alpha)) / 32;
+                            g = (tg * alpha) + (i.g / i.w * (31 - alpha)) / 32;
+                            b = (tb * alpha) + (i.b / i.w * (31 - alpha)) / 32;
+                            a = p->attr.alpha;
+                        } else {
+                            continue;
+                        }
+                        break;
                 }
             }
 
@@ -1389,7 +1407,6 @@ void render_polygon(GPU* gpu, poly* p) {
             if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
                 (gpu->screen[y][x] & (1 << 15))) {
                 if (gpu->polyid_buf[y][x] == p->attr.id) continue;
-                gpu->polyid_buf[y][x] = p->attr.id;
                 u16 sr = gpu->screen[y][x] & 0x1f;
                 u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
                 u16 sb = gpu->screen[y][x] >> 10 & 0x1f;
@@ -1397,6 +1414,7 @@ void render_polygon(GPU* gpu, poly* p) {
                 g = (g * a + sg * (31 - a)) / 32;
                 b = (b * a + sb * (31 - a)) / 32;
             }
+            gpu->polyid_buf[y][x] = p->attr.id;
             gpu->screen[y][x] = r | g << 5 | b << 10 | 1 << 15;
         }
     }
@@ -1416,6 +1434,7 @@ void gpu_render(GPU* gpu) {
                 if (gpu->w_buffer) depth = 1 / depth;
                 gpu->depth_buf[y][x] = depth;
                 gpu->polyid_buf[y][x] = gpu->master->io9.clear_color.id;
+                gpu->stencil_buf[y][x] = false;
             }
         }
     } else {
@@ -1430,6 +1449,7 @@ void gpu_render(GPU* gpu) {
                 gpu->screen[y][x] = clear_color;
                 gpu->depth_buf[y][x] = clear_depth;
                 gpu->polyid_buf[y][x] = gpu->master->io9.clear_color.id;
+                gpu->stencil_buf[y][x] = false;
             }
         }
     }
