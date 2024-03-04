@@ -918,11 +918,13 @@ void lcd_capture_line(NDS* nds) {
                                               : nds->ppuA.cur_line;
             break;
     }
-    u16* dest = (u16*) &nds->vrambanks[nds->io9.dispcapcnt.vram_w_block]
-                                      [0x8000 * nds->io9.dispcapcnt.vram_w_off +
-                                       2 * NDS_SCREEN_W * nds->io7.vcount];
-
-    memcpy(dest, source, 2 * w);
+    u32 dest_addr = 0x8000 * nds->io9.dispcapcnt.vram_w_off +
+                    2 * NDS_SCREEN_W * nds->io7.vcount;
+    if (dest_addr >= 0x20000) return;
+    int len = 0x20000 - dest_addr;
+    if (len > 2 * w) len = 2 * w;
+    memcpy(&nds->vrambanks[nds->io9.dispcapcnt.vram_w_block][dest_addr], source,
+           len);
 }
 
 void lcd_hdraw(NDS* nds) {
@@ -952,7 +954,7 @@ void lcd_hdraw(NDS* nds) {
     ppu_check_window(&nds->ppuB);
 
     if (nds->io7.vcount < NDS_SCREEN_H) {
-        if(nds->io7.vcount == 0) {
+        if (nds->io7.vcount == 0) {
             if (nds->io9.powcnt.screenswap) {
                 nds->ppuA.screen = nds->screen_top;
                 nds->ppuB.screen = nds->screen_bottom;
@@ -1015,7 +1017,7 @@ void lcd_vblank(NDS* nds) {
     ppu_vblank(&nds->ppuA);
     ppu_vblank(&nds->ppuB);
 
-    if(nds->gpu.blocked) {
+    if (nds->gpu.blocked) {
         nds->gpu.blocked = false;
         gpu_render(&nds->gpu);
         gxcmd_execute_all(&nds->gpu);
