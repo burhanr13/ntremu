@@ -1,6 +1,7 @@
 #include "gpu.h"
 
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "io.h"
@@ -350,6 +351,14 @@ void add_vtx(GPU* gpu) {
             }
         }
     }
+}
+
+int cmp_poly(const void* a, const void* b) {
+    const poly* p1 = a;
+    const poly* p2 = b;
+    float y1 = p1->p[0]->v.p[1];
+    float y2 = p2->p[0]->v.p[1];
+    return y1 > y2 ? 1 : y1 < y2 ? -1 : 0;
 }
 
 void gxcmd_execute(GPU* gpu) {
@@ -840,8 +849,12 @@ void gxcmd_execute(GPU* gpu) {
         case END_VTXS:
             break;
         case SWAP_BUFFERS:
+            if(gpu->autosort) {
+                qsort(gpu->polygonram, gpu->n_polys, sizeof(poly), cmp_poly);
+            }
             gpu->blocked = true;
             gpu->w_buffer = gpu->param_fifo[0] & 2;
+            gpu->autosort = !(gpu->param_fifo[0] & 1);
             break;
         case VIEWPORT: {
             int x0, y0, x1, y1;
@@ -1343,11 +1356,6 @@ void render_polygon(GPU* gpu, poly* p) {
                     }
                     if (!alpha) continue;
 
-                    if (alpha == 31 || p->attr.depth_transparent) {
-                        if (gpu->w_buffer) gpu->depth_buf[y][x] = i.w;
-                        else gpu->depth_buf[y][x] = i.z;
-                    }
-
                     u16 tr = color & 0x1f;
                     u16 tg = color >> 5 & 0x1f;
                     u16 tb = color >> 10 & 0x1f;
@@ -1387,6 +1395,12 @@ void render_polygon(GPU* gpu, poly* p) {
                             break;
                         }
                     }
+
+                    if (a == 31 || p->attr.depth_transparent) {
+                        if (gpu->w_buffer) gpu->depth_buf[y][x] = i.w;
+                        else gpu->depth_buf[y][x] = i.z;
+                    }
+
                     if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
                         (gpu->screen[y][x] & (1 << 15))) {
                         u16 sr = gpu->screen[y][x] & 0x1f;
@@ -1441,6 +1455,8 @@ void render_polygon(GPU* gpu, poly* p) {
     }
 }
 
+#define IS_SEMITRANS(p) (p.attr.alpha < 31 || p.texparam.format == TEX_A3I5 || p.texparam.format == TEX_A5I3)
+
 void gpu_render(GPU* gpu) {
     if (gpu->master->io9.disp3dcnt.rearplane_mode) {
         for (int y = 0; y < NDS_SCREEN_H; y++) {
@@ -1477,7 +1493,12 @@ void gpu_render(GPU* gpu) {
         }
     } else {
         for (int i = 0; i < gpu->n_polys; i++) {
-            render_polygon(gpu, &gpu->polygonram[i]);
+            if (!IS_SEMITRANS(gpu->polygonram[i]))
+                render_polygon(gpu, &gpu->polygonram[i]);
+        }
+        for (int i = 0; i < gpu->n_polys; i++) {
+            if(IS_SEMITRANS(gpu->polygonram[i]))
+                render_polygon(gpu, &gpu->polygonram[i]);
         }
     }
 

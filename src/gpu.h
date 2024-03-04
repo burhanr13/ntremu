@@ -226,6 +226,7 @@ typedef struct {
     u32 cur_pltt_base;
 
     bool w_buffer;
+    bool autosort;
 
     int view_x;
     int view_y;
