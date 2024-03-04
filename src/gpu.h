@@ -151,6 +151,7 @@ typedef struct {
     PolygonAttr attr;
     TexParam texparam;
     u32 pltt_base;
+    float y;
 } poly;
 
 struct interp_attrs {
@@ -224,6 +225,8 @@ typedef struct {
 
     TexParam cur_texparam;
     u32 cur_pltt_base;
+
+    float cur_y;
 
     bool w_buffer;
     bool autosort;

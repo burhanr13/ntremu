@@ -248,6 +248,7 @@ bool add_poly(GPU* gpu, int n_orig, bool strip) {
     gpu->polygonram[gpu->n_polys].attr = gpu->cur_attr;
     gpu->polygonram[gpu->n_polys].texparam = gpu->cur_texparam;
     gpu->polygonram[gpu->n_polys].pltt_base = gpu->cur_pltt_base;
+    gpu->polygonram[gpu->n_polys].y = gpu->cur_y;
     gpu->n_polys++;
 
     gpu->master->io9.ram_count.n_verts = gpu->n_verts;
@@ -271,6 +272,8 @@ void add_vtx(GPU* gpu) {
         gpu->cur_vtx.vt.p[0] += s;
         gpu->cur_vtx.vt.p[1] += t;
     }
+
+    gpu->cur_y = gpu->cur_vtx.v.p[1];
 
     vertex v = gpu->cur_vtx;
     vecmul(&gpu->clipmtx, &v.v);
@@ -356,8 +359,8 @@ void add_vtx(GPU* gpu) {
 int cmp_poly(const void* a, const void* b) {
     const poly* p1 = a;
     const poly* p2 = b;
-    float y1 = p1->p[0]->v.p[1];
-    float y2 = p2->p[0]->v.p[1];
+    float y1 = p1->y;
+    float y2 = p2->y;
     return y1 > y2 ? 1 : y1 < y2 ? -1 : 0;
 }
 
@@ -849,9 +852,9 @@ void gxcmd_execute(GPU* gpu) {
         case END_VTXS:
             break;
         case SWAP_BUFFERS:
-            if(gpu->autosort) {
-                qsort(gpu->polygonram, gpu->n_polys, sizeof(poly), cmp_poly);
-            }
+            // if(gpu->autosort) {
+            //     qsort(gpu->polygonram, gpu->n_polys, sizeof(poly), cmp_poly);
+            // }
             gpu->blocked = true;
             gpu->w_buffer = gpu->param_fifo[0] & 2;
             gpu->autosort = !(gpu->param_fifo[0] & 1);
@@ -1185,7 +1188,7 @@ void render_polygon(GPU* gpu, poly* p) {
         if (format == TEX_2BPP) palbase >>= 1;
 
         for (int y = yMin; y < yMax; y++) {
-            int h = right[y].x - left[y].x;
+            int h = right[y].x - left[y].x + 1;
 
             struct interp_attrs i = left[y];
             struct interp_attrs di;
