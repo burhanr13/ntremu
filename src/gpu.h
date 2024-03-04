@@ -169,6 +169,7 @@ typedef struct {
 
     float depth_buf[NDS_SCREEN_H][NDS_SCREEN_W];
     u8 polyid_buf[NDS_SCREEN_H][NDS_SCREEN_W];
+    bool blended[NDS_SCREEN_H][NDS_SCREEN_W];
     bool stencil_buf[NDS_SCREEN_H][NDS_SCREEN_W];
 
     u8* texram[4];
