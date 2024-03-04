@@ -151,7 +151,6 @@ typedef struct {
     PolygonAttr attr;
     TexParam texparam;
     u32 pltt_base;
-    float y;
 } poly;
 
 struct interp_attrs {
@@ -169,6 +168,7 @@ typedef struct {
     u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
 
     float depth_buf[NDS_SCREEN_H][NDS_SCREEN_W];
+    u8 polyid_buf[NDS_SCREEN_H][NDS_SCREEN_W];
 
     u8* texram[4];
     u16* texpal[6];
@@ -225,8 +225,6 @@ typedef struct {
 
     TexParam cur_texparam;
     u32 cur_pltt_base;
-
-    float cur_y;
 
     bool w_buffer;
     bool autosort;

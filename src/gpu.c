@@ -7,6 +7,10 @@
 #include "io.h"
 #include "nds.h"
 
+#define IS_SEMITRANS(p)                                                        \
+    ((p).attr.alpha < 31 || (p).texparam.format == TEX_A3I5 ||                 \
+     (p).texparam.format == TEX_A5I3)
+
 extern bool wireframe;
 extern bool freecam;
 extern mat4 freecam_mtx;
@@ -248,7 +252,6 @@ bool add_poly(GPU* gpu, int n_orig, bool strip) {
     gpu->polygonram[gpu->n_polys].attr = gpu->cur_attr;
     gpu->polygonram[gpu->n_polys].texparam = gpu->cur_texparam;
     gpu->polygonram[gpu->n_polys].pltt_base = gpu->cur_pltt_base;
-    gpu->polygonram[gpu->n_polys].y = gpu->cur_y;
     gpu->n_polys++;
 
     gpu->master->io9.ram_count.n_verts = gpu->n_verts;
@@ -272,8 +275,6 @@ void add_vtx(GPU* gpu) {
         gpu->cur_vtx.vt.p[0] += s;
         gpu->cur_vtx.vt.p[1] += t;
     }
-
-    gpu->cur_y = gpu->cur_vtx.v.p[1];
 
     vertex v = gpu->cur_vtx;
     vecmul(&gpu->clipmtx, &v.v);
@@ -354,14 +355,6 @@ void add_vtx(GPU* gpu) {
             }
         }
     }
-}
-
-int cmp_poly(const void* a, const void* b) {
-    const poly* p1 = a;
-    const poly* p2 = b;
-    float y1 = p1->y;
-    float y2 = p2->y;
-    return y1 > y2 ? 1 : y1 < y2 ? -1 : 0;
 }
 
 void gxcmd_execute(GPU* gpu) {
@@ -852,9 +845,6 @@ void gxcmd_execute(GPU* gpu) {
         case END_VTXS:
             break;
         case SWAP_BUFFERS:
-            // if(gpu->autosort) {
-            //     qsort(gpu->polygonram, gpu->n_polys, sizeof(poly), cmp_poly);
-            // }
             gpu->blocked = true;
             gpu->w_buffer = gpu->param_fifo[0] & 2;
             gpu->autosort = !(gpu->param_fifo[0] & 1);
@@ -1177,288 +1167,240 @@ void render_polygon(GPU* gpu, poly* p) {
         render_line_attrs(gpu, p->p[i], p->p[next], left, right);
     }
 
-    if (gpu->master->io9.disp3dcnt.texture && p->texparam.format) {
+    u32 base = p->texparam.offset << 3;
+    u32 s_shift = p->texparam.s_size + 3;
+    u32 t_shift = p->texparam.t_size + 3;
+    int format = p->texparam.format;
 
-        u32 base = p->texparam.offset << 3;
-        u32 s_shift = p->texparam.s_size + 3;
-        u32 t_shift = p->texparam.t_size + 3;
-        int format = p->texparam.format;
+    u32 palbase = p->pltt_base << 3;
+    if (format == TEX_2BPP) palbase >>= 1;
 
-        u32 palbase = p->pltt_base << 3;
-        if (format == TEX_2BPP) palbase >>= 1;
+    for (int y = yMin; y < yMax; y++) {
+        int h = right[y].x - left[y].x + 1;
 
-        for (int y = yMin; y < yMax; y++) {
-            int h = right[y].x - left[y].x + 1;
+        struct interp_attrs i = left[y];
+        struct interp_attrs di;
+        di.z = (right[y].z - i.z) / h;
+        di.w = (right[y].w - i.w) / h;
+        di.s = (right[y].s - i.s) / h;
+        di.t = (right[y].t - i.t) / h;
+        di.r = (right[y].r - i.r) / h;
+        di.g = (right[y].g - i.g) / h;
+        di.b = (right[y].b - i.b) / h;
+        for (int x = left[y].x; x <= right[y].x; x++, i.z += di.z, i.w += di.w,
+                 i.s += di.s, i.t += di.t, i.r += di.r, i.g += di.g,
+                 i.b += di.b) {
+            bool depth_test;
+            if (p->attr.depth_test) {
+                if (gpu->w_buffer)
+                    depth_test = fabsf(i.w - gpu->depth_buf[y][x]) <= 0.125f;
+                else depth_test = fabsf(i.z - gpu->depth_buf[y][x]) <= 0.125f;
+            } else {
+                if (gpu->w_buffer) depth_test = i.w > gpu->depth_buf[y][x];
+                else depth_test = i.z < gpu->depth_buf[y][x];
+            }
+            if (!depth_test) continue;
 
-            struct interp_attrs i = left[y];
-            struct interp_attrs di;
-            di.z = (right[y].z - i.z) / h;
-            di.w = (right[y].w - i.w) / h;
-            di.s = (right[y].s - i.s) / h;
-            di.t = (right[y].t - i.t) / h;
-            di.r = (right[y].r - i.r) / h;
-            di.g = (right[y].g - i.g) / h;
-            di.b = (right[y].b - i.b) / h;
-            for (int x = left[y].x; x <= right[y].x; x++, i.z += di.z,
-                     i.w += di.w, i.s += di.s, i.t += di.t, i.r += di.r,
-                     i.g += di.g, i.b += di.b) {
-                bool depth_test;
-                if (p->attr.depth_test) {
-                    if (gpu->w_buffer)
-                        depth_test =
-                            fabsf(i.w - gpu->depth_buf[y][x]) <= 0.125f;
-                    else
-                        depth_test =
-                            fabsf(i.z - gpu->depth_buf[y][x]) <= 0.125f;
+            u16 color = 0xffff;
+            u8 alpha = 31;
+            if (gpu->master->io9.disp3dcnt.texture && p->texparam.format) {
+                s32 ss = i.s / i.w;
+                s32 tt = i.t / i.w;
+                if (p->texparam.s_rep) {
+                    bool flip = p->texparam.s_flip && ((ss >> s_shift) & 1);
+                    ss &= (1 << s_shift) - 1;
+                    if (flip) ss = (1 << s_shift) - 1 - ss;
                 } else {
-                    if (gpu->w_buffer) depth_test = i.w > gpu->depth_buf[y][x];
-                    else depth_test = i.z < gpu->depth_buf[y][x];
+                    if (ss < 0) ss = 0;
+                    if (ss > (1 << s_shift) - 1) ss = (1 << s_shift) - 1;
                 }
-                if (depth_test) {
-                    s32 ss = i.s / i.w;
-                    s32 tt = i.t / i.w;
-                    if (p->texparam.s_rep) {
-                        bool flip = p->texparam.s_flip && ((ss >> s_shift) & 1);
-                        ss &= (1 << s_shift) - 1;
-                        if (flip) ss = (1 << s_shift) - 1 - ss;
-                    } else {
-                        if (ss < 0) ss = 0;
-                        if (ss > (1 << s_shift) - 1) ss = (1 << s_shift) - 1;
-                    }
-                    if (p->texparam.t_rep) {
-                        bool flip = p->texparam.t_flip && ((tt >> t_shift) & 1);
-                        tt &= (1 << t_shift) - 1;
-                        if (flip) tt = (1 << t_shift) - 1 - tt;
-                    } else {
-                        if (tt < 0) tt = 0;
-                        if (tt > (1 << t_shift) - 1) tt = (1 << t_shift) - 1;
-                    }
-                    u32 ofs = (tt << s_shift) + ss;
+                if (p->texparam.t_rep) {
+                    bool flip = p->texparam.t_flip && ((tt >> t_shift) & 1);
+                    tt &= (1 << t_shift) - 1;
+                    if (flip) tt = (1 << t_shift) - 1 - tt;
+                } else {
+                    if (tt < 0) tt = 0;
+                    if (tt > (1 << t_shift) - 1) tt = (1 << t_shift) - 1;
+                }
+                u32 ofs = (tt << s_shift) + ss;
 
-                    u16 color = 0;
-                    u8 alpha = 31;
-                    switch (format) {
-                        case TEX_2BPP: {
-                            u32 addr = base + (ofs >> 2);
-                            u8 col_ind =
-                                gpu->texram[addr >> 17][addr & 0x1ffff];
-                            col_ind >>= (ofs & 3) << 1;
-                            col_ind &= 3;
-                            if (!col_ind && p->texparam.color0) alpha = 0;
-                            else {
-                                u32 paladdr = palbase + col_ind;
-                                color = gpu->texpal[paladdr >> 13]
-                                                   [paladdr & 0x1fff];
-                            }
-                            break;
-                        }
-                        case TEX_4BPP: {
-                            u32 addr = base + (ofs >> 1);
-                            u8 col_ind =
-                                gpu->texram[addr >> 17][addr & 0x1ffff];
-                            col_ind >>= (ofs & 1) << 2;
-                            col_ind &= 15;
-                            if (!col_ind && p->texparam.color0) alpha = 0;
-                            else {
-                                u32 paladdr = palbase + col_ind;
-                                color = gpu->texpal[paladdr >> 13]
-                                                   [paladdr & 0x1fff];
-                            }
-                            break;
-                        }
-                        case TEX_8BPP: {
-                            u32 addr = base + ofs;
-                            u8 col_ind =
-                                gpu->texram[addr >> 17][addr & 0x1ffff];
-                            if (!col_ind && p->texparam.color0) alpha = 0;
-                            else {
-                                u32 paladdr = palbase + col_ind;
-                                color = gpu->texpal[paladdr >> 13]
-                                                   [paladdr & 0x1fff];
-                            }
-                            break;
-                        }
-                        case TEX_A3I5: {
-                            u32 addr = base + ofs;
-                            u8 col_ind =
-                                gpu->texram[addr >> 17][addr & 0x1ffff];
-                            alpha = col_ind >> 5;
-                            alpha = alpha << 2 | alpha >> 1;
-                            col_ind &= 31;
+                switch (format) {
+                    case TEX_2BPP: {
+                        u32 addr = base + (ofs >> 2);
+                        u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                        col_ind >>= (ofs & 3) << 1;
+                        col_ind &= 3;
+                        if (!col_ind && p->texparam.color0) alpha = 0;
+                        else {
                             u32 paladdr = palbase + col_ind;
                             color =
                                 gpu->texpal[paladdr >> 13][paladdr & 0x1fff];
-                            break;
                         }
-                        case TEX_A5I3: {
-                            u32 addr = base + ofs;
-                            u8 col_ind =
-                                gpu->texram[addr >> 17][addr & 0x1ffff];
-                            alpha = col_ind >> 3;
-                            col_ind &= 7;
+                        break;
+                    }
+                    case TEX_4BPP: {
+                        u32 addr = base + (ofs >> 1);
+                        u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                        col_ind >>= (ofs & 1) << 2;
+                        col_ind &= 15;
+                        if (!col_ind && p->texparam.color0) alpha = 0;
+                        else {
                             u32 paladdr = palbase + col_ind;
                             color =
                                 gpu->texpal[paladdr >> 13][paladdr & 0x1fff];
-                            break;
                         }
-                        case TEX_COMPRESS: {
-                            u32 block_ofs =
-                                ((tt >> 2) << (s_shift - 2)) + (ss >> 2);
-                            u32 block_addr = base + (block_ofs << 2);
-                            u32 row_addr = block_addr + (tt & 3);
-                            u8 ind =
-                                gpu->texram[row_addr >> 17][row_addr & 0x1ffff];
-                            ind >>= (ss & 3) << 1;
-                            ind &= 3;
-                            u16 palmode =
-                                *(u16*) &gpu
-                                     ->texram[1][(block_addr >> 18 << 16) +
-                                                 ((block_addr >> 1) & 0xffff)];
-                            u32 paladdr = palbase + ((palmode & 0x3fff) << 1);
-                            palmode >>= 14;
-                            if (palmode < 2 && ind == 3) alpha = 0;
-                            else if (ind < 2 || !(palmode & 1)) {
-                                paladdr += ind;
-                                color = gpu->texpal[paladdr >> 13]
-                                                   [paladdr & 0x1fff];
+                        break;
+                    }
+                    case TEX_8BPP: {
+                        u32 addr = base + ofs;
+                        u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                        if (!col_ind && p->texparam.color0) alpha = 0;
+                        else {
+                            u32 paladdr = palbase + col_ind;
+                            color =
+                                gpu->texpal[paladdr >> 13][paladdr & 0x1fff];
+                        }
+                        break;
+                    }
+                    case TEX_A3I5: {
+                        u32 addr = base + ofs;
+                        u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                        alpha = col_ind >> 5;
+                        alpha = alpha << 2 | alpha >> 1;
+                        col_ind &= 31;
+                        u32 paladdr = palbase + col_ind;
+                        color = gpu->texpal[paladdr >> 13][paladdr & 0x1fff];
+                        break;
+                    }
+                    case TEX_A5I3: {
+                        u32 addr = base + ofs;
+                        u8 col_ind = gpu->texram[addr >> 17][addr & 0x1ffff];
+                        alpha = col_ind >> 3;
+                        col_ind &= 7;
+                        u32 paladdr = palbase + col_ind;
+                        color = gpu->texpal[paladdr >> 13][paladdr & 0x1fff];
+                        break;
+                    }
+                    case TEX_COMPRESS: {
+                        u32 block_ofs =
+                            ((tt >> 2) << (s_shift - 2)) + (ss >> 2);
+                        u32 block_addr = base + (block_ofs << 2);
+                        u32 row_addr = block_addr + (tt & 3);
+                        u8 ind =
+                            gpu->texram[row_addr >> 17][row_addr & 0x1ffff];
+                        ind >>= (ss & 3) << 1;
+                        ind &= 3;
+                        u16 palmode =
+                            *(u16*) &gpu
+                                 ->texram[1][(block_addr >> 18 << 16) +
+                                             ((block_addr >> 1) & 0xffff)];
+                        u32 paladdr = palbase + ((palmode & 0x3fff) << 1);
+                        palmode >>= 14;
+                        if (palmode < 2 && ind == 3) alpha = 0;
+                        else if (ind < 2 || !(palmode & 1)) {
+                            paladdr += ind;
+                            color =
+                                gpu->texpal[paladdr >> 13][paladdr & 0x1fff];
+                        } else {
+                            u16 color0 =
+                                gpu->texpal[paladdr >> 13][paladdr & 0x1fff];
+                            paladdr++;
+                            u16 color1 =
+                                gpu->texpal[paladdr >> 13][paladdr & 0x1fff];
+                            u16 r0 = color0 & 0x1f;
+                            u16 r1 = color1 & 0x1f;
+                            u16 g0 = (color0 >> 5) & 0x1f;
+                            u16 g1 = (color1 >> 5) & 0x1f;
+                            u16 b0 = (color0 >> 10) & 0x1f;
+                            u16 b1 = (color1 >> 10) & 0x1f;
+                            if (palmode == 1) {
+                                color = (r0 + r1) / 2 | (g0 + g1) / 2 << 5 |
+                                        (b0 + b1) / 2 << 10;
+                            } else if (ind == 2) {
+                                color = (5 * r0 + 3 * r1) / 8 |
+                                        (5 * g0 + 3 * g1) / 8 << 5 |
+                                        (5 * b0 + 3 * b1) / 8 << 10;
                             } else {
-                                u16 color0 = gpu->texpal[paladdr >> 13]
-                                                        [paladdr & 0x1fff];
-                                paladdr++;
-                                u16 color1 = gpu->texpal[paladdr >> 13]
-                                                        [paladdr & 0x1fff];
-                                u16 r0 = color0 & 0x1f;
-                                u16 r1 = color1 & 0x1f;
-                                u16 g0 = (color0 >> 5) & 0x1f;
-                                u16 g1 = (color1 >> 5) & 0x1f;
-                                u16 b0 = (color0 >> 10) & 0x1f;
-                                u16 b1 = (color1 >> 10) & 0x1f;
-                                if (palmode == 1) {
-                                    color = (r0 + r1) / 2 | (g0 + g1) / 2 << 5 |
-                                            (b0 + b1) / 2 << 10;
-                                } else if (ind == 2) {
-                                    color = (5 * r0 + 3 * r1) / 8 |
-                                            (5 * g0 + 3 * g1) / 8 << 5 |
-                                            (5 * b0 + 3 * b1) / 8 << 10;
-                                } else {
-                                    color = (3 * r0 + 5 * r1) / 8 |
-                                            (3 * g0 + 5 * g1) / 8 << 5 |
-                                            (3 * b0 + 5 * b1) / 8 << 10;
-                                }
+                                color = (3 * r0 + 5 * r1) / 8 |
+                                        (3 * g0 + 5 * g1) / 8 << 5 |
+                                        (3 * b0 + 5 * b1) / 8 << 10;
                             }
-
-                            break;
                         }
-                        case TEX_DIRECT: {
-                            u32 addr = base + (ofs << 1);
-                            color = *(u16*) &gpu
-                                         ->texram[addr >> 17][addr & 0x1ffff];
-                            alpha = (color >> 15) ? 31 : 0;
-                            break;
-                        }
-                    }
-                    if (!alpha) continue;
 
-                    u16 tr = color & 0x1f;
-                    u16 tg = color >> 5 & 0x1f;
-                    u16 tb = color >> 10 & 0x1f;
-
-                    u16 r = 0, g = 0, b = 0, a = 0;
-                    switch (p->attr.mode) {
-                        case POLYMODE_MOD:
-                            r = ((i.r / i.w + 1) * (tr + 1) - 1) / 32;
-                            g = ((i.g / i.w + 1) * (tg + 1) - 1) / 32;
-                            b = ((i.b / i.w + 1) * (tb + 1) - 1) / 32;
-                            a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
-                            break;
-                        case POLYMODE_DECAL:
-                            r = (tr * alpha) + (i.r / i.w * (31 - alpha)) / 32;
-                            g = (tg * alpha) + (i.g / i.w * (31 - alpha)) / 32;
-                            b = (tb * alpha) + (i.b / i.w * (31 - alpha)) / 32;
-                            a = p->attr.alpha;
-                            break;
-                        case POLYMODE_TOON: {
-                            u16 tooncolor =
-                                gpu->master->io9.toon_table[(int) (i.r / i.w)];
-                            u16 shr = tooncolor & 0x1f;
-                            u16 shg = tooncolor >> 5 & 0x1f;
-                            u16 shb = tooncolor >> 10 & 0x1f;
-                            r = ((shr + 1) * (tr + 1) - 1) / 32;
-                            g = ((shg + 1) * (tg + 1) - 1) / 32;
-                            b = ((shb + 1) * (tb + 1) - 1) / 32;
-                            a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
-                            if (gpu->master->io9.disp3dcnt.shading_mode) {
-                                r += shr;
-                                if (r > 31) r = 31;
-                                g += shg;
-                                if (g > 31) g = 31;
-                                b += shb;
-                                if (b > 31) b = 31;
-                            }
-                            break;
-                        }
+                        break;
                     }
-
-                    if (a == 31 || p->attr.depth_transparent) {
-                        if (gpu->w_buffer) gpu->depth_buf[y][x] = i.w;
-                        else gpu->depth_buf[y][x] = i.z;
+                    case TEX_DIRECT: {
+                        u32 addr = base + (ofs << 1);
+                        color =
+                            *(u16*) &gpu->texram[addr >> 17][addr & 0x1ffff];
+                        alpha = (color >> 15) ? 31 : 0;
+                        break;
                     }
-
-                    if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
-                        (gpu->screen[y][x] & (1 << 15))) {
-                        u16 sr = gpu->screen[y][x] & 0x1f;
-                        u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
-                        u16 sb = gpu->screen[y][x] >> 10 & 0x1f;
-                        r = (r * a + sr * (31 - a)) / 32;
-                        g = (g * a + sg * (31 - a)) / 32;
-                        b = (b * a + sb * (31 - a)) / 32;
-                    }
-                    gpu->screen[y][x] = r | g << 5 | b << 10 | 1 << 15;
                 }
             }
-        }
-    } else {
-        for (int y = yMin; y < yMax; y++) {
-            int h = right[y].x - left[y].x;
 
-            float z = left[y].z;
-            float w = left[y].w;
-            float dz = (right[y].z - z) / h;
-            float dw = (right[y].w - w) / h;
+            if (alpha == 0) continue;
 
-            float r = left[y].r;
-            float g = left[y].g;
-            float b = left[y].b;
-            float dr = (right[y].r - r) / h;
-            float dg = (right[y].g - g) / h;
-            float db = (right[y].b - b) / h;
-            for (int x = left[y].x; x <= right[y].x;
-                 x++, z += dz, w += dw, r += dr, g += dg, b += db) {
-                bool depth_test;
-                if (p->attr.depth_test) {
-                    if (gpu->w_buffer)
-                        depth_test = fabsf(w - gpu->depth_buf[y][x]) <= 0.125f;
-                    else depth_test = fabsf(z - gpu->depth_buf[y][x]) <= 0.125f;
-                } else {
-                    if (gpu->w_buffer) depth_test = w > gpu->depth_buf[y][x];
-                    else depth_test = z < gpu->depth_buf[y][x];
-                }
-                if (depth_test) {
-                    if (gpu->w_buffer) gpu->depth_buf[y][x] = w;
-                    else gpu->depth_buf[y][x] = z;
+            u16 tr = color & 0x1f;
+            u16 tg = color >> 5 & 0x1f;
+            u16 tb = color >> 10 & 0x1f;
 
-                    u16 c = 0x8000;
-                    c |= (u16) (r / w) & 0x1f;
-                    c |= ((u16) (g / w) & 0x1f) << 5;
-                    c |= ((u16) (b / w) & 0x1f) << 10;
-                    gpu->screen[y][x] = c;
+            u16 r = 0, g = 0, b = 0, a = 0;
+            switch (p->attr.mode) {
+                case POLYMODE_MOD:
+                    r = ((i.r / i.w + 1) * (tr + 1) - 1) / 32;
+                    g = ((i.g / i.w + 1) * (tg + 1) - 1) / 32;
+                    b = ((i.b / i.w + 1) * (tb + 1) - 1) / 32;
+                    a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
+                    break;
+                case POLYMODE_DECAL:
+                    r = (tr * alpha) + (i.r / i.w * (31 - alpha)) / 32;
+                    g = (tg * alpha) + (i.g / i.w * (31 - alpha)) / 32;
+                    b = (tb * alpha) + (i.b / i.w * (31 - alpha)) / 32;
+                    a = p->attr.alpha;
+                    break;
+                case POLYMODE_TOON: {
+                    u16 tooncolor =
+                        gpu->master->io9.toon_table[(int) (i.r / i.w)];
+                    u16 shr = tooncolor & 0x1f;
+                    u16 shg = tooncolor >> 5 & 0x1f;
+                    u16 shb = tooncolor >> 10 & 0x1f;
+                    r = ((shr + 1) * (tr + 1) - 1) / 32;
+                    g = ((shg + 1) * (tg + 1) - 1) / 32;
+                    b = ((shb + 1) * (tb + 1) - 1) / 32;
+                    a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
+                    if (gpu->master->io9.disp3dcnt.shading_mode) {
+                        r += shr;
+                        if (r > 31) r = 31;
+                        g += shg;
+                        if (g > 31) g = 31;
+                        b += shb;
+                        if (b > 31) b = 31;
+                    }
+                    break;
                 }
             }
+
+            if (a == 31 || p->attr.depth_transparent) {
+                if (gpu->w_buffer) gpu->depth_buf[y][x] = i.w;
+                else gpu->depth_buf[y][x] = i.z;
+            }
+
+            if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
+                (gpu->screen[y][x] & (1 << 15))) {
+                if (gpu->polyid_buf[y][x] == p->attr.id) continue;
+                gpu->polyid_buf[y][x] = p->attr.id;
+                u16 sr = gpu->screen[y][x] & 0x1f;
+                u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
+                u16 sb = gpu->screen[y][x] >> 10 & 0x1f;
+                r = (r * a + sr * (31 - a)) / 32;
+                g = (g * a + sg * (31 - a)) / 32;
+                b = (b * a + sb * (31 - a)) / 32;
+            }
+            gpu->screen[y][x] = r | g << 5 | b << 10 | 1 << 15;
         }
     }
 }
-
-#define IS_SEMITRANS(p) (p.attr.alpha < 31 || p.texparam.format == TEX_A3I5 || p.texparam.format == TEX_A5I3)
 
 void gpu_render(GPU* gpu) {
     if (gpu->master->io9.disp3dcnt.rearplane_mode) {
@@ -1473,6 +1415,7 @@ void gpu_render(GPU* gpu) {
                 depth *= 1 << 12;
                 if (gpu->w_buffer) depth = 1 / depth;
                 gpu->depth_buf[y][x] = depth;
+                gpu->polyid_buf[y][x] = gpu->master->io9.clear_color.id;
             }
         }
     } else {
@@ -1486,6 +1429,7 @@ void gpu_render(GPU* gpu) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {
                 gpu->screen[y][x] = clear_color;
                 gpu->depth_buf[y][x] = clear_depth;
+                gpu->polyid_buf[y][x] = gpu->master->io9.clear_color.id;
             }
         }
     }
@@ -1500,7 +1444,7 @@ void gpu_render(GPU* gpu) {
                 render_polygon(gpu, &gpu->polygonram[i]);
         }
         for (int i = 0; i < gpu->n_polys; i++) {
-            if(IS_SEMITRANS(gpu->polygonram[i]))
+            if (IS_SEMITRANS(gpu->polygonram[i]))
                 render_polygon(gpu, &gpu->polygonram[i]);
         }
     }
