@@ -715,7 +715,14 @@ typedef struct _IO {
             } clear_color;
             u16 clear_depth;
             u16 clrimage_offset;
-            u32 fog_color;
+            union {
+                u32 w;
+                struct {
+                    u32 color : 16;
+                    u32 alpha : 5;
+                    u32 unused : 11;
+                };
+            } fog_color;
             u32 fog_offset;
             u8 fog_table[0x20];
             u16 toon_table[0x20];

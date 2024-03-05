@@ -1199,7 +1199,7 @@ void render_polygon(GPU* gpu, poly* p) {
             }
             if (!depth_test) {
                 if (!p->attr.id && p->attr.mode == POLYMODE_SHADOW) {
-                    gpu->stencil_buf[y][x] = true;
+                    gpu->attr_buf[y][x].stencil = 1;
                 }
                 continue;
             }
@@ -1383,14 +1383,22 @@ void render_polygon(GPU* gpu, poly* p) {
                     break;
                     case POLYMODE_SHADOW:
                         if (p->attr.id) {
-                            if (!gpu->stencil_buf[y][x]) continue;
+                            if (!gpu->attr_buf[y][x].stencil) continue;
+                            gpu->attr_buf[y][x].stencil = 0;
                             if (gpu->polyid_buf[y][x] == p->attr.id) continue;
-                            if (!(gpu->master->io9.disp3dcnt.texture &&
-                                  p->texparam.format))
-                                alpha = 0;
-                            r = (tr * alpha) + (i.r / i.w * (31 - alpha)) / 32;
-                            g = (tg * alpha) + (i.g / i.w * (31 - alpha)) / 32;
-                            b = (tb * alpha) + (i.b / i.w * (31 - alpha)) / 32;
+                            if (gpu->master->io9.disp3dcnt.texture &&
+                                p->texparam.format) {
+                                r = (tr * alpha) +
+                                    (i.r / i.w * (31 - alpha)) / 32;
+                                g = (tg * alpha) +
+                                    (i.g / i.w * (31 - alpha)) / 32;
+                                b = (tb * alpha) +
+                                    (i.b / i.w * (31 - alpha)) / 32;
+                            } else {
+                                r = i.r / i.w;
+                                g = i.g / i.w;
+                                b = i.b / i.w;
+                            }
                             a = p->attr.alpha;
                         } else {
                             continue;
@@ -1406,7 +1414,8 @@ void render_polygon(GPU* gpu, poly* p) {
 
             if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
                 (gpu->screen[y][x] & (1 << 15))) {
-                if (gpu->blended[y][x] && gpu->polyid_buf[y][x] == p->attr.id)
+                if (gpu->attr_buf[y][x].blend &&
+                    gpu->polyid_buf[y][x] == p->attr.id)
                     continue;
                 u16 sr = gpu->screen[y][x] & 0x1f;
                 u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
@@ -1414,7 +1423,19 @@ void render_polygon(GPU* gpu, poly* p) {
                 r = (r * a + sr * (31 - a)) / 32;
                 g = (g * a + sg * (31 - a)) / 32;
                 b = (b * a + sb * (31 - a)) / 32;
-                gpu->blended[y][x] = true;
+                gpu->attr_buf[y][x].blend = 1;
+                gpu->attr_buf[y][x].fog &= p->attr.fog;
+            } else {
+                gpu->attr_buf[y][x].fog = p->attr.fog;
+                if (p->attr.id != gpu->polyid_buf[y][x] &&
+                    (y == yMin || y == (yMax - 1) || x == left[y].x ||
+                     x == right[y].x ||
+                     (left[y - 1].x < x && x < left[y + 1].x) ||
+                     (left[y + 1].x < x && x < left[y - 1].x) ||
+                     (right[y - 1].x < x && x < right[y + 1].x) ||
+                     (right[y + 1].x < x && x < right[y - 1].x))) {
+                    gpu->attr_buf[y][x].edge = 1;
+                }
             }
 
             gpu->polyid_buf[y][x] = p->attr.id;
@@ -1437,8 +1458,8 @@ void gpu_render(GPU* gpu) {
                 if (gpu->w_buffer) depth = 1 / depth;
                 gpu->depth_buf[y][x] = depth;
                 gpu->polyid_buf[y][x] = gpu->master->io9.clear_color.id;
-                gpu->stencil_buf[y][x] = false;
-                gpu->blended[y][x] = false;
+                gpu->attr_buf[y][x].b = 0;
+                gpu->attr_buf[y][x].fog = gpu->master->io9.clear_color.fog;
             }
         }
     } else {
@@ -1453,8 +1474,8 @@ void gpu_render(GPU* gpu) {
                 gpu->screen[y][x] = clear_color;
                 gpu->depth_buf[y][x] = clear_depth;
                 gpu->polyid_buf[y][x] = gpu->master->io9.clear_color.id;
-                gpu->stencil_buf[y][x] = false;
-                gpu->blended[y][x] = false;
+                gpu->attr_buf[y][x].b = 0;
+                gpu->attr_buf[y][x].fog = gpu->master->io9.clear_color.fog;
             }
         }
     }
@@ -1471,6 +1492,65 @@ void gpu_render(GPU* gpu) {
         for (int i = 0; i < gpu->n_polys; i++) {
             if (IS_SEMITRANS(gpu->polygonram[i]))
                 render_polygon(gpu, &gpu->polygonram[i]);
+        }
+    }
+
+    if (gpu->master->io9.disp3dcnt.edge_marking ||
+        gpu->master->io9.disp3dcnt.fog_enable) {
+        float fog_depth =
+            (gpu->master->io9.fog_offset & 0x7fff) / (float) 0x8000;
+        fog_depth *= 1 << 12;
+        if (gpu->w_buffer) fog_depth = 1 / fog_depth;
+        float fog_step =
+            (0x400 >> gpu->master->io9.disp3dcnt.fog_shift) / (float) 0x8000;
+        for (int y = 0; y < NDS_SCREEN_H; y++) {
+            for (int x = 0; x < NDS_SCREEN_W; x++) {
+                if (gpu->attr_buf[y][x].edge &&
+                    gpu->master->io9.disp3dcnt.edge_marking) {
+                    if ((x > 0 &&
+                         gpu->polyid_buf[y][x] != gpu->polyid_buf[y][x - 1] &&
+                         gpu->depth_buf[y][x] < gpu->depth_buf[y][x - 1]) ||
+                        (x < NDS_SCREEN_W - 1 &&
+                         gpu->polyid_buf[y][x] != gpu->polyid_buf[y][x + 1] &&
+                         gpu->depth_buf[y][x] < gpu->depth_buf[y][x + 1]) ||
+                        (y > 0 &&
+                         gpu->polyid_buf[y][x] != gpu->polyid_buf[y - 1][x] &&
+                         gpu->depth_buf[y][x] < gpu->depth_buf[y - 1][x]) ||
+                        (y < NDS_SCREEN_H - 1 &&
+                         gpu->polyid_buf[y][x] != gpu->polyid_buf[y + 1][x] &&
+                         gpu->depth_buf[y][x] < gpu->depth_buf[y + 1][x])) {
+                        gpu->screen[y][x] =
+                            1 << 15 |
+                            gpu->master->io9
+                                .edge_color[gpu->polyid_buf[y][x] >> 3];
+                    }
+                }
+
+                if (gpu->attr_buf[y][x].fog &&
+                    gpu->master->io9.disp3dcnt.fog_enable) {
+                    int fog_ind = (fog_depth - gpu->depth_buf[y][x]) / fog_step;
+                    if (gpu->w_buffer) fog_ind = -fog_ind;
+                    if (fog_ind < 0) fog_ind = 0;
+                    if (fog_ind > 31) fog_ind = 31;
+                    u8 fog_density = gpu->master->io9.fog_table[fog_ind] & 0x7f;
+                    if (!gpu->master->io9.disp3dcnt.fog_mode) {
+                        u16 fogc = gpu->master->io9.fog_color.color;
+                        u16 fr = fogc & 0x1f;
+                        u16 fg = fogc >> 5 & 0x1f;
+                        u16 fb = fogc >> 10 & 0x1f;
+                        u16 sr = gpu->screen[y][x] & 0x1f;
+                        u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
+                        u16 sb = gpu->screen[y][x] >> 10 & 0x1f;
+                        u16 r =
+                            (fr * fog_density + sr * (128 - fog_density)) / 128;
+                        u16 g =
+                            (fg * fog_density + sg * (128 - fog_density)) / 128;
+                        u16 b =
+                            (fb * fog_density + sb * (128 - fog_density)) / 128;
+                        gpu->screen[y][x] = r | g << 5 | b << 10 | 1 << 15;
+                    }
+                }
+            }
         }
     }
 
