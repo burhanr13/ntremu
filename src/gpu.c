@@ -1443,9 +1443,7 @@ void render_polygon(GPU* gpu, poly* p) {
                         g = (g + sg) / 2;
                         b = (b + sb) / 2;
                     }
-                    //if (p->attr.id != gpu->polyid_buf[y][x]) {
-                        gpu->attr_buf[y][x].edge = 1;
-                    //}
+                    gpu->attr_buf[y][x].edge = 1;
                 }
             }
 
