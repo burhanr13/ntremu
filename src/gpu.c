@@ -1428,14 +1428,24 @@ void render_polygon(GPU* gpu, poly* p) {
                 gpu->attr_buf[y][x].fog &= p->attr.fog;
             } else {
                 gpu->attr_buf[y][x].fog = p->attr.fog;
-                if (p->attr.id != gpu->polyid_buf[y][x] &&
-                    (y == yMin || y == (yMax - 1) || x == left[y].x ||
+                if ((y == yMin || y == (yMax - 1) || x == left[y].x ||
                      x == right[y].x ||
                      (left[y - 1].x < x && x < left[y + 1].x) ||
                      (left[y + 1].x < x && x < left[y - 1].x) ||
                      (right[y - 1].x < x && x < right[y + 1].x) ||
                      (right[y + 1].x < x && x < right[y - 1].x))) {
-                    gpu->attr_buf[y][x].edge = 1;
+                    if (gpu->attr_buf[y][x].edge &&
+                        gpu->master->io9.disp3dcnt.anti_aliasing) {
+                        u16 sr = gpu->screen[y][x] & 0x1f;
+                        u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
+                        u16 sb = gpu->screen[y][x] >> 10 & 0x1f;
+                        r = (r + sr) / 2;
+                        g = (g + sg) / 2;
+                        b = (b + sb) / 2;
+                    }
+                    //if (p->attr.id != gpu->polyid_buf[y][x]) {
+                        gpu->attr_buf[y][x].edge = 1;
+                    //}
                 }
             }
 
@@ -1518,10 +1528,26 @@ void gpu_render(GPU* gpu) {
                         (y < NDS_SCREEN_H - 1 &&
                          gpu->polyid_buf[y][x] != gpu->polyid_buf[y + 1][x] &&
                          gpu->depth_buf[y][x] < gpu->depth_buf[y + 1][x])) {
-                        gpu->screen[y][x] =
-                            1 << 15 |
-                            gpu->master->io9
-                                .edge_color[gpu->polyid_buf[y][x] >> 3];
+                        if (gpu->master->io9.disp3dcnt.anti_aliasing) {
+                            u16 sr = gpu->screen[y][x] & 0x1f;
+                            u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
+                            u16 sb = gpu->screen[y][x] >> 10 & 0x1f;
+                            u16 edgec =
+                                gpu->master->io9
+                                    .edge_color[gpu->polyid_buf[y][x] >> 3];
+                            u16 r = edgec & 0x1f;
+                            u16 g = edgec >> 5 & 0x1f;
+                            u16 b = edgec >> 10 & 0x1f;
+                            r = (r + sr) / 2;
+                            g = (g + sg) / 2;
+                            b = (b + sb) / 2;
+                            gpu->screen[y][x] = r | g << 5 | b << 10 | 1 << 15;
+                        } else {
+                            gpu->screen[y][x] =
+                                1 << 15 |
+                                gpu->master->io9
+                                    .edge_color[gpu->polyid_buf[y][x] >> 3];
+                        }
                     }
                 }
 
