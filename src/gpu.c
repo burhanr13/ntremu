@@ -1191,10 +1191,11 @@ void render_polygon(GPU* gpu, poly* p) {
             bool depth_test;
             if (p->attr.depth_test) {
                 if (gpu->w_buffer)
-                    depth_test = fabsf(i.w - gpu->depth_buf[y][x]) <= 0.125f;
+                    depth_test =
+                        fabsf(1 / i.w - gpu->depth_buf[y][x]) <= 0.125f;
                 else depth_test = fabsf(i.z - gpu->depth_buf[y][x]) <= 0.125f;
             } else {
-                if (gpu->w_buffer) depth_test = i.w > gpu->depth_buf[y][x];
+                if (gpu->w_buffer) depth_test = 1 / i.w < gpu->depth_buf[y][x];
                 else depth_test = i.z < gpu->depth_buf[y][x];
             }
             if (!depth_test) {
@@ -1408,7 +1409,7 @@ void render_polygon(GPU* gpu, poly* p) {
             }
 
             if (a == 31 || p->attr.depth_transparent) {
-                if (gpu->w_buffer) gpu->depth_buf[y][x] = i.w;
+                if (gpu->w_buffer) gpu->depth_buf[y][x] = 1 / i.w;
                 else gpu->depth_buf[y][x] = i.z;
             }
 
@@ -1453,9 +1454,8 @@ void gpu_render(GPU* gpu) {
                 float depth =
                     (*(u16*) &gpu->texram[3][(y * NDS_SCREEN_W + x) << 1] &
                      0x7fff) /
-                    (float) 0x8000;
-                depth *= 1 << 12;
-                if (gpu->w_buffer) depth = 1 / depth;
+                    (float) (1 << 12);
+                if (gpu->w_buffer) depth *= 0x200;
                 gpu->depth_buf[y][x] = depth;
                 gpu->polyid_buf[y][x] = gpu->master->io9.clear_color.id;
                 gpu->attr_buf[y][x].b = 0;
@@ -1466,9 +1466,8 @@ void gpu_render(GPU* gpu) {
         u16 clear_color = gpu->master->io9.clear_color.color;
         if (gpu->master->io9.clear_color.alpha) clear_color |= 0x8000;
         float clear_depth =
-            (gpu->master->io9.clear_depth & 0x7fff) / (float) 0x8000;
-        clear_depth *= 1 << 12;
-        if (gpu->w_buffer) clear_depth = 1 / clear_depth;
+            (gpu->master->io9.clear_depth & 0x7fff) / (float) (1 << 12);
+        if (gpu->w_buffer) clear_depth *= 0x200;
         for (int y = 0; y < NDS_SCREEN_H; y++) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {
                 gpu->screen[y][x] = clear_color;
@@ -1498,11 +1497,11 @@ void gpu_render(GPU* gpu) {
     if (gpu->master->io9.disp3dcnt.edge_marking ||
         gpu->master->io9.disp3dcnt.fog_enable) {
         float fog_depth =
-            (gpu->master->io9.fog_offset & 0x7fff) / (float) 0x8000;
-        fog_depth *= 1 << 12;
-        if (gpu->w_buffer) fog_depth = 1 / fog_depth;
+            (gpu->master->io9.fog_offset & 0x7fff) / (float) (1 << 12);
+        if (gpu->w_buffer) fog_depth *= 0x200;
         float fog_step =
-            (0x400 >> gpu->master->io9.disp3dcnt.fog_shift) / (float) 0x8000;
+            (0x400 >> gpu->master->io9.disp3dcnt.fog_shift) / (float) (1 << 12);
+        if (gpu->w_buffer) fog_step *= 0x200;
         for (int y = 0; y < NDS_SCREEN_H; y++) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {
                 if (gpu->attr_buf[y][x].edge &&
@@ -1528,11 +1527,17 @@ void gpu_render(GPU* gpu) {
 
                 if (gpu->attr_buf[y][x].fog &&
                     gpu->master->io9.disp3dcnt.fog_enable) {
-                    int fog_ind = (fog_depth - gpu->depth_buf[y][x]) / fog_step;
-                    if (gpu->w_buffer) fog_ind = -fog_ind;
-                    if (fog_ind < 0) fog_ind = 0;
-                    if (fog_ind > 31) fog_ind = 31;
-                    u8 fog_density = gpu->master->io9.fog_table[fog_ind] & 0x7f;
+                    float fog_ind_intr =
+                        (gpu->depth_buf[y][x] - fog_depth) / fog_step;
+                    if (fog_ind_intr < 0) fog_ind_intr = 0;
+                    if (fog_ind_intr > 31) fog_ind_intr = 31;
+                    int fog_ind = fog_ind_intr;
+                    fog_ind_intr -= fog_ind;
+                    u8 fog_density =
+                        (gpu->master->io9.fog_table[fog_ind] & 0x7f) *
+                            (1 - fog_ind_intr) +
+                        (gpu->master->io9.fog_table[fog_ind + 1] & 0x7f) *
+                            (fog_ind_intr);
                     if (!gpu->master->io9.disp3dcnt.fog_mode) {
                         u16 fogc = gpu->master->io9.fog_color.color;
                         u16 fr = fogc & 0x1f;
