@@ -132,6 +132,7 @@ bool card_write_command(GameCard* card, u8* command) {
                 card->state = CARD_DATA;
                 card->addr = command[1] << 24 | command[2] << 16 |
                              command[3] << 8 | command[4];
+                card->addr %= card->rom_size;
                 if (card->addr < 0x8000) {
                     card->addr = 0x8000 + (card->addr & 0x1ff);
                 }

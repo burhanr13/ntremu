@@ -1434,15 +1434,6 @@ void render_polygon(GPU* gpu, poly* p) {
                      (left[y + 1].x < x && x < left[y - 1].x) ||
                      (right[y - 1].x < x && x < right[y + 1].x) ||
                      (right[y + 1].x < x && x < right[y - 1].x))) {
-                    if (gpu->attr_buf[y][x].edge &&
-                        gpu->master->io9.disp3dcnt.anti_aliasing) {
-                        u16 sr = gpu->screen[y][x] & 0x1f;
-                        u16 sg = gpu->screen[y][x] >> 5 & 0x1f;
-                        u16 sb = gpu->screen[y][x] >> 10 & 0x1f;
-                        r = (r + sr) / 2;
-                        g = (g + sg) / 2;
-                        b = (b + sb) / 2;
-                    }
                     gpu->attr_buf[y][x].edge = 1;
                 }
             }
