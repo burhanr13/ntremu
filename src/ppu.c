@@ -962,6 +962,17 @@ void lcd_hdraw(NDS* nds) {
                 nds->ppuA.screen = nds->screen_bottom;
                 nds->ppuB.screen = nds->screen_top;
             }
+
+            if (nds->gpu.drawing) {
+                nds->gpu.drawing = false;
+                void* tmp = nds->gpu.screen_back;
+                nds->gpu.screen_back = nds->gpu.screen;
+                nds->gpu.screen = tmp;
+            }
+            if (nds->gpu.pending_swapbuffers) {
+                nds->gpu.pending_swapbuffers = false;
+                swap_buffers(&nds->gpu);
+            }
         }
 
         draw_scanline(&nds->ppuA);
@@ -1019,7 +1030,6 @@ void lcd_vblank(NDS* nds) {
 
     if (nds->gpu.blocked) {
         nds->gpu.blocked = false;
-        gpu_render(&nds->gpu);
         gxcmd_execute_all(&nds->gpu);
     }
 

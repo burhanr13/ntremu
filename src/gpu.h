@@ -165,7 +165,9 @@ typedef struct _NDS NDS;
 typedef struct {
     NDS* master;
 
-    u16 screen[NDS_SCREEN_H][NDS_SCREEN_W];
+    u16 framebuffers[2][NDS_SCREEN_H][NDS_SCREEN_W];
+    u16 (*screen)[NDS_SCREEN_W];
+    u16 (*screen_back)[NDS_SCREEN_W];
 
     float depth_buf[NDS_SCREEN_H][NDS_SCREEN_W];
     u8 polyid_buf[NDS_SCREEN_H][NDS_SCREEN_W];
@@ -183,12 +185,27 @@ typedef struct {
     u8* texram[4];
     u16* texpal[6];
 
+    vertex vertexrambufs[2][MAX_VTX];
+    poly polygonrambufs[2][MAX_POLY];
+
+    vertex* vertexram;
+    poly* polygonram;
+    u16 n_verts;
+    u16 n_polys;
+
+    vertex* vertexram_rendering;
+    poly* polygonram_rendering;
+    u16 n_polys_rendering;
+
+    bool blocked;
+    bool drawing;
+    bool pending_swapbuffers;
+
     u8 cmd_fifo[256];
     u32 param_fifo[256];
     u8 cmd_fifosize;
     u8 param_fifosize;
     u8 params_pending;
-    bool blocked;
 
     mat4 projmtx;
     mat4 projmtx_stk[1];
@@ -209,12 +226,6 @@ typedef struct {
     mat4 clipmtx;
 
     bool mtx_dirty;
-
-    vertex vertexram[MAX_VTX];
-    u16 n_verts;
-
-    poly polygonram[MAX_POLY];
-    u16 n_polys;
 
     int poly_mode;
     PolygonAttr cur_attr;
@@ -246,9 +257,12 @@ typedef struct {
 
 } GPU;
 
+void gpu_init_ptrs(GPU* gpu);
+
 void gxfifo_write(GPU* gpu, u32 command);
 void gxcmd_execute(GPU* gpu);
 void gxcmd_execute_all(GPU* gpu);
+void swap_buffers(GPU* gpu);
 
 void update_mtxs(GPU* gpu);
 
