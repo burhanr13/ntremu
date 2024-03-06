@@ -965,6 +965,7 @@ void lcd_hdraw(NDS* nds) {
 
             if (nds->gpu.drawing) {
                 nds->gpu.drawing = false;
+                pthread_mutex_lock(&gpu_mutex);
                 void* tmp = nds->gpu.screen_back;
                 nds->gpu.screen_back = nds->gpu.screen;
                 nds->gpu.screen = tmp;

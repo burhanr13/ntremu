@@ -30,6 +30,8 @@ int main(int argc, char** argv) {
 
     if (emulator_init(argc, argv) < 0) return -1;
 
+    init_gpu_thread(&ntremu.nds->gpu);
+
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER);
 
     SDL_GameController* controller = NULL;
@@ -194,8 +196,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    emulator_quit();
-
     if (controller) SDL_GameControllerClose(controller);
 
     SDL_CloseAudioDevice(audio);
@@ -204,6 +204,10 @@ int main(int argc, char** argv) {
     SDL_DestroyWindow(window);
 
     SDL_Quit();
+
+    destroy_gpu_thread();
+
+    emulator_quit();
 
     return 0;
 }

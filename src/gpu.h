@@ -1,6 +1,8 @@
 #ifndef GPU_H
 #define GPU_H
 
+#include <pthread.h>
+
 #include "ppu.h"
 #include "types.h"
 
@@ -256,6 +258,13 @@ typedef struct {
     int view_h;
 
 } GPU;
+
+extern pthread_t gpu_thread;
+extern pthread_mutex_t gpu_mutex;
+extern pthread_cond_t gpu_cond;
+
+void init_gpu_thread(GPU* gpu);
+void destroy_gpu_thread();
 
 void gpu_init_ptrs(GPU* gpu);
 
