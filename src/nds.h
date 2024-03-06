@@ -214,6 +214,7 @@ typedef struct _NDS {
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware, bool bootbios);
 
 bool nds_step(NDS* nds);
+void nds_run(NDS* nds);
 
 void firmware_spi_write(NDS* nds, u8 data, bool hold);
 void tsc_spi_write(NDS* nds, u8 data);

@@ -89,8 +89,10 @@ int main(int argc, char** argv) {
                                 bkpthit = true;
                                 break;
                             }
+                            nds_step(ntremu.nds);
+                        } else {
+                            nds_run(ntremu.nds);
                         }
-                        nds_step(ntremu.nds);
                         if (ntremu.nds->cpuerr) break;
                         if (ntremu.nds->samples_full) {
                             ntremu.nds->samples_full = false;

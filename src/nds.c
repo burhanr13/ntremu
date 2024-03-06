@@ -174,6 +174,44 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     spu_sample(&nds->spu);
 }
 
+void nds_run(NDS* nds) {
+    nds->cur_cpu = CPU9;
+    nds->last_event = nds->sched.now;
+    while (!event_pending(&nds->sched)) {
+        if (cpu9_step(&nds->cpu9)) {
+            nds->sched.now += nds->cpu9.cycles >> 1;
+            if (!(nds->half_tick ^= nds->cpu9.cycles & 1)) {
+                nds->sched.now++;
+            }
+        } else {
+            nds->sched.now = nds->sched.event_queue[0].time;
+            break;
+        }
+    }
+    nds->cur_cpu = CPU7;
+    nds->sched.now = nds->last_event;
+    while (!event_pending(&nds->sched)) {
+        if (nds->halt7) {
+            if (nds->io7.ie.w & nds->io7.ifl.w) {
+                nds->halt7 = false;
+                nds->io7.haltcnt = 0;
+                nds->cpu7.irq = true;
+            } else {
+                nds->sched.now = nds->sched.event_queue[0].time;
+                break;
+            }
+        } else {
+            cpu7_step(&nds->cpu7);
+            nds->sched.now += nds->cpu7.cycles;
+        }
+    }
+    run_to_present(&nds->sched);
+    nds->cpu7.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
+    nds->cpu9.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
+    nds->cur_cpu = CPU9;
+    nds->last_event = nds->sched.now;
+}
+
 bool nds_step(NDS* nds) {
     if (nds->cur_cpu) {
         if (nds->halt7) {
