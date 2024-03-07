@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
 
             if (!ntremu.uncap) {
                 if (play_audio) {
-                    while (SDL_GetQueuedAudioSize(audio) >= 32 * SAMPLE_BUF_LEN)
+                    while (SDL_GetQueuedAudioSize(audio) >= 16 * SAMPLE_BUF_LEN)
                         SDL_Delay(1);
                 } else {
                     cur_time = SDL_GetPerformanceCounter();

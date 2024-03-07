@@ -897,14 +897,16 @@ void gxcmd_execute(GPU* gpu) {
             break;
         case SWAP_BUFFERS: {
             gpu->blocked = true;
-            if (gpu->drawing) {
+            gpu->w_buffer = gpu->param_fifo[0] & 2;
+            gpu->autosort = !(gpu->param_fifo[0] & 1);
+
+            // eprintf("%d/%d ", gpu->master->io7.vcount, gpu->drawing);
+
+            if (gpu->drawing || gpu->master->io7.vcount >= NDS_SCREEN_H) {
                 gpu->pending_swapbuffers = true;
                 break;
             }
             swap_buffers(gpu);
-
-            gpu->w_buffer = gpu->param_fifo[0] & 2;
-            gpu->autosort = !(gpu->param_fifo[0] & 1);
             break;
         }
         case VIEWPORT: {

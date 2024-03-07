@@ -121,4 +121,6 @@ void lcd_hdraw(NDS* nds);
 void lcd_vblank(NDS* nds);
 void lcd_hblank(NDS* nds);
 
+void apply_screenswap(NDS* nds);
+
 #endif

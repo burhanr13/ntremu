@@ -955,13 +955,7 @@ void lcd_hdraw(NDS* nds) {
 
     if (nds->io7.vcount < NDS_SCREEN_H) {
         if (nds->io7.vcount == 0) {
-            if (nds->io9.powcnt.screenswap) {
-                nds->ppuA.screen = nds->screen_top;
-                nds->ppuB.screen = nds->screen_bottom;
-            } else {
-                nds->ppuA.screen = nds->screen_bottom;
-                nds->ppuB.screen = nds->screen_top;
-            }
+            apply_screenswap(nds);
 
             if (nds->gpu.drawing) {
                 nds->gpu.drawing = false;
@@ -1082,5 +1076,15 @@ void lcd_hblank(NDS* nds) {
                 dma9_activate(&nds->dma9, i);
             }
         }
+    }
+}
+
+void apply_screenswap(NDS* nds) {
+    if (nds->io9.powcnt.screenswap) {
+        nds->ppuA.screen = nds->screen_top;
+        nds->ppuB.screen = nds->screen_bottom;
+    } else {
+        nds->ppuA.screen = nds->screen_bottom;
+        nds->ppuB.screen = nds->screen_top;
     }
 }
