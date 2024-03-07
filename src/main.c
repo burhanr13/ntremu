@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
 
             bkpthit = false;
 
-            bool play_audio = !(ntremu.mute || ntremu.uncap);
+            bool play_audio = !(ntremu.pause || ntremu.mute || ntremu.uncap);
 
             if (!(ntremu.pause)) {
                 do {

@@ -900,8 +900,6 @@ void gxcmd_execute(GPU* gpu) {
             gpu->w_buffer = gpu->param_fifo[0] & 2;
             gpu->autosort = !(gpu->param_fifo[0] & 1);
 
-            // eprintf("%d/%d ", gpu->master->io7.vcount, gpu->drawing);
-
             if (gpu->drawing || gpu->master->io7.vcount >= NDS_SCREEN_H) {
                 gpu->pending_swapbuffers = true;
                 break;
@@ -1486,9 +1484,9 @@ void render_polygon(GPU* gpu, poly* p) {
                 u16 sr = gpu->screen_back[y][x] & 0x1f;
                 u16 sg = gpu->screen_back[y][x] >> 5 & 0x1f;
                 u16 sb = gpu->screen_back[y][x] >> 10 & 0x1f;
-                r = (r * a + sr * (31 - a)) / 32;
-                g = (g * a + sg * (31 - a)) / 32;
-                b = (b * a + sb * (31 - a)) / 32;
+                r = (r * (a + 1) + sr * (31 - a)) / 32;
+                g = (g * (a + 1) + sg * (31 - a)) / 32;
+                b = (b * (a + 1) + sb * (31 - a)) / 32;
                 gpu->attr_buf[y][x].blend = 1;
                 gpu->attr_buf[y][x].fog &= p->attr.fog;
             } else {
