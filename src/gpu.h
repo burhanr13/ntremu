@@ -233,6 +233,8 @@ typedef struct {
     PolygonAttr cur_attr;
 
     vertex cur_vtx;
+    vec4 cur_texcoord;
+
     int cur_vtx_ct;
     bool tri_orient;
 

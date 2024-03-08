@@ -303,8 +303,8 @@ void add_vtx(GPU* gpu) {
     update_mtxs(gpu);
 
     if (gpu->cur_texparam.transform == TEXTF_VTX) {
-        float s = gpu->cur_vtx.vt.p[0];
-        float t = gpu->cur_vtx.vt.p[1];
+        float s = gpu->cur_texcoord.p[0];
+        float t = gpu->cur_texcoord.p[1];
         gpu->cur_vtx.vt = gpu->cur_vtx.v;
         gpu->cur_vtx.vt.p[3] = 0;
         vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
@@ -723,8 +723,8 @@ void gxcmd_execute(GPU* gpu) {
             normal.p[3] = 0;
 
             if (gpu->cur_texparam.transform == TEXTF_NORMAL) {
-                float s = gpu->cur_vtx.vt.p[0];
-                float t = gpu->cur_vtx.vt.p[1];
+                float s = gpu->cur_texcoord.p[0];
+                float t = gpu->cur_texcoord.p[1];
                 gpu->cur_vtx.vt = normal;
                 vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
                 gpu->cur_vtx.vt.p[0] += s;
@@ -777,11 +777,14 @@ void gxcmd_execute(GPU* gpu) {
             break;
         }
         case TEXCOORD:
-            gpu->cur_vtx.vt.p[0] =
+            gpu->cur_texcoord.p[0] =
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 20);
-            gpu->cur_vtx.vt.p[1] =
+            gpu->cur_texcoord.p[1] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 20);
-            if (gpu->cur_texparam.transform == TEXTF_TEXCOORD) {
+            if (gpu->cur_texparam.transform == TEXTF_NONE) {
+                gpu->cur_vtx.vt = gpu->cur_texcoord;
+            } else if (gpu->cur_texparam.transform == TEXTF_TEXCOORD) {
+                gpu->cur_vtx.vt = gpu->cur_texcoord;
                 gpu->cur_vtx.vt.p[2] = 0.0625f;
                 gpu->cur_vtx.vt.p[3] = 0.0625f;
                 vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
@@ -1035,11 +1038,14 @@ void swap_buffers(GPU* gpu) {
     pthread_mutex_unlock(&gpu_mutex);
 }
 
+#define VTX_SCX(_v) (((_v).v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x)
+#define VTX_SCY(_v) ((1 - (_v).v.p[1]) * gpu->view_h / 2 + gpu->view_y)
+
 void render_line(GPU* gpu, vertex* v0, vertex* v1) {
-    int x0 = (v0->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
-    int y0 = (1 - v0->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
-    int x1 = (v1->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
-    int y1 = (1 - v1->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
+    int x0 = VTX_SCX(*v0);
+    int y0 = VTX_SCY(*v0);
+    int x1 = VTX_SCX(*v1);
+    int y1 = VTX_SCY(*v1);
 
     float m = (float) (y1 - y0) / (x1 - x0);
     if (fabsf(m) > 1) {
@@ -1086,10 +1092,10 @@ void render_polygon_wireframe(GPU* gpu, poly* p) {
 void render_line_attrs(GPU* gpu, vertex* v0, vertex* v1,
                        struct interp_attrs* left, struct interp_attrs* right) {
 
-    int x0 = (v0->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
-    int y0 = (1 - v0->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
-    int x1 = (v1->v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x;
-    int y1 = (1 - v1->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
+    int x0 = VTX_SCX(*v0);
+    int y0 = VTX_SCY(*v0);
+    int x1 = VTX_SCX(*v1);
+    int y1 = VTX_SCY(*v1);
 
     struct interp_attrs i0, i1;
 
@@ -1212,7 +1218,7 @@ void render_polygon(GPU* gpu, poly* p) {
     int yMin = NDS_SCREEN_H;
     int yMax = -1;
     for (int i = 0; i < p->n; i++) {
-        int y = (1 - p->p[i]->v.p[1]) * gpu->view_h / 2 + gpu->view_y;
+        int y = VTX_SCY(*p->p[i]);
         if (y > yMax) yMax = y;
         if (y < yMin) yMin = y;
     }
@@ -1258,10 +1264,12 @@ void render_polygon(GPU* gpu, poly* p) {
                 if (gpu->w_buffer)
                     depth_test =
                         fabsf(1 / i.w - gpu->depth_buf[y][x]) <= 0.125f;
-                else depth_test = fabsf(i.z - gpu->depth_buf[y][x]) <= 0.125f;
+                else
+                    depth_test =
+                        fabsf(i.z / i.w - gpu->depth_buf[y][x]) <= 0.125f;
             } else {
                 if (gpu->w_buffer) depth_test = 1 / i.w < gpu->depth_buf[y][x];
-                else depth_test = i.z < gpu->depth_buf[y][x];
+                else depth_test = i.z / i.w < gpu->depth_buf[y][x];
             }
             if (!depth_test) {
                 if (!p->attr.id && p->attr.mode == POLYMODE_SHADOW) {
@@ -1475,7 +1483,7 @@ void render_polygon(GPU* gpu, poly* p) {
 
             if (a == 31 || p->attr.depth_transparent) {
                 if (gpu->w_buffer) gpu->depth_buf[y][x] = 1 / i.w;
-                else gpu->depth_buf[y][x] = i.z;
+                else gpu->depth_buf[y][x] = i.z / i.w;
             }
 
             if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
