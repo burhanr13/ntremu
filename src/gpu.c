@@ -1262,12 +1262,10 @@ void render_polygon(GPU* gpu, poly* p) {
                 if (gpu->w_buffer)
                     depth_test =
                         fabsf(1 / i.w - gpu->depth_buf[y][x]) <= 0.125f;
-                else
-                    depth_test =
-                        fabsf(i.z / i.w - gpu->depth_buf[y][x]) <= 0.125f;
+                else depth_test = fabsf(i.z - gpu->depth_buf[y][x]) <= 0.125f;
             } else {
                 if (gpu->w_buffer) depth_test = 1 / i.w < gpu->depth_buf[y][x];
-                else depth_test = i.z / i.w < gpu->depth_buf[y][x];
+                else depth_test = i.z < gpu->depth_buf[y][x];
             }
             if (!depth_test) {
                 if (!p->attr.id && p->attr.mode == POLYMODE_SHADOW) {
@@ -1481,7 +1479,7 @@ void render_polygon(GPU* gpu, poly* p) {
 
             if (a == 31 || p->attr.depth_transparent) {
                 if (gpu->w_buffer) gpu->depth_buf[y][x] = 1 / i.w;
-                else gpu->depth_buf[y][x] = i.z / i.w;
+                else gpu->depth_buf[y][x] = i.z;
             }
 
             if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
