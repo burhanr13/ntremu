@@ -303,13 +303,13 @@ void add_vtx(GPU* gpu) {
     update_mtxs(gpu);
 
     if (gpu->cur_texparam.transform == TEXTF_VTX) {
-        float s = gpu->cur_texcoord.p[0];
-        float t = gpu->cur_texcoord.p[1];
         gpu->cur_vtx.vt = gpu->cur_vtx.v;
         gpu->cur_vtx.vt.p[3] = 0;
         vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
-        gpu->cur_vtx.vt.p[0] += s;
-        gpu->cur_vtx.vt.p[1] += t;
+        gpu->cur_vtx.vt.p[0] /= 16;
+        gpu->cur_vtx.vt.p[1] /= 16;
+        gpu->cur_vtx.vt.p[0] += gpu->cur_texcoord.p[0];
+        gpu->cur_vtx.vt.p[1] += gpu->cur_texcoord.p[1];
     }
 
     vertex v = gpu->cur_vtx;
@@ -723,12 +723,12 @@ void gxcmd_execute(GPU* gpu) {
             normal.p[3] = 0;
 
             if (gpu->cur_texparam.transform == TEXTF_NORMAL) {
-                float s = gpu->cur_texcoord.p[0];
-                float t = gpu->cur_texcoord.p[1];
                 gpu->cur_vtx.vt = normal;
                 vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);
-                gpu->cur_vtx.vt.p[0] += s;
-                gpu->cur_vtx.vt.p[1] += t;
+                gpu->cur_vtx.vt.p[0] /= 16;
+                gpu->cur_vtx.vt.p[1] /= 16;
+                gpu->cur_vtx.vt.p[0] += gpu->cur_texcoord.p[0];
+                gpu->cur_vtx.vt.p[1] += gpu->cur_texcoord.p[1];
             }
 
             vecmul(&gpu->vecmtx, &normal);
@@ -781,10 +781,8 @@ void gxcmd_execute(GPU* gpu) {
                 ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 20);
             gpu->cur_texcoord.p[1] =
                 (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 20);
-            if (gpu->cur_texparam.transform == TEXTF_NONE) {
-                gpu->cur_vtx.vt = gpu->cur_texcoord;
-            } else if (gpu->cur_texparam.transform == TEXTF_TEXCOORD) {
-                gpu->cur_vtx.vt = gpu->cur_texcoord;
+            gpu->cur_vtx.vt = gpu->cur_texcoord;
+            if (gpu->cur_texparam.transform == TEXTF_TEXCOORD) {
                 gpu->cur_vtx.vt.p[2] = 0.0625f;
                 gpu->cur_vtx.vt.p[3] = 0.0625f;
                 vecmul(&gpu->texmtx, &gpu->cur_vtx.vt);

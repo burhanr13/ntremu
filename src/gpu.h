@@ -25,6 +25,7 @@ enum {
     MTX_MULT_33,
     MTX_SCALE,
     MTX_TRANS = 0x1c,
+
     COLOR = 0x20,
     NORMAL,
     TEXCOORD,
@@ -37,15 +38,20 @@ enum {
     POLYGON_ATTR,
     TEXIMAGE_PARAM,
     PLTT_BASE,
+
     DIF_AMB = 0x30,
     SPE_EMI,
     LIGHT_VECTOR,
     LIGHT_COLOR,
     SHININESS = 0x34,
+
     BEGIN_VTXS = 0x40,
     END_VTXS,
+
     SWAP_BUFFERS = 0x50,
+
     VIEWPORT = 0x60,
+    
     BOX_TEST = 0x70,
     POS_TEST,
     VEC_TEST
