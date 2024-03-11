@@ -97,7 +97,7 @@ bool card_write_command(GameCard* card, u8* command) {
                             (command[0] & 0xf) << 12;
                 card->addr = block << 12;
                 card->i = 0;
-                card->len = 0x1018;
+                card->len = 0x1000;
                 return true;
                 break;
             }
@@ -159,10 +159,7 @@ bool card_read_data(GameCard* card, u32* data) {
             *data = CHIPID;
             return false;
         case CARD_DATA:
-            if (card->i >= 0x1000) *data = 0;
-            else
-                *data =
-                    *(u32*) &card->rom[(card->addr + card->i) % card->rom_size];
+            *data = *(u32*) &card->rom[(card->addr + card->i) % card->rom_size];
             card->i += 4;
             if (card->i < card->len) {
                 return true;
