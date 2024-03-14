@@ -285,8 +285,16 @@ void render_bgs(PPU* ppu) {
             if (ppu->io->dispcnt.bg_enable & 1) {
                 ppu->draw_bg[0] = true;
                 ppu->bg0_3d = true;
-                memcpy(ppu->layerlines[0], ppu->master->gpu.screen[ppu->ly],
-                       sizeof ppu->screen[0]);
+
+                for (int x = 0; x < NDS_SCREEN_W; x++) {
+                    int sx = (ppu->io->bgtext[0].hofs + x) % 512;
+                    if (sx >= NDS_SCREEN_W) {
+                        ppu->layerlines[0][x] = 0;
+                    } else {
+                        ppu->layerlines[0][x] =
+                            ppu->master->gpu.screen[ppu->ly][sx];
+                    }
+                }
             }
         } else {
             render_bg_line_text(ppu, 0);
@@ -920,7 +928,7 @@ void lcd_capture_line(NDS* nds) {
     }
     u32 dest_addr = 0x8000 * nds->io9.dispcapcnt.vram_w_off +
                     2 * NDS_SCREEN_W * nds->io7.vcount;
-                    
+
     if (nds->vramstate.lcdc[nds->io9.dispcapcnt.vram_w_block] == VRAMNULL)
         return;
 
