@@ -920,11 +920,14 @@ void lcd_capture_line(NDS* nds) {
     }
     u32 dest_addr = 0x8000 * nds->io9.dispcapcnt.vram_w_off +
                     2 * NDS_SCREEN_W * nds->io7.vcount;
-    if (dest_addr >= 0x20000) return;
-    int len = 0x20000 - dest_addr;
-    if (len > 2 * w) len = 2 * w;
-    memcpy(&nds->vrambanks[nds->io9.dispcapcnt.vram_w_block][dest_addr], source,
-           len);
+                    
+    if (nds->vramstate.lcdc[nds->io9.dispcapcnt.vram_w_block] == VRAMNULL)
+        return;
+
+    for (int i = 0; i < w; i++) {
+        *(u16*) &nds->vrambanks[nds->io9.dispcapcnt.vram_w_block]
+                               [(dest_addr + 2 * i) % VRAMABCDSIZE] = source[i];
+    }
 }
 
 void lcd_hdraw(NDS* nds) {
