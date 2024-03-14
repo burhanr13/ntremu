@@ -22,6 +22,7 @@
                 }                                                              \
                 break;                                                         \
             case R_IO:                                                         \
+                nds->memerr = true;                                            \
                 return io9_read##size(&nds->io9, addr & 0xffffff);             \
                 break;                                                         \
             case R_PAL:                                                        \

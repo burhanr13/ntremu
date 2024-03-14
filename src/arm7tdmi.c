@@ -10,6 +10,13 @@
 #include "types.h"
 
 void cpu7_step(Arm7TDMI* cpu) {
+    cpu->instr_history[cpu->history_ind] = cpu->cur_instr;
+    cpu->instr_addr_history[cpu->history_ind] = cpu->cur_instr_addr;
+    cpu->history_ind++;
+    cpu->history_ind %= HISTORY_SIZE;
+
+    if (cpu->cur_instr.w == 0) cpu->master->cpuerr = true;
+
     cpu->cycles = 0;
     if (!cpu->cpsr.i && cpu->irq) {
         cpu7_handle_interrupt(cpu, I_IRQ);
@@ -86,6 +93,7 @@ void cpu7_handle_interrupt(Arm7TDMI* cpu, CpuInterrupt intr) {
             cpu->cpsr.m = M_ABT;
             break;
         case I_UND:
+            cpu->master->cpuerr = true;
             cpu->cpsr.m = M_UND;
             break;
         case I_IRQ:

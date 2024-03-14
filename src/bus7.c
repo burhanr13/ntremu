@@ -30,6 +30,7 @@
                 return *(u##size*) (&nds->wram7[addr % WRAM7SIZE]);            \
                 break;                                                         \
             case R_IO:                                                         \
+                nds->memerr = true;                                            \
                 return io7_read##size(&nds->io7, addr & 0xffffff);             \
                 break;                                                         \
             case R_VRAM: {                                                     \

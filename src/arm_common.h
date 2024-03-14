@@ -1,6 +1,8 @@
 #ifndef ARM_COMMON_H
 #define ARM_COMMON_H
 
+#define HISTORY_SIZE (1<<20)
+
 typedef enum { B_USER, B_FIQ, B_SVC, B_ABT, B_IRQ, B_UND, B_CT } RegBank;
 typedef enum {
     M_USER = 0b10000,

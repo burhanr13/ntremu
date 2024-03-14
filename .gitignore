@@ -7,5 +7,6 @@ build
 release
 
 ntremu*
+*.log
 
 perf*

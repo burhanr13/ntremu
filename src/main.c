@@ -151,6 +151,9 @@ int main(int argc, char** argv) {
             dst.y += dst.h;
             update_input_touch(ntremu.nds, &dst);
 
+            bool a = (frame < 600 && (frame & 1)) || frame == 800;
+            ntremu.nds->io7.keyinput.a = ntremu.nds->io9.keyinput.a = !a;
+
             if (!ntremu.uncap) {
                 if (play_audio) {
                     while (SDL_GetQueuedAudioSize(audio) >= 16 * SAMPLE_BUF_LEN)
@@ -187,6 +190,27 @@ int main(int argc, char** argv) {
 
         if (ntremu.debugger) {
             ntremu.running = false;
+            if (ntremu.nds->cpuerr) {
+                FILE* f = fopen("arm7.log", "w");
+                for (int i = 0; i < HISTORY_SIZE; i++) {
+                    fprintf(
+                        f, "%08x: %08x ",
+                        ntremu.nds->cpu7.instr_addr_history
+                            [(ntremu.nds->cpu7.history_ind + i) % HISTORY_SIZE],
+                        ntremu.nds->cpu7
+                            .instr_history[(ntremu.nds->cpu7.history_ind + i) %
+                                           HISTORY_SIZE].w);
+                    arm4_disassemble(
+                        ntremu.nds->cpu7
+                            .instr_history[(ntremu.nds->cpu7.history_ind + i) %
+                                           HISTORY_SIZE],
+                        ntremu.nds->cpu7.instr_addr_history
+                            [(ntremu.nds->cpu7.history_ind + i) % HISTORY_SIZE],
+                        f);
+                    fprintf(f, "\n");
+                }
+                fclose(f);
+            }
             if (bkpthit) {
                 printf("Breakpoint hit: %08x\n", ntremu.breakpoint);
             }

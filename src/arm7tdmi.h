@@ -49,6 +49,10 @@ typedef struct _Arm7TDMI {
 
     bool irq;
 
+    Arm4Instr instr_history[HISTORY_SIZE];
+    u32 instr_addr_history[HISTORY_SIZE];
+    int history_ind;
+
 } Arm7TDMI;
 
 void cpu7_step(Arm7TDMI* cpu);
