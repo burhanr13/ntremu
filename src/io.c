@@ -473,7 +473,7 @@ VRAMBank* get_vram_map(NDS* nds, VRAMBank bank, int mst, int ofs) {
         default:
             break;
     }
-    return &nds->vramstate.lcdc[bank - 1];
+    return NULL;
 }
 
 void vram_map_ppu(NDS* nds, VRAMBank bank, int mst, int ofs) {
@@ -542,7 +542,7 @@ void io9_write8(IO* io, u32 addr, u8 data) {
             if (io->vramcnt[i].enable) {
                 VRAMBank* pre = get_vram_map(io->master, b, io->vramcnt[i].mst,
                                              io->vramcnt[i].ofs);
-                if (*pre == b) *pre = VRAMNULL;
+                if (pre && *pre == b) *pre = VRAMNULL;
                 if (b == VRAMC && io->vramcnt[i].mst == 2) {
                     io->master->io7.vramstat &= ~1;
                 } else if (b == VRAMD && io->vramcnt[i].mst == 2) {
@@ -551,16 +551,21 @@ void io9_write8(IO* io, u32 addr, u8 data) {
             }
             io->vramcnt[i].b = data;
             if (io->vramcnt[i].enable) {
-                *get_vram_map(io->master, b, io->vramcnt[i].mst,
-                              io->vramcnt[i].ofs) = b;
+
                 if (b == VRAMC && io->vramcnt[i].mst == 2) {
                     io->master->io7.vramstat |= 1;
                 } else if (b == VRAMD && io->vramcnt[i].mst == 2) {
                     io->master->io7.vramstat |= 2;
                 }
 
-                vram_map_ppu(io->master, b, io->vramcnt[i].mst,
-                             io->vramcnt[i].ofs);
+                VRAMBank* post = get_vram_map(io->master, b, io->vramcnt[i].mst,
+                                              io->vramcnt[i].ofs);
+                if (post) {
+                    *post = b;
+                } else {
+                    vram_map_ppu(io->master, b, io->vramcnt[i].mst,
+                                 io->vramcnt[i].ofs);
+                }
             }
             break;
         }
