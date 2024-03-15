@@ -5,6 +5,7 @@
 roms
 build
 release
+*.log
 
 ntremu*
 
