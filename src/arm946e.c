@@ -10,6 +10,13 @@
 #include "types.h"
 
 bool cpu9_step(Arm946E* cpu) {
+    cpu->instr_history[cpu->history_ind] = cpu->cur_instr;
+    cpu->instr_addr_history[cpu->history_ind] = cpu->cur_instr_addr;
+    cpu->history_ind++;
+    cpu->history_ind %= HISTORY_SIZE;
+
+    if (cpu->cur_instr.w == 0) cpu->master->cpuerr = true;
+
     cpu->cycles = 0;
     if (cpu->halt) {
         if (cpu->irq) {

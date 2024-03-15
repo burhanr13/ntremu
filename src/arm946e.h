@@ -61,6 +61,10 @@ typedef struct _Arm946E {
     u32 dtcm_base;
     u32 dtcm_virtsize;
 
+    Arm5Instr instr_history[HISTORY_SIZE];
+    u32 instr_addr_history[HISTORY_SIZE];
+    int history_ind;
+
 } Arm946E;
 
 bool cpu9_step(Arm946E* cpu);
