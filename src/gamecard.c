@@ -159,7 +159,9 @@ bool card_read_data(GameCard* card, u32* data) {
             *data = CHIPID;
             return false;
         case CARD_DATA:
-            *data = *(u32*) &card->rom[(card->addr + card->i) % card->rom_size];
+            *data = *(u32*) &card->rom[((card->addr & 0xfffff000) +
+                                        ((card->addr + card->i) & 0xfff)) %
+                                       card->rom_size];
             card->i += 4;
             if (card->i < card->len) {
                 return true;
