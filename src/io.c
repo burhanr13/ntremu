@@ -230,7 +230,8 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                 bool key1com = io->master->card->key1mode;
                 if (card_write_command(io->master->card, io->romcommand)) {
                     io->romctrl.busy = 1;
-                    add_event(&io->master->sched, EVENT_CARD_DRQ, 20);
+                    add_event(&io->master->sched, EVENT_CARD_DRQ,
+                              io->master->sched.now + 32);
                 } else if (key1com) {
                     io->ifl.gamecardtrans = 1;
                     UPDATE_IRQ(7);
@@ -334,7 +335,7 @@ u32 io7_read32(IO* io, u32 addr) {
                 io->romctrl.drq = 0;
                 if (card_read_data(io->master->card, &data)) {
                     add_event(&io->master->sched, EVENT_CARD_DRQ,
-                              io->master->sched.now + 20);
+                              io->master->sched.now + 32);
                 } else {
                     io->romctrl.busy = 0;
                     io->ifl.gamecardtrans = 1;
@@ -776,7 +777,7 @@ void io9_write16(IO* io, u32 addr, u16 data) {
                 if (card_write_command(io->master->card, io->romcommand)) {
                     io->romctrl.busy = 1;
                     add_event(&io->master->sched, EVENT_CARD_DRQ,
-                              io->master->sched.now + 20);
+                              io->master->sched.now + 32);
                 }
             }
             break;
@@ -858,7 +859,7 @@ u32 io9_read32(IO* io, u32 addr) {
                 io->romctrl.drq = 0;
                 if (card_read_data(io->master->card, &data)) {
                     add_event(&io->master->sched, EVENT_CARD_DRQ,
-                              io->master->sched.now + 20);
+                              io->master->sched.now + 32);
                 } else {
                     io->romctrl.busy = 0;
                     io->ifl.gamecardtrans = 1;
