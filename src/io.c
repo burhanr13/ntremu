@@ -641,10 +641,13 @@ void io9_write16(IO* io, u32 addr, u16 data) {
 
         s64 op1 = io->div_numer, op2 = io->div_denom;
 
+        int cycles = 34;
+
         switch (io->divcnt.mode) {
             case 0:
                 op1 = (s32) op1;
                 op2 = (s32) op2;
+                cycles = 18;
                 break;
             case 1:
                 op2 = (s32) op2;
@@ -663,7 +666,9 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             io->divrem_result = op1 % op2;
         }
 
-        io->divcnt.busy = 0;
+        io->divcnt.busy = 1;
+        remove_event(&io->master->sched, EVENT_DIV);
+        add_event_in(&io->master->sched, EVENT_DIV, cycles);
         return;
     }
     if (addr == SQRTCNT || (SQRT_PARAM <= addr && addr < SQRT_PARAM + 8)) {
@@ -675,7 +680,9 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             io->sqrt_result = sqrt((u32) io->sqrt_param);
         }
 
-        io->sqrtcnt.busy = 0;
+        io->sqrtcnt.busy = 1;
+        remove_event(&io->master->sched, EVENT_SQRT);
+        add_event_in(&io->master->sched, EVENT_SQRT, 13);
         return;
     }
     if (GXFIFO <= addr && addr < GXSTAT) {

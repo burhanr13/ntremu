@@ -7,6 +7,9 @@ typedef enum {
     EVENT_LCD_HDRAW,
     EVENT_LCD_HBLANK,
     EVENT_CARD_DRQ,
+    EVENT_DIV,
+    EVENT_SQRT,
+    EVENT_GXCMD,
     EVENT_TM07_RELOAD,
     EVENT_TM17_RELOAD,
     EVENT_TM27_RELOAD,
@@ -46,6 +49,7 @@ static inline bool event_pending(Scheduler* sched) {
 }
 
 void add_event(Scheduler* sched, EventType t, u64 time);
+#define add_event_in(s, t, time) add_event(s, t, (s)->now + time);
 void remove_event(Scheduler* sched, EventType t);
 u64 find_event(Scheduler* sched, EventType t);
 

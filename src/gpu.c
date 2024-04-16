@@ -8,10 +8,6 @@
 #include "io.h"
 #include "nds.h"
 
-#define IS_SEMITRANS(p)                                                        \
-    ((p).attr.alpha < 31 || (p).texparam.format == TEX_A3I5 ||                 \
-     (p).texparam.format == TEX_A5I3)
-
 extern bool wireframe;
 extern bool freecam;
 extern mat4 freecam_mtx;
@@ -28,6 +24,16 @@ const int cmd_parms[8][16] = {{0},
                               {1},
                               {1},
                               {3, 2, 1}};
+
+const int cmd_cycles[8][16] = {
+    {0},
+    {1, 17, 36, 17, 36, 19, 34, 30, 35, 31, 28, 22, 22},
+    {1, 9, 1, 9, 8, 8, 8, 8, 8, 1, 1, 1},
+    {4, 4, 6, 1, 32},
+    {1, 1},
+    {392},
+    {1},
+    {103, 9, 5}};
 
 void* gpu_thread_run(void* data) {
     GPU* gpu = data;
@@ -61,9 +67,8 @@ void gpu_init_ptrs(GPU* gpu) {
 }
 
 void gxfifo_write(GPU* gpu, u32 command) {
-    if (gpu->master->io9.gxstat.gxfifo_size == 256) {
-        gpu->master->sched.now = gpu->master->next_vblank;
-        run_to_present(&gpu->master->sched);
+    while (gpu->master->io9.gxstat.gxfifo_size >= 256 - 4) {
+        run_next_event(&gpu->master->sched);
     }
 
     if (gpu->params_pending) {
@@ -85,8 +90,8 @@ void gxfifo_write(GPU* gpu, u32 command) {
         }
     }
 
-    if (!gpu->blocked) {
-        gxcmd_execute_all(gpu);
+    if (!(gpu->blocked || gpu->master->io9.gxstat.gx_busy)) {
+        gxcmd_schedule_next(gpu);
     }
 
     gpu->master->io9.gxstat.gxfifo_empty =
@@ -99,12 +104,14 @@ void gxfifo_write(GPU* gpu, u32 command) {
                                    gpu->master->io9.gxstat.gxfifo_half);
 }
 
-void gxcmd_execute_all(GPU* gpu) {
-    if (!gpu->params_pending) {
-        while (!gpu->blocked && gpu->cmd_fifosize) {
-            gxcmd_execute(gpu);
-        }
-    }
+void gxcmd_schedule_next(GPU* gpu) {
+    if (gpu->cmd_fifosize == 0 ||
+        (gpu->cmd_fifosize <= 4 && gpu->params_pending))
+        return;
+    gpu->master->io9.gxstat.gx_busy = 1;
+    u8 cmd = gpu->cmd_fifo[0];
+    int cycles = cmd_cycles[cmd >> 4][cmd & 0xf];
+    add_event_in(&gpu->master->sched, EVENT_GXCMD, cycles);
 }
 
 void matmul(mat4* dst, mat4* src) {
@@ -409,6 +416,8 @@ void normalize_vtxs(GPU* gpu) {
 }
 
 void gxcmd_execute(GPU* gpu) {
+    gpu->master->io9.gxstat.gx_busy = 0;
+
     u8 cmd = gpu->cmd_fifo[0];
     switch (cmd) {
         case MTX_MODE:
@@ -900,12 +909,13 @@ void gxcmd_execute(GPU* gpu) {
             gpu->blocked = true;
             gpu->w_buffer = gpu->param_fifo[0] & 2;
             gpu->autosort = !(gpu->param_fifo[0] & 1);
+            gpu->master->io9.gxstat.gx_busy = 1;
 
             if (gpu->drawing || gpu->master->io7.vcount >= NDS_SCREEN_H) {
                 gpu->pending_swapbuffers = true;
-                break;
+            } else {
+                swap_buffers(gpu);
             }
-            swap_buffers(gpu);
             break;
         }
         case VIEWPORT: {
@@ -1012,6 +1022,8 @@ void gxcmd_execute(GPU* gpu) {
     } else {
         gpu->master->io9.gxstat.gxfifo_size--;
     }
+
+    gxcmd_schedule_next(gpu);
 }
 
 void swap_buffers(GPU* gpu) {
@@ -1510,6 +1522,10 @@ void render_polygon(GPU* gpu, poly* p) {
         }
     }
 }
+
+#define IS_SEMITRANS(p)                                                        \
+    ((p).attr.alpha < 31 || (p).texparam.format == TEX_A3I5 ||                 \
+     (p).texparam.format == TEX_A5I3)
 
 void gpu_render(GPU* gpu) {
     if (gpu->master->io9.disp3dcnt.rearplane_mode) {

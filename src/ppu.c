@@ -1036,7 +1036,8 @@ void lcd_vblank(NDS* nds) {
 
     if (nds->gpu.blocked) {
         nds->gpu.blocked = false;
-        gxcmd_execute_all(&nds->gpu);
+        nds->io9.gxstat.gx_busy = 0;
+        gxcmd_schedule_next(&nds->gpu);
     }
 
     for (int i = 0; i < 4; i++) {

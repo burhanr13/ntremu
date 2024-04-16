@@ -278,7 +278,7 @@ void gpu_init_ptrs(GPU* gpu);
 
 void gxfifo_write(GPU* gpu, u32 command);
 void gxcmd_execute(GPU* gpu);
-void gxcmd_execute_all(GPU* gpu);
+void gxcmd_schedule_next(GPU* gpu);
 void swap_buffers(GPU* gpu);
 
 void update_mtxs(GPU* gpu);

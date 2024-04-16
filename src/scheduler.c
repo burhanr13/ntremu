@@ -25,25 +25,40 @@ int run_next_event(Scheduler* sched) {
     }
     sched->now = e.time;
 
-    if (e.type == EVENT_LCD_HDRAW) {
-        lcd_hdraw(sched->master);
-    } else if (e.type == EVENT_LCD_HBLANK) {
-        lcd_hblank(sched->master);
-    } else if (e.type == EVENT_CARD_DRQ) {
-        if (sched->master->io7.exmemcnt.ndscardrights) {
-            sched->master->io7.romctrl.drq = 1;
-            for (int i = 0; i < 4; i++) {
-                if (sched->master->io7.dma[i].cnt.mode == DMA7_DSCARD) {
-                    dma7_activate(&sched->master->dma7, i);
+    if (e.type < EVENT_TM07_RELOAD) {
+        switch (e.type) {
+            case EVENT_LCD_HDRAW:
+                lcd_hdraw(sched->master);
+                break;
+            case EVENT_LCD_HBLANK:
+                lcd_hblank(sched->master);
+                break;
+            case EVENT_CARD_DRQ:
+                if (sched->master->io7.exmemcnt.ndscardrights) {
+                    sched->master->io7.romctrl.drq = 1;
+                    for (int i = 0; i < 4; i++) {
+                        if (sched->master->io7.dma[i].cnt.mode == DMA7_DSCARD) {
+                            dma7_activate(&sched->master->dma7, i);
+                        }
+                    }
+                } else {
+                    sched->master->io9.romctrl.drq = 1;
+                    for (int i = 0; i < 4; i++) {
+                        if (sched->master->io9.dma[i].cnt.mode == DMA9_DSCARD) {
+                            dma9_activate(&sched->master->dma9, i);
+                        }
+                    }
                 }
-            }
-        } else {
-            sched->master->io9.romctrl.drq = 1;
-            for (int i = 0; i < 4; i++) {
-                if (sched->master->io9.dma[i].cnt.mode == DMA9_DSCARD) {
-                    dma9_activate(&sched->master->dma9, i);
-                }
-            }
+                break;
+            case EVENT_DIV:
+                sched->master->io9.divcnt.busy = 0;
+                break;
+            case EVENT_SQRT:
+                sched->master->io9.sqrtcnt.busy = 0;
+                break;
+            case EVENT_GXCMD:
+                gxcmd_execute(&sched->master->gpu);
+                break;
         }
     } else if (e.type < EVENT_TM09_RELOAD) {
         reload_timer(&sched->master->tmc7, e.type - EVENT_TM07_RELOAD);
@@ -100,9 +115,10 @@ u64 find_event(Scheduler* sched, EventType t) {
 
 void print_scheduled_events(Scheduler* sched) {
     static char* event_names[EVENT_MAX] = {
-        "LCD HDraw",    "LCD HBlank",   "GameCard DRQ", "TM0-7 Reload",
-        "TM1-7 Reload", "TM2-7 Reload", "TM3-7 Reload", "TM0-9 Reload",
-        "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload", "SPU Sample"};
+        "LCD HDraw",     "LCD HBlank",     "GameCard DRQ", "DIV Complete",
+        "SQRT Complete", "GXFIFO Command", "TM0-7 Reload", "TM1-7 Reload",
+        "TM2-7 Reload",  "TM3-7 Reload",   "TM0-9 Reload", "TM1-9 Reload",
+        "TM2-9 Reload",  "TM3-9 Reload",   "SPU Sample"};
 
     printf("Now: %ld\n", sched->now);
     for (int i = 0; i < sched->n_events; i++) {
