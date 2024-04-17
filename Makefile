@@ -16,6 +16,8 @@ DEPS := $(OBJS:.o=.d)
 OBJS_RELEASE := $(SRCS:%=$(RELEASE_DIR)/%.o)
 DEPS_RELEASE := $(OBJS_RELEASE:.o=.d)
 
+target: release
+
 .PHONY: debug
 debug: $(BUILD_DIR)/$(TARGET_EXEC)
 

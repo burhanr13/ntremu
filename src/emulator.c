@@ -5,6 +5,7 @@
 
 #include "arm4_isa.h"
 #include "arm5_isa.h"
+#include "emulator_state.h"
 #include "nds.h"
 #include "thumb1_isa.h"
 #include "thumb2_isa.h"
@@ -13,10 +14,6 @@
 #define ROTATE_SPEED 0.02
 
 EmulatorState ntremu;
-
-bool wireframe;
-bool freecam;
-mat4 freecam_mtx;
 
 const char usage[] = "ntremu [options] <romfile>\n"
                      "-u -- run at uncapped speed\n"
@@ -136,28 +133,30 @@ void hotkey_press(SDL_KeyCode key) {
             ntremu.uncap = !ntremu.uncap;
             break;
         case SDLK_o:
-            wireframe = !wireframe;
+            ntremu.wireframe = !ntremu.wireframe;
             break;
         case SDLK_BACKSPACE:
             if (ntremu.nds->io7.extkeyin.hinge) {
                 ntremu.nds->io7.extkeyin.hinge = 0;
                 ntremu.nds->io7.ifl.unfold = 1;
-                ntremu.nds->io9.ifl.unfold = 1;
             } else {
                 ntremu.nds->io7.extkeyin.hinge = 1;
             }
             break;
         case SDLK_c:
-            if (freecam) {
-                freecam = false;
+            if (ntremu.freecam) {
+                ntremu.freecam = false;
             } else {
-                freecam = true;
-                freecam_mtx = (mat4){0};
-                freecam_mtx.p[0][0] = 1;
-                freecam_mtx.p[1][1] = 1;
-                freecam_mtx.p[2][2] = 1;
-                freecam_mtx.p[3][3] = 1;
+                ntremu.freecam = true;
+                ntremu.freecam_mtx = (mat4){0};
+                ntremu.freecam_mtx.p[0][0] = 1;
+                ntremu.freecam_mtx.p[1][1] = 1;
+                ntremu.freecam_mtx.p[2][2] = 1;
+                ntremu.freecam_mtx.p[3][3] = 1;
             }
+            break;
+        case SDLK_u:
+            ntremu.abs_touch = !ntremu.abs_touch;
             break;
         default:
             break;
@@ -211,21 +210,67 @@ void update_input_controller(NDS* nds, SDL_GameController* controller) {
         ~SDL_GameControllerGetButton(controller, SDL_CONTROLLER_BUTTON_X);
 }
 
-void update_input_touch(NDS* nds, SDL_Rect* ts_bounds) {
+void update_input_touch(NDS* nds, SDL_Rect* ts_bounds,
+                        SDL_GameController* controller) {
     int x, y;
     bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
     x = (x - ts_bounds->x) * NDS_SCREEN_W / ts_bounds->w;
     y = (y - ts_bounds->y) * NDS_SCREEN_H / ts_bounds->h;
     if (x < 0 || x >= NDS_SCREEN_W || y < 0 || y >= NDS_SCREEN_H)
         pressed = false;
-    if (!pressed) {
-        x = 0;
-        y = 0xff;
+    if (pressed) {
+        nds->tsc.x = x;
+        nds->tsc.y = y;
+    }
+
+    if (controller) {
+        int x =
+            SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX);
+        int y =
+            SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY);
+        x -= 3000;
+        y -= 400;
+        if (x >= (1 << 15)) x = (1 << 15) - 1;
+        if (x < INT16_MIN) x = INT16_MIN;
+        if (y >= (1 << 15)) y = (1 << 15) - 1;
+        if (y < INT16_MIN) y = INT16_MIN;
+        if (abs(x) >= 3000 || abs(y) >= 3000) {
+            pressed = true;
+
+            if (ntremu.abs_touch) {
+                nds->tsc.x =
+                    NDS_SCREEN_W / 2 + (x * (NDS_SCREEN_W / 2 - 10) >> 15);
+                nds->tsc.y =
+                    NDS_SCREEN_H / 2 + (y * (NDS_SCREEN_H / 2 - 10) >> 15);
+            } else {
+                static int prev_x, prev_y, target_x, target_y;
+                if (nds->tsc.x == (u8) -1) {
+                    nds->tsc.x = NDS_SCREEN_W / 2;
+                    nds->tsc.y = NDS_SCREEN_H / 2;
+                    prev_x = x, prev_y = y;
+                    target_x = NDS_SCREEN_W / 2;
+                    target_y = NDS_SCREEN_H / 2;
+                } else if (abs(x - prev_x) > 10 || abs(y - prev_y) > 10) {
+                    prev_x = x, prev_y = y;
+                    int tx = target_x + (x >> 12);
+                    int ty = target_y + (y >> 12);
+                    if (tx >= 0 && tx < NDS_SCREEN_W && ty >= 0 &&
+                        ty < NDS_SCREEN_H) {
+                        target_x = tx;
+                        target_y = ty;
+                    }
+                    nds->tsc.x = (nds->tsc.x + target_x) / 2;
+                    nds->tsc.y = (nds->tsc.y + target_y) / 2;
+                }
+            }
+        }
     }
 
     nds->io7.extkeyin.pen = !pressed;
-    nds->tsc.x = x;
-    nds->tsc.y = y;
+    if (!pressed) {
+        ntremu.nds->tsc.x = -1;
+        ntremu.nds->tsc.y = -1;
+    }
 }
 
 void matmul2(mat4* a, mat4* b, mat4* dst) {
@@ -254,8 +299,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[1][3] = -speed;
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_S]) {
         mat4 m = {0};
@@ -265,8 +310,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[1][3] = speed;
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_Q]) {
         mat4 m = {0};
@@ -277,8 +322,8 @@ void update_input_freecam() {
         m.p[2][1] = sinf(ROTATE_SPEED);
         m.p[2][2] = cosf(ROTATE_SPEED);
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_E]) {
         mat4 m = {0};
@@ -289,8 +334,8 @@ void update_input_freecam() {
         m.p[2][1] = sinf(-ROTATE_SPEED);
         m.p[2][2] = cosf(-ROTATE_SPEED);
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_A]) {
         mat4 m = {0};
@@ -300,8 +345,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[0][3] = speed;
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_D]) {
         mat4 m = {0};
@@ -311,8 +356,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[0][3] = -speed;
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_LEFT]) {
         mat4 m = {0};
@@ -323,8 +368,8 @@ void update_input_freecam() {
         m.p[0][2] = sinf(-ROTATE_SPEED);
         m.p[0][0] = cosf(-ROTATE_SPEED);
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_RIGHT]) {
         mat4 m = {0};
@@ -335,8 +380,8 @@ void update_input_freecam() {
         m.p[0][2] = sinf(ROTATE_SPEED);
         m.p[0][0] = cosf(ROTATE_SPEED);
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_UP]) {
         mat4 m = {0};
@@ -346,8 +391,8 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[2][3] = speed;
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_DOWN]) {
         mat4 m = {0};
@@ -357,7 +402,12 @@ void update_input_freecam() {
         m.p[3][3] = 1;
         m.p[2][3] = -speed;
         mat4 tmp;
-        matmul2(&m, &freecam_mtx, &tmp);
-        freecam_mtx = tmp;
+        matmul2(&m, &ntremu.freecam_mtx, &tmp);
+        ntremu.freecam_mtx = tmp;
     }
+
+    ntremu.nds->io7.keyinput.keys = 0x3ff;
+    ntremu.nds->io9.keyinput.keys = 0x3ff;
+    ntremu.nds->io7.extkeyin.x = 1;
+    ntremu.nds->io7.extkeyin.y = 1;
 }

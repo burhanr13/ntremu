@@ -5,16 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "emulator_state.h"
 #include "io.h"
 #include "nds.h"
 
 #define IS_SEMITRANS(p)                                                        \
     ((p).attr.alpha < 31 || (p).texparam.format == TEX_A3I5 ||                 \
      (p).texparam.format == TEX_A5I3)
-
-extern bool wireframe;
-extern bool freecam;
-extern mat4 freecam_mtx;
 
 pthread_t gpu_thread;
 pthread_mutex_t gpu_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -153,9 +150,9 @@ void update_mtxs(GPU* gpu) {
         }
     }
 
-    if (freecam) {
+    if (ntremu.freecam) {
         gpu->clipmtx = gpu->projmtx;
-        matmul(&gpu->clipmtx, &freecam_mtx);
+        matmul(&gpu->clipmtx, &ntremu.freecam_mtx);
         matmul(&gpu->clipmtx, &gpu->posmtx);
     }
 }
@@ -1544,7 +1541,7 @@ void gpu_render(GPU* gpu) {
             }
         }
     }
-    if (wireframe) {
+    if (ntremu.wireframe) {
         for (int i = 0; i < gpu->n_polys_rendering; i++) {
             render_polygon_wireframe(gpu, &gpu->polygonram_rendering[i]);
         }

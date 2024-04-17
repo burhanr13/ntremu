@@ -7,8 +7,6 @@
 #include "nds.h"
 #include "types.h"
 
-extern bool freecam;
-
 char wintitle[200];
 
 static inline void center_screen_in_window(int windowW, int windowH,
@@ -137,19 +135,15 @@ int main(int argc, char** argv) {
                 if (e.type == SDL_QUIT) ntremu.running = false;
                 if (e.type == SDL_KEYDOWN) hotkey_press(e.key.keysym.sym);
             }
-            if (freecam) {
+            if (ntremu.freecam) {
                 update_input_freecam();
-                ntremu.nds->io7.keyinput.keys = 0x3ff;
-                ntremu.nds->io9.keyinput.keys = 0x3ff;
-                ntremu.nds->io7.extkeyin.x = 1;
-                ntremu.nds->io7.extkeyin.y = 1;
             } else {
                 update_input_keyboard(ntremu.nds);
             }
             if (controller) update_input_controller(ntremu.nds, controller);
             dst.h /= 2;
             dst.y += dst.h;
-            update_input_touch(ntremu.nds, &dst);
+            update_input_touch(ntremu.nds, &dst, controller);
 
             if (!ntremu.uncap) {
                 if (play_audio) {
