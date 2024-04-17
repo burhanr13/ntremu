@@ -227,6 +227,11 @@ u32 cpu9_fetch32(Arm946E* cpu, u32 addr) {
 }
 
 u32 cp15_read(Arm946E* cpu, u32 cn, u32 cm, u32 cp) {
+    if (cn == 0 && cm == 0) {
+        if (cp == 0) {
+            return 0x41059460;
+        }
+    }
     if (cn == 9 && cm == 1) {
         u32 virtsize = 0, base = 0;
         if (cp == 0) {
