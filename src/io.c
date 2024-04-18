@@ -691,11 +691,50 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             break;
         case VCOUNT:
             break;
+        case BG2X:
+        case BG2X + 2:
+            io->h[addr >> 1] = data;
+            io->master->ppuA.bgaffintr[0].x = io->ppuA.bgaff[0].x;
+            break;
+        case BG2Y:
+        case BG2Y + 2:
+            io->h[addr >> 1] = data;
+            io->master->ppuA.bgaffintr[0].y = io->ppuA.bgaff[0].y;
+            break;
+        case BG3X:
+        case BG3X + 2:
+            io->h[addr >> 1] = data;
+            io->master->ppuA.bgaffintr[1].x = io->ppuA.bgaff[1].x;
+            break;
+        case BG3Y:
+        case BG3Y + 2:
+            io->h[addr >> 1] = data;
+            io->master->ppuA.bgaffintr[1].y = io->ppuA.bgaff[1].y;
+            break;
+        case PPUB_OFF + BG2X:
+        case PPUB_OFF + BG2X + 2:
+            io->h[addr >> 1] = data;
+            io->master->ppuB.bgaffintr[0].x = io->ppuB.bgaff[0].x;
+            break;
+        case PPUB_OFF + BG2Y:
+        case PPUB_OFF + BG2Y + 2:
+            io->h[addr >> 1] = data;
+            io->master->ppuB.bgaffintr[0].y = io->ppuB.bgaff[0].y;
+            break;
+        case PPUB_OFF + BG3X:
+        case PPUB_OFF + BG3X + 2:
+            io->h[addr >> 1] = data;
+            io->master->ppuB.bgaffintr[1].x = io->ppuB.bgaff[1].x;
+            break;
+        case PPUB_OFF + BG3Y:
+        case PPUB_OFF + BG3Y + 2:
+            io->h[addr >> 1] = data;
+            io->master->ppuB.bgaffintr[1].y = io->ppuB.bgaff[1].y;
+            break;
         case DISP3DCNT:
             io->disp3dcnt.w = data;
-            if (io->disp3dcnt.rdlines_underflow)
-                io->disp3dcnt.rdlines_underflow = 0;
-            if (io->disp3dcnt.ram_overflow) io->disp3dcnt.ram_overflow = 0;
+            io->disp3dcnt.rdlines_underflow = 0;
+            io->disp3dcnt.ram_overflow = 0;
             break;
         case DMA0CNT + 2:
         case DMA1CNT + 2:
