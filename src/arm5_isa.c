@@ -588,8 +588,8 @@ void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr) {
             if (instr.half_trans.rd == 15) cpu9_flush(cpu);
         } else {
             if (instr.half_trans.h) {
-                cpu9_write32(cpu, addr, cpu->r[instr.half_trans.rd]);
-                cpu9_write32(cpu, addr + 4, cpu->r[instr.half_trans.rd | 1]);
+                cpu9_write32m(cpu, addr, 0, cpu->r[instr.half_trans.rd]);
+                cpu9_write32m(cpu, addr, 1, cpu->r[instr.half_trans.rd + 1]);
                 if (instr.half_trans.w || !instr.half_trans.p) {
                     cpu->r[instr.half_trans.rn] = wback;
                 }
@@ -597,8 +597,8 @@ void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr) {
                 if (instr.half_trans.w || !instr.half_trans.p) {
                     cpu->r[instr.half_trans.rn] = wback;
                 }
-                cpu->r[instr.half_trans.rd] = cpu9_read32(cpu, addr);
-                cpu->r[instr.half_trans.rd | 1] = cpu9_read32(cpu, addr + 4);
+                cpu->r[instr.half_trans.rd] = cpu9_read32m(cpu, addr, 0);
+                cpu->r[instr.half_trans.rd + 1] = cpu9_read32m(cpu, addr, 1);
             }
         }
     } else if (instr.half_trans.h) {
