@@ -54,8 +54,10 @@ typedef struct {
     char* rom_filename;
     char* sav_filename;
 
+    bool sav_new;
+
     u8* rom;
-    u32 rom_size;
+    u64 rom_size;
 
     bool encrypted;
 
@@ -63,7 +65,6 @@ typedef struct {
 
     u32 addr;
     u32 i;
-    u32 secure_gap;
     u32 len;
     bool key1mode;
 

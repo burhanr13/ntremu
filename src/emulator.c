@@ -1,7 +1,10 @@
 #include "emulator.h"
 
 #include <SDL2/SDL.h>
+#include <fcntl.h>
 #include <math.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "arm4_isa.h"
 #include "arm5_isa.h"
@@ -16,48 +19,53 @@
 EmulatorState ntremu;
 
 const char usage[] = "ntremu [options] <romfile>\n"
-                     "-u -- run at uncapped speed\n"
-                     "-d -- run the debugger\n";
+                     "-b -- boot from firmware\n"
+                     "-d -- run the debugger\n"
+                     "-p <path> -- path to bios/firmware files\n";
 
 int emulator_init(int argc, char** argv) {
     read_args(argc, argv);
     if (!ntremu.romfile) {
-        printf(usage);
+        eprintf(usage);
         return -1;
     }
 
-    ntremu.bios7 = malloc(BIOS7SIZE);
-    FILE* f = fopen("bios7.bin", "rb");
-    if (!f) {
-        printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' "
-               "exist.\n");
+    int dirfd = AT_FDCWD;
+    if (ntremu.biosPath) {
+        dirfd = open(ntremu.biosPath, O_RDONLY | O_DIRECTORY);
+        if (dirfd < 0) {
+            eprintf("Invalid bios path\n");
+            return -1;
+        }
+    }
+
+    int bios7fd = openat(dirfd, "bios7.bin", O_RDONLY);
+    int bios9fd = openat(dirfd, "bios9.bin", O_RDONLY);
+    int firmwarefd = openat(dirfd, "firmware.bin", O_RDWR);
+
+    close(dirfd);
+
+    if (bios7fd < 0 || bios9fd < 0 || firmwarefd < 0) {
+        eprintf("Missing bios or firmware. Make sure 'bios7.bin','bios9.bin', "
+                "and 'firmware.bin' exist.\n");
         return -1;
     }
-    fread(ntremu.bios7, 1, BIOS7SIZE, f);
-    fclose(f);
-    ntremu.bios9 = malloc(BIOS9SIZE);
-    f = fopen("bios9.bin", "rb");
-    if (!f) {
-        printf("No BIOS found. Make sure both 'bios7.bin' and 'bios9.bin' "
-               "exist.\n");
-        return -1;
-    }
-    fread(ntremu.bios9, 1, BIOS9SIZE, f);
-    fclose(f);
-    ntremu.firmware = malloc(FIRMSIZE);
-    f = fopen("firmware.bin", "rb");
-    if (f) {
-        fread(ntremu.firmware, 1, FIRMSIZE, f);
-        fclose(f);
-    } else {
-        printf("Firmware not found.\n");
-    }
+
+    ntremu.bios7 =
+        mmap(NULL, BIOS7SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, bios7fd, 0);
+    ntremu.bios9 =
+        mmap(NULL, BIOS9SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, bios9fd, 0);
+    ntremu.firmware = mmap(NULL, FIRMWARESIZE, PROT_READ | PROT_WRITE,
+                           MAP_SHARED, firmwarefd, 0);
+
+    close(bios7fd);
+    close(bios9fd);
+    close(firmwarefd);
 
     ntremu.nds = malloc(sizeof *ntremu.nds);
     ntremu.card = create_card(ntremu.romfile);
     if (!ntremu.card) {
-        free(ntremu.nds);
-        printf("Invalid rom file\n");
+        eprintf("Invalid rom file\n");
         return -1;
     }
 
@@ -78,14 +86,9 @@ int emulator_init(int argc, char** argv) {
 void emulator_quit() {
     destroy_card(ntremu.card);
     free(ntremu.nds);
-    free(ntremu.bios7);
-    free(ntremu.bios9);
-    FILE* f = fopen("firmware.bin", "wb");
-    if (f) {
-        fwrite(ntremu.firmware, 1, FIRMSIZE, f);
-        fclose(f);
-    }
-    free(ntremu.firmware);
+    munmap(ntremu.bios7, BIOS7SIZE);
+    munmap(ntremu.bios9, BIOS9SIZE);
+    munmap(ntremu.firmware, FIRMWARESIZE);
 }
 
 void emulator_reset() {
@@ -98,17 +101,21 @@ void read_args(int argc, char** argv) {
         if (argv[i][0] == '-') {
             for (char* f = &argv[i][1]; *f; f++) {
                 switch (*f) {
-                    case 'u':
-                        ntremu.uncap = true;
-                        break;
                     case 'd':
                         ntremu.debugger = true;
                         break;
                     case 'b':
                         ntremu.bootbios = true;
                         break;
+                    case 'p':
+                        if (!f[1] && i + 1 < argc) {
+                            ntremu.biosPath = argv[++i];
+                        } else {
+                            eprintf("Missing argument for '-p'\n");
+                        }
+                        break;
                     default:
-                        printf("Invalid flag\n");
+                        eprintf("Invalid argument\n");
                 }
             }
         } else {

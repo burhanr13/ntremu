@@ -8,6 +8,7 @@
 typedef struct {
     char* romfile;
     char* romfilenodir;
+    char* biosPath;
 
     bool running;
     bool uncap;

@@ -562,6 +562,11 @@ void exec_arm5_sat_arith(Arm946E* cpu, Arm5Instr instr) {
 }
 
 void exec_arm5_half_trans(Arm946E* cpu, Arm5Instr instr) {
+    if(!instr.half_trans.l && instr.half_trans.s && (instr.half_trans.rd & 1)) {
+        cpu9_handle_interrupt(cpu, I_UND);
+        return;
+    }
+
     u32 addr = cpu->r[instr.half_trans.rn];
     u32 offset;
     if (instr.half_trans.i) {

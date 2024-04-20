@@ -1,61 +1,79 @@
 #include "gamecard.h"
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "key1.h"
 
 GameCard* create_card(char* filename) {
-    FILE* fp = fopen(filename, "rb");
-    if (!fp) return NULL;
+
+    int fd = open(filename, O_RDONLY);
+    if (fd < 0) return NULL;
 
     GameCard* card = calloc(1, sizeof *card);
 
-    fseek(fp, 0, SEEK_END);
-    card->rom_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    if (card->rom_size < 0x200) card->rom_size = 0x200;
-    card->rom = malloc(card->rom_size);
-    fread(card->rom, 1, card->rom_size, fp);
-    fclose(fp);
+    struct stat st;
+    fstat(fd, &st);
+    u64 v = st.st_size;
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    v++;
+    if (v < (1 << 17)) v = 1 << 17;
+    card->rom_size = v;
+    card->rom =
+        mmap(NULL, card->rom_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    close(fd);
 
-    card->rom_filename = malloc(strlen(filename) + 1);
-    strcpy(card->rom_filename, filename);
+    card->rom_filename = strdup(filename);
     int i = strrchr(filename, '.') - filename;
     card->sav_filename = malloc(i + sizeof ".sav");
     strncpy(card->sav_filename, card->rom_filename, i);
     strcpy(card->sav_filename + i, ".sav");
 
-    fp = fopen(card->sav_filename, "rb");
-    if (!fp) {
+    fd = open(card->sav_filename, O_RDWR);
+    if (fd < 0) {
+        card->sav_new = true;
         card->eeprom = calloc(1 << 16, 1);
         card->eeprom_size = 1 << 16;
         card->addrtype = 2;
     } else {
-        fseek(fp, 0, SEEK_END);
-        card->eeprom_size = ftell(fp);
+        struct stat st;
+        fstat(fd, &st);
+        card->eeprom_size = st.st_size;
         if (card->eeprom_size == 512) card->addrtype = 1;
         else if (card->eeprom_size <= (1 << 16)) card->addrtype = 2;
         else card->addrtype = 3;
         card->eeprom_detected = true;
-        fseek(fp, 0, SEEK_SET);
-        card->eeprom = malloc(card->eeprom_size);
-        fread(card->eeprom, 1, card->eeprom_size, fp);
-        fclose(fp);
+        card->eeprom = mmap(NULL, card->eeprom_size, PROT_READ | PROT_WRITE,
+                            MAP_SHARED, fd, 0);
+        close(fd);
     }
 
     return card;
 }
 
 void destroy_card(GameCard* card) {
-    FILE* fp = fopen(card->sav_filename, "wb");
-    if (fp) {
-        fwrite(card->eeprom, 1, card->eeprom_size, fp);
-        fclose(fp);
+    if (card->sav_new) {
+        FILE* fp = fopen(card->sav_filename, "wb");
+        if (fp) {
+            fwrite(card->eeprom, 1, card->eeprom_size, fp);
+            fclose(fp);
+        }
+        free(card->eeprom);
+    } else {
+        munmap(card->eeprom, card->eeprom_size);
     }
-    free(card->eeprom);
-    free(card->rom);
+    munmap(card->rom, card->rom_size);
     free(card);
 }
 
@@ -132,7 +150,7 @@ bool card_write_command(GameCard* card, u8* command) {
                 card->state = CARD_DATA;
                 card->addr = command[1] << 24 | command[2] << 16 |
                              command[3] << 8 | command[4];
-                card->addr %= card->rom_size;
+                card->addr &= card->rom_size - 1;
                 if (card->addr < 0x8000) {
                     card->addr = 0x8000 + (card->addr & 0x1ff);
                 }
@@ -159,9 +177,8 @@ bool card_read_data(GameCard* card, u32* data) {
             *data = CHIPID;
             return false;
         case CARD_DATA:
-            *data = *(u32*) &card->rom[((card->addr & 0xfffff000) +
-                                        ((card->addr + card->i) & 0xfff)) %
-                                       card->rom_size];
+            *data = *(u32*) &card->rom[(card->addr & 0xfffff000) +
+                                       ((card->addr + card->i) & 0xfff)];
             card->i += 4;
             if (card->i < card->len) {
                 return true;

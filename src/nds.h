@@ -26,7 +26,18 @@
 #define VRAMFGISIZE (1 << 14)
 #define VRAMHSIZE (1 << 15)
 
-typedef enum { VRAMNULL, VRAMA, VRAMB, VRAMC, VRAMD, VRAME, VRAMF, VRAMG, VRAMH, VRAMI } VRAMBank;
+typedef enum {
+    VRAMNULL,
+    VRAMA,
+    VRAMB,
+    VRAMC,
+    VRAMD,
+    VRAME,
+    VRAMF,
+    VRAMG,
+    VRAMH,
+    VRAMI
+} VRAMBank;
 
 #define PALSIZE (1 << 10)
 
@@ -35,7 +46,7 @@ typedef enum { VRAMNULL, VRAMA, VRAMB, VRAMC, VRAMD, VRAME, VRAMF, VRAMG, VRAMH,
 
 #define BIOS7SIZE (1 << 14)
 #define BIOS9SIZE (1 << 15)
-#define FIRMSIZE (1 << 18)
+#define FIRMWARESIZE (1 << 18)
 
 typedef enum { CPU9, CPU7 } CPUType;
 
@@ -211,7 +222,8 @@ typedef struct _NDS {
 
 } NDS;
 
-void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware, bool bootbios);
+void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
+              bool bootbios);
 
 bool nds_step(NDS* nds);
 void nds_run(NDS* nds);
