@@ -10,8 +10,7 @@
 #include "emulator.h"
 #include "nds.h"
 #include "scheduler.h"
-#include "thumb1_isa.h"
-#include "thumb2_isa.h"
+#include "thumb_isa.h"
 
 const char* help = "Debugger commands:\n"
                    "c -- continue emulation\n"
@@ -274,17 +273,17 @@ void debugger_run() {
                             u32 addr = ntremu.nds->cpu7.cur_instr_addr +
                                        ((i - lines) << 1);
                             printf("%03x: ", addr & 0xfff);
-                            thumb1_disassemble(
-                                (Thumb1Instr){bus7_read16(ntremu.nds, addr)},
+                            thumb_disassemble(
+                                (ThumbInstr){bus7_read16(ntremu.nds, addr)},
                                 addr, stdout);
                             printf("\n");
                         } else {
                             u32 addr = ntremu.nds->cpu7.cur_instr_addr +
                                        ((i - lines) << 2);
                             printf("%03x: ", addr & 0xfff);
-                            arm4_disassemble(
-                                (Arm4Instr){bus7_read32(ntremu.nds, addr)},
-                                addr, stdout);
+                            arm_disassemble(
+                                (ArmInstr){bus7_read32(ntremu.nds, addr)}, addr,
+                                stdout);
                             printf("\n");
                         }
                     }
@@ -296,17 +295,17 @@ void debugger_run() {
                             u32 addr = ntremu.nds->cpu9.cur_instr_addr +
                                        ((i - lines) << 1);
                             printf("%03x: ", addr & 0xfff);
-                            thumb2_disassemble((Thumb2Instr){cpu9_fetch16(
-                                                   &ntremu.nds->cpu9, addr)},
-                                               addr, stdout);
+                            thumb_disassemble((ThumbInstr){cpu9_fetch16(
+                                                  &ntremu.nds->cpu9, addr)},
+                                              addr, stdout);
                             printf("\n");
                         } else {
                             u32 addr = ntremu.nds->cpu9.cur_instr_addr +
                                        ((i - lines) << 2);
                             printf("%03x: ", addr & 0xfff);
-                            arm5_disassemble((Arm5Instr){cpu9_fetch32(
-                                                 &ntremu.nds->cpu9, addr)},
-                                             addr, stdout);
+                            arm_disassemble((ArmInstr){cpu9_fetch32(
+                                                &ntremu.nds->cpu9, addr)},
+                                            addr, stdout);
                             printf("\n");
                         }
                     }

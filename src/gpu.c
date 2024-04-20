@@ -9,10 +9,6 @@
 #include "io.h"
 #include "nds.h"
 
-#define IS_SEMITRANS(p)                                                        \
-    ((p).attr.alpha < 31 || (p).texparam.format == TEX_A3I5 ||                 \
-     (p).texparam.format == TEX_A5I3)
-
 pthread_t gpu_thread;
 pthread_mutex_t gpu_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t gpu_cond = PTHREAD_COND_INITIALIZER;
@@ -38,6 +34,7 @@ void* gpu_thread_run(void* data) {
 
 void init_gpu_thread(GPU* gpu) {
     pthread_create(&gpu_thread, NULL, gpu_thread_run, gpu);
+    pthread_detach(gpu_thread);
 }
 
 void destroy_gpu_thread() {
@@ -1507,6 +1504,10 @@ void render_polygon(GPU* gpu, poly* p) {
         }
     }
 }
+
+#define IS_SEMITRANS(p)                                                        \
+    ((p).attr.alpha < 31 || (p).texparam.format == TEX_A3I5 ||                 \
+     (p).texparam.format == TEX_A5I3)
 
 void gpu_render(GPU* gpu) {
     if (gpu->master->io9.disp3dcnt.rearplane_mode) {

@@ -135,14 +135,14 @@ typedef union {
         u16 h1 : 1;
         u16 c1 : 3; // 111
     } branch_l;
-} Thumb2Instr;
+} ThumbInstr;
 
-extern Arm5Instr thumb2_lookup[1 << 16];
+extern ArmInstr thumb_lookup[1 << 16];
 
-void thumb2_generate_lookup();
+void thumb_generate_lookup();
 
-Arm5Instr thumb2_decode_instr(Thumb2Instr instr);
+ArmInstr thumb_decode_instr(ThumbInstr instr);
 
-void thumb2_disassemble(Thumb2Instr instr, u32 addr, FILE* out);
+void thumb_disassemble(ThumbInstr instr, u32 addr, FILE* out);
 
 #endif

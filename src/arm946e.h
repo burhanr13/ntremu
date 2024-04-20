@@ -45,8 +45,8 @@ typedef struct _Arm946E {
     u32 banked_lr[B_CT];
     u32 banked_spsr[B_CT];
 
-    Arm5Instr cur_instr;
-    Arm5Instr next_instr;
+    ArmInstr cur_instr;
+    ArmInstr next_instr;
     u32 cur_instr_addr;
 
     int cycles;

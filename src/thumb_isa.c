@@ -1,17 +1,15 @@
-#include "thumb1_isa.h"
+#include "thumb_isa.h"
 
-#include "arm7tdmi.h"
+ArmInstr thumb_lookup[1 << 16];
 
-Arm4Instr thumb1_lookup[1 << 16];
-
-void thumb1_generate_lookup() {
+void thumb_generate_lookup() {
     for (int i = 0; i < 1 << 16; i++) {
-        thumb1_lookup[i] = thumb1_decode_instr((Thumb1Instr){i});
+        thumb_lookup[i] = thumb_decode_instr((ThumbInstr){i});
     }
 }
 
-Arm4Instr thumb1_decode_instr(Thumb1Instr instr) {
-    Arm4Instr dec = {0};
+ArmInstr thumb_decode_instr(ThumbInstr instr) {
+    ArmInstr dec = {0};
     dec.cond = C_AL;
 
     switch (instr.n3) {
@@ -122,7 +120,8 @@ Arm4Instr thumb1_decode_instr(Thumb1Instr instr) {
                     dec.data_proc.s = 0;
                     dec.data_proc.rn = instr.hi_ops.rd | (instr.hi_ops.h1 << 3);
                     dec.data_proc.rd = instr.hi_ops.rd | (instr.hi_ops.h1 << 3);
-                    dec.data_proc.op2 = instr.hi_ops.rs | (instr.hi_ops.h2 << 3);
+                    dec.data_proc.op2 =
+                        instr.hi_ops.rs | (instr.hi_ops.h2 << 3);
                     switch (instr.hi_ops.op) {
                         case 0:
                             dec.data_proc.opcode = A_ADD;
@@ -135,9 +134,12 @@ Arm4Instr thumb1_decode_instr(Thumb1Instr instr) {
                             dec.data_proc.opcode = A_MOV;
                             break;
                         case 3:
-                            dec.branch_ex.c3 = 0b0001;
+                            dec.branch_ex.c4 = 1;
+                            dec.branch_ex.l = instr.hi_ops.h1;
+                            dec.branch_ex.c3 = 0b00;
                             dec.branch_ex.c1 = 0b00010010;
-                            dec.branch_ex.rn = instr.hi_ops.rs | (instr.hi_ops.h2 << 3);
+                            dec.branch_ex.rn =
+                                instr.hi_ops.rs | (instr.hi_ops.h2 << 3);
                             break;
                     }
                     break;
@@ -195,8 +197,9 @@ Arm4Instr thumb1_decode_instr(Thumb1Instr instr) {
             dec.single_trans.l = instr.ldst_imm.l;
             dec.single_trans.rn = instr.ldst_imm.rb;
             dec.single_trans.rd = instr.ldst_imm.rd;
-            dec.single_trans.offset =
-                (instr.ldst_imm.b) ? instr.ldst_imm.offset : instr.ldst_imm.offset << 2;
+            dec.single_trans.offset = (instr.ldst_imm.b)
+                                          ? instr.ldst_imm.offset
+                                          : instr.ldst_imm.offset << 2;
             break;
         case 8:
             dec.half_trans.c1 = 0b000;
@@ -286,20 +289,22 @@ Arm4Instr thumb1_decode_instr(Thumb1Instr instr) {
             }
             break;
         case 14:
-            dec.branch.c1 = 0b101;
-            dec.branch.l = 0;
-            u32 offset = instr.branch.offset;
-            if (offset & (1 << 10)) offset |= 0xfffff800;
-            dec.branch.offset = offset;
-            break;
         case 15:
             dec.branch.c1 = 0b101;
-            dec.branch.l = 1;
-            if (instr.branch_l.h) {
-                dec.branch.offset = instr.branch_l.offset;
-                dec.branch.offset |= 1 << 22;
+            if (instr.branch.c1 == 0b11100) {
+                dec.branch.l = 0;
+                u32 offset = instr.branch.offset;
+                if (offset & (1 << 10)) offset |= 0xfffff800;
+                dec.branch.offset = offset;
             } else {
-                dec.branch.offset = instr.branch_l.offset << 11;
+                dec.branch.l = 1;
+                if (instr.branch_l.h) {
+                    dec.branch.offset = instr.branch_l.offset;
+                    dec.branch.offset |= 1 << 22;
+                    if (!instr.branch_l.h1) dec.cond = 0xf;
+                } else {
+                    dec.branch.offset = instr.branch_l.offset << 11;
+                }
             }
             break;
     }
@@ -307,6 +312,6 @@ Arm4Instr thumb1_decode_instr(Thumb1Instr instr) {
     return dec;
 }
 
-void thumb1_disassemble(Thumb1Instr instr, u32 addr, FILE* out) {
-    arm4_disassemble(thumb1_lookup[instr.h], addr, out);
+void thumb_disassemble(ThumbInstr instr, u32 addr, FILE* out) {
+    arm_disassemble(thumb_lookup[instr.h], addr, out);
 }

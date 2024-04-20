@@ -41,8 +41,8 @@ typedef struct _Arm7TDMI {
     u32 banked_lr[B_CT];
     u32 banked_spsr[B_CT];
 
-    Arm4Instr cur_instr;
-    Arm4Instr next_instr;
+    ArmInstr cur_instr;
+    ArmInstr next_instr;
     u32 cur_instr_addr;
 
     int cycles;
@@ -71,7 +71,6 @@ void cpu7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w);
 
 u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr);
 u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr);
-
 
 void print_cpu7_state(Arm7TDMI* cpu);
 void print_cur_instr7(Arm7TDMI* cpu);

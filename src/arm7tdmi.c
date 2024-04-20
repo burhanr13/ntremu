@@ -6,7 +6,7 @@
 #include "arm_common.h"
 #include "bus7.h"
 #include "nds.h"
-#include "thumb1_isa.h"
+#include "thumb_isa.h"
 #include "types.h"
 
 void cpu7_step(Arm7TDMI* cpu) {
@@ -21,7 +21,7 @@ void cpu7_step(Arm7TDMI* cpu) {
 void cpu7_fetch_instr(Arm7TDMI* cpu) {
     cpu->cur_instr = cpu->next_instr;
     if (cpu->cpsr.t) {
-        cpu->next_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc)];
+        cpu->next_instr = thumb_lookup[cpu7_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
         cpu->cur_instr_addr += 2;
     } else {
@@ -35,9 +35,9 @@ void cpu7_flush(Arm7TDMI* cpu) {
     if (cpu->cpsr.t) {
         cpu->pc &= ~1;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc)];
+        cpu->cur_instr = thumb_lookup[cpu7_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
-        cpu->next_instr = thumb1_lookup[cpu7_fetch16(cpu, cpu->pc)];
+        cpu->next_instr = thumb_lookup[cpu7_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
     } else {
         cpu->pc &= ~0b11;
@@ -130,7 +130,8 @@ u32 cpu7_read32(Arm7TDMI* cpu, u32 addr) {
     cpu->cycles++;
     u32 data = bus7_read32(cpu->master, addr & ~3);
     if (addr & 0b11) {
-        data = (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
+        data =
+            (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
     }
     return data;
 }
@@ -181,8 +182,9 @@ u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr) {
 }
 
 void print_cpu7_state(Arm7TDMI* cpu) {
-    static char* reg_names[16] = {"r0", "r1", "r2",  "r3",  "r4", "r5", "r6", "r7",
-                                  "r8", "r9", "r10", "r11", "ip", "sp", "lr", "pc"};
+    static char* reg_names[16] = {"r0", "r1", "r2", "r3", "r4",  "r5",
+                                  "r6", "r7", "r8", "r9", "r10", "r11",
+                                  "ip", "sp", "lr", "pc"};
     for (int i = 0; i < 4; i++) {
         if (i == 0) printf("CPU7 ");
         else printf("     ");
@@ -191,20 +193,20 @@ void print_cpu7_state(Arm7TDMI* cpu) {
         }
         printf("\n");
     }
-    printf("     cpsr=%08x (n=%d,z=%d,c=%d,v=%d,i=%d,f=%d,t=%d,m=%s)\n", cpu->cpsr.w, cpu->cpsr.n,
-           cpu->cpsr.z, cpu->cpsr.c, cpu->cpsr.v, cpu->cpsr.i, cpu->cpsr.v, cpu->cpsr.t,
-           mode_name(cpu->cpsr.m));
+    printf("     cpsr=%08x (n=%d,z=%d,c=%d,v=%d,i=%d,f=%d,t=%d,m=%s)\n",
+           cpu->cpsr.w, cpu->cpsr.n, cpu->cpsr.z, cpu->cpsr.c, cpu->cpsr.v,
+           cpu->cpsr.i, cpu->cpsr.v, cpu->cpsr.t, mode_name(cpu->cpsr.m));
 }
 
 void print_cur_instr7(Arm7TDMI* cpu) {
     if (cpu->cpsr.t) {
-        Thumb1Instr instr = {bus7_read16(cpu->master, cpu->cur_instr_addr)};
+        ThumbInstr instr = {bus7_read16(cpu->master, cpu->cur_instr_addr)};
         printf("%08x: %04x ", cpu->cur_instr_addr, instr.h);
-        thumb1_disassemble(instr, cpu->cur_instr_addr, stdout);
+        thumb_disassemble(instr, cpu->cur_instr_addr, stdout);
         printf("\n");
     } else {
         printf("%08x: %08x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        arm4_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
+        arm_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
         printf("\n");
     }
 }

@@ -1,6 +1,10 @@
 #ifndef ARM_COMMON_H
 #define ARM_COMMON_H
 
+#include <stdio.h>
+
+#include "types.h"
+
 typedef enum { B_USER, B_FIQ, B_SVC, B_ABT, B_IRQ, B_UND, B_CT } RegBank;
 typedef enum {
     M_USER = 0b10000,
@@ -12,9 +16,34 @@ typedef enum {
     M_SYSTEM = 0b11111
 } CpuMode;
 
-typedef enum { I_RESET, I_UND, I_SWI, I_PABT, I_DABT, I_ADDR, I_IRQ, I_FIQ } CpuInterrupt;
+typedef enum {
+    I_RESET,
+    I_UND,
+    I_SWI,
+    I_PABT,
+    I_DABT,
+    I_ADDR,
+    I_IRQ,
+    I_FIQ
+} CpuInterrupt;
 
-enum { C_EQ, C_NE, C_CS, C_CC, C_MI, C_PL, C_VS, C_VC, C_HI, C_LS, C_GE, C_LT, C_GT, C_LE, C_AL };
+enum {
+    C_EQ,
+    C_NE,
+    C_CS,
+    C_CC,
+    C_MI,
+    C_PL,
+    C_VS,
+    C_VC,
+    C_HI,
+    C_LS,
+    C_GE,
+    C_LT,
+    C_GT,
+    C_LE,
+    C_AL
+};
 
 enum {
     A_AND,
@@ -56,7 +85,193 @@ enum {
     T_MVN
 };
 
+typedef union {
+    u32 w;
+    struct {
+        u32 _b0_3 : 4;
+        u32 declo : 4;
+        u32 _b8_19 : 12;
+        u32 dechi : 8;
+        u32 cond : 4;
+    };
+    struct {
+        u32 op2 : 12;
+        u32 rd : 4;
+        u32 rn : 4;
+        u32 s : 1;
+        u32 opcode : 4;
+        u32 i : 1;
+        u32 c1 : 2; // 00
+        u32 cond : 4;
+    } data_proc;
+    struct {
+        u32 op2 : 12;
+        u32 rd : 4;
+        u32 c : 1;
+        u32 x : 1;
+        u32 s : 1;
+        u32 f : 1;
+        u32 c3 : 1; // 0
+        u32 op : 1;
+        u32 p : 1;
+        u32 c2 : 2; // 10
+        u32 i : 1;
+        u32 c1 : 2; // 00
+        u32 cond : 4;
+    } psr_trans;
+    struct {
+        u32 rm : 4;
+        u32 c2 : 4; // 1001
+        u32 rs : 4;
+        u32 rn : 4;
+        u32 rd : 4;
+        u32 s : 1;
+        u32 a : 1;
+        u32 c1 : 6; // 000000
+        u32 cond : 4;
+    } multiply;
+    struct {
+        u32 rm : 4;
+        u32 c2 : 4; // 1001
+        u32 rs : 4;
+        u32 rdlo : 4;
+        u32 rdhi : 4;
+        u32 s : 1;
+        u32 a : 1;
+        u32 u : 1;
+        u32 c1 : 5; // 00001
+        u32 cond : 4;
+    } multiply_long;
+    struct {
+        u32 rm : 4;
+        u32 c4 : 1; // 0
+        u32 x : 1;
+        u32 y : 1;
+        u32 c3 : 1; // 1
+        u32 rs : 4;
+        u32 rn : 4;
+        u32 rd : 4;
+        u32 c2 : 1; // 0
+        u32 op : 2;
+        u32 c1 : 5; // 00010
+    } multiply_short;
+    struct {
+        u32 rm : 4;
+        u32 c4 : 4; // 1001
+        u32 c3 : 4;
+        u32 rd : 4;
+        u32 rn : 4;
+        u32 c2 : 2; // 00
+        u32 b : 1;
+        u32 c1 : 5; // 00010
+        u32 cond : 4;
+    } swap;
+    struct {
+        u32 rn : 4;
+        u32 c4 : 1; // 1
+        u32 l : 1;
+        u32 c3 : 2; // 00
+        u32 c2 : 12;
+        u32 c1 : 8; // 00010010
+        u32 cond : 4;
+    } branch_ex;
+    struct {
+        u32 rm : 4;
+        u32 c4 : 4; // 0001
+        u32 c3 : 4;
+        u32 rd : 4;
+        u32 c2 : 4;
+        u32 c1 : 8; // 00010110
+        u32 cond : 4;
+    } clz;
+    struct {
+        u32 rm : 4;
+        u32 c4 : 4; // 0101
+        u32 c3 : 4;
+        u32 rd : 4;
+        u32 rn : 4;
+        u32 c2 : 1; // 0
+        u32 op : 1;
+        u32 d : 1;
+        u32 c1 : 5; // 00010
+        u32 cond : 4;
+    } sat_arith;
+    struct {
+        u32 offlo : 4;
+        u32 c3 : 1; // 1
+        u32 h : 1;
+        u32 s : 1;
+        u32 c2 : 1; // 1
+        u32 offhi : 4;
+        u32 rd : 4;
+        u32 rn : 4;
+        u32 l : 1;
+        u32 w : 1;
+        u32 i : 1;
+        u32 u : 1;
+        u32 p : 1;
+        u32 c1 : 3; // 000
+        u32 cond : 4;
+    } half_trans;
+    struct {
+        u32 offset : 12;
+        u32 rd : 4;
+        u32 rn : 4;
+        u32 l : 1;
+        u32 w : 1;
+        u32 b : 1;
+        u32 u : 1;
+        u32 p : 1;
+        u32 i : 1;
+        u32 c1 : 2; // 01
+        u32 cond : 4;
+    } single_trans;
+    struct {
+        u32 u2 : 4;
+        u32 c2 : 1; // 1
+        u32 u1 : 20;
+        u32 c1 : 3; // 011
+        u32 cond : 4;
+    } undefined;
+    struct {
+        u32 rlist : 16;
+        u32 rn : 4;
+        u32 l : 1;
+        u32 w : 1;
+        u32 s : 1;
+        u32 u : 1;
+        u32 p : 1;
+        u32 c1 : 3; // 100
+        u32 cond : 4;
+    } block_trans;
+    struct {
+        u32 offset : 24;
+        u32 l : 1;
+        u32 c1 : 3; // 101
+        u32 cond : 4;
+    } branch;
+    struct {
+        u32 crm : 4;
+        u32 c2 : 1; // 1
+        u32 cp : 3;
+        u32 cpnum : 4;
+        u32 rd : 4;
+        u32 crn : 4;
+        u32 l : 1;
+        u32 cpopc : 3;
+        u32 c1 : 4; // 1110
+        u32 cond : 4;
+    } cp_reg_trans;
+    struct {
+        u32 arg : 24;
+        u32 c1 : 4; // 1111
+        u32 cond : 4;
+    } sw_intr;
+} ArmInstr;
+
 char* mode_name(CpuMode m);
 RegBank get_bank(CpuMode mode);
+
+void arm_disassemble(ArmInstr instr, u32 addr, FILE* out);
 
 #endif

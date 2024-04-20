@@ -10,8 +10,7 @@
 #include "arm5_isa.h"
 #include "emulator_state.h"
 #include "nds.h"
-#include "thumb1_isa.h"
-#include "thumb2_isa.h"
+#include "thumb_isa.h"
 
 #define TRANSLATE_SPEED 5.0
 #define ROTATE_SPEED 0.02
@@ -70,9 +69,8 @@ int emulator_init(int argc, char** argv) {
     }
 
     arm4_generate_lookup();
-    thumb1_generate_lookup();
     arm5_generate_lookup();
-    thumb2_generate_lookup();
+    thumb_generate_lookup();
     generate_adpcm_table();
 
     emulator_reset();

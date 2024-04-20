@@ -6,7 +6,7 @@
 #include "arm_common.h"
 #include "bus9.h"
 #include "nds.h"
-#include "thumb2_isa.h"
+#include "thumb_isa.h"
 #include "types.h"
 
 bool cpu9_step(Arm946E* cpu) {
@@ -30,7 +30,7 @@ bool cpu9_step(Arm946E* cpu) {
 void cpu9_fetch_instr(Arm946E* cpu) {
     cpu->cur_instr = cpu->next_instr;
     if (cpu->cpsr.t) {
-        cpu->next_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc)];
+        cpu->next_instr = thumb_lookup[cpu9_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
         cpu->cur_instr_addr += 2;
     } else {
@@ -44,9 +44,9 @@ void cpu9_flush(Arm946E* cpu) {
     if (cpu->cpsr.t) {
         cpu->pc &= ~1;
         cpu->cur_instr_addr = cpu->pc;
-        cpu->cur_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc)];
+        cpu->cur_instr = thumb_lookup[cpu9_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
-        cpu->next_instr = thumb2_lookup[cpu9_fetch16(cpu, cpu->pc)];
+        cpu->next_instr = thumb_lookup[cpu9_fetch16(cpu, cpu->pc)];
         cpu->pc += 2;
     } else {
         cpu->pc &= ~0b11;
@@ -287,13 +287,13 @@ void print_cpu9_state(Arm946E* cpu) {
 
 void print_cur_instr9(Arm946E* cpu) {
     if (cpu->cpsr.t) {
-        Thumb2Instr instr = {bus9_read16(cpu->master, cpu->cur_instr_addr)};
+        ThumbInstr instr = {bus9_read16(cpu->master, cpu->cur_instr_addr)};
         printf("%08x: %04x ", cpu->cur_instr_addr, instr.h);
-        thumb2_disassemble(instr, cpu->cur_instr_addr, stdout);
+        thumb_disassemble(instr, cpu->cur_instr_addr, stdout);
         printf("\n");
     } else {
         printf("%08x: %08x ", cpu->cur_instr_addr, cpu->cur_instr.w);
-        arm5_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
+        arm_disassemble(cpu->cur_instr, cpu->cur_instr_addr, stdout);
         printf("\n");
     }
 }

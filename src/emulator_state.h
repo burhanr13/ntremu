@@ -27,6 +27,8 @@ typedef struct {
     u8* bios9;
     u8* firmware;
 
+    u8* dldi_sd;
+
     bool wireframe;
     bool freecam;
     mat4 freecam_mtx;
