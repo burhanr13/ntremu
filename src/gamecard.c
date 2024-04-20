@@ -74,6 +74,9 @@ void destroy_card(GameCard* card) {
         munmap(card->eeprom, card->eeprom_size);
     }
     munmap(card->rom, card->rom_size);
+
+    free(card->rom_filename);
+    free(card->sav_filename);
     free(card);
 }
 
