@@ -1,5 +1,5 @@
-#ifndef THUMB2_ISA_H
-#define THUMB2_ISA_H
+#ifndef _THUMB_H_
+#define _THUMB_H_
 
 #include "arm5_isa.h"
 #include "arm_common.h"

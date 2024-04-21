@@ -1,4 +1,4 @@
-#include "thumb_isa.h"
+#include "thumb.h"
 
 ArmInstr thumb_lookup[1 << 16];
 

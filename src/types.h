@@ -1,5 +1,5 @@
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef _TYPES_H_
+#define _TYPES_H_
 
 #include <limits.h>
 #include <stdbool.h>

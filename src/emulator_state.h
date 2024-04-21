@@ -1,5 +1,5 @@
-#ifndef EMULATOR_STATE_H
-#define EMULATOR_STATE_H
+#ifndef _EMULATOR_STATE_H_
+#define _EMULATOR_STATE_H_
 
 #include "gamecard.h"
 #include "nds.h"
@@ -27,7 +27,9 @@ typedef struct {
     u8* bios9;
     u8* firmware;
 
-    u8* dldi_sd;
+    char* sd_path;
+    int dldi_sd_fd;
+    u64 dldi_sd_size;
 
     bool wireframe;
     bool freecam;

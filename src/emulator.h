@@ -1,5 +1,5 @@
-#ifndef EMULATOR_H
-#define EMULATOR_H
+#ifndef _EMULATOR_H_
+#define _EMULATOR_H_
 
 #include <SDL2/SDL.h>
 

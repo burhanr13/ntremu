@@ -1,5 +1,5 @@
-#ifndef DEBUGGER_H
-#define DEBUGGER_H
+#ifndef _DEBUGGER_H_
+#define _DEBUGGER_H_
 
 void debugger_run();
 

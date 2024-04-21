@@ -6,7 +6,7 @@
 #include "arm_common.h"
 #include "bus7.h"
 #include "nds.h"
-#include "thumb_isa.h"
+#include "thumb.h"
 #include "types.h"
 
 void cpu7_step(Arm7TDMI* cpu) {

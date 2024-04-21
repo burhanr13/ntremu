@@ -1,5 +1,5 @@
-#ifndef KEY1_H
-#define KEY1_H
+#ifndef _KEY1_H_
+#define _KEY1_H_
 
 #include "types.h"
 

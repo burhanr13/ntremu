@@ -1,5 +1,5 @@
-#ifndef SPU_H
-#define SPU_H
+#ifndef _SPU_H_
+#define _SPU_H_
 
 #include "types.h"
 
@@ -26,7 +26,7 @@ typedef struct {
     int adpcm_idx_loopstart[16];
     u8 psg_ctr[6];
     u16 psg_lfsr[2];
-    
+
     u32 capture_ptrs[2];
 
     float channel_samples[16][2];

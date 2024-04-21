@@ -5,6 +5,7 @@
 
 #include "bus7.h"
 #include "bus9.h"
+#include "dldi.h"
 #include "ppu.h"
 
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
@@ -107,7 +108,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     *(u16*) &nds->wifi_io[0x03c] = 0x0200;
     nds->wifi_bb_regs[0] = 0x6d;
 
-    nds->next_vblank = NDS_SCREEN_H * DOTS_W * 6;
+    nds->next_vblank = NDS_SCREEN_H_ * DOTS_W * 6;
 
     if (bootbios) {
         encrypt_securearea(card, (u32*) &bios7[0x30]);
@@ -115,15 +116,6 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
         cpu7_handle_interrupt(&nds->cpu7, I_RESET);
         cpu9_handle_interrupt(&nds->cpu9, I_RESET);
     } else {
-
-        nds->io9.ppuA.bgaff[0].pa = 1 << 8;
-        nds->io9.ppuA.bgaff[0].pd = 1 << 8;
-        nds->io9.ppuA.bgaff[1].pa = 1 << 8;
-        nds->io9.ppuA.bgaff[1].pd = 1 << 8;
-        nds->io9.ppuB.bgaff[0].pa = 1 << 8;
-        nds->io9.ppuB.bgaff[0].pd = 1 << 8;
-        nds->io9.ppuB.bgaff[1].pa = 1 << 8;
-        nds->io9.ppuB.bgaff[1].pd = 1 << 8;
 
         nds->io7.wramstat = 3;
         nds->io9.wramcnt = 3;
@@ -151,6 +143,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 
         memcpy(&nds->ram[0x3ffe00], header, sizeof *header);
 
+        dldi_patch_binary(&card->rom[header->arm9_rom_offset],
+                          header->arm9_size);
         for (int i = 0; i < header->arm9_size; i += 4) {
             bus9_write32(nds, header->arm9_ram_offset + i,
                          *(u32*) &card->rom[header->arm9_rom_offset + i]);

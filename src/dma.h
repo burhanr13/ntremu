@@ -1,16 +1,11 @@
-#ifndef DMA_H
-#define DMA_H
+#ifndef _DMA_H_
+#define _DMA_H_
 
 #include "types.h"
 
 enum { DMA_ADCNT_INC, DMA_ADCNT_DEC, DMA_ADCNT_FIX, DMA_ADCNT_INR };
 
-enum {
-    DMA7_IMM = 0,
-    DMA7_VBLANK = 2,
-    DMA7_DSCARD = 4,
-    DMA7_SPEC = 6
-};
+enum { DMA7_IMM = 0, DMA7_VBLANK = 2, DMA7_DSCARD = 4, DMA7_SPEC = 6 };
 
 enum {
     DMA9_IMM,

@@ -10,7 +10,7 @@
 #include "emulator.h"
 #include "nds.h"
 #include "scheduler.h"
-#include "thumb_isa.h"
+#include "thumb.h"
 
 const char* help = "Debugger commands:\n"
                    "c -- continue emulation\n"
@@ -86,6 +86,27 @@ void debugger_run() {
                     print_cur_instr9(&ntremu.nds->cpu9);
                 }
                 break;
+            case 's': {
+                u32 next_instr_addr;
+                if (ntremu.nds->cur_cpu) {
+                    next_instr_addr = ntremu.nds->cpu7.cur_instr_addr;
+                    if (ntremu.nds->cpu7.cpsr.t) {
+                        next_instr_addr += 2;
+                    } else {
+                        next_instr_addr += 4;
+                    }
+                } else {
+                    next_instr_addr = ntremu.nds->cpu9.cur_instr_addr;
+                    if (ntremu.nds->cpu9.cpsr.t) {
+                        next_instr_addr += 2;
+                    } else {
+                        next_instr_addr += 4;
+                    }
+                }
+                ntremu.breakpoint = next_instr_addr;
+                ntremu.running = true;
+                return;
+            }
             case 'f':
                 while (!nds_step(ntremu.nds)) {
                 }

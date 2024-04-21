@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "bus7.h"
+#include "dldi.h"
 #include "nds.h"
 
 #define UPDATE_IRQ(x)                                                          \
@@ -907,6 +908,12 @@ u32 io9_read32(IO* io, u32 addr) {
             }
             return data;
         }
+        case DLDI_CTRL:
+            return dldi_get_status();
+            break;
+        case DLDI_DATA:
+            return dldi_read_data();
+            break;
         default:
             return io9_read16(io, addr) | (io9_read16(io, addr | 2) << 16);
     }
@@ -956,6 +963,12 @@ void io9_write32(IO* io, u32 addr, u32 data) {
                                  ? 1
                                  : 0;
             UPDATE_IRQ(9);
+            break;
+        case DLDI_CTRL:
+            dldi_write_addr(data);
+            break;
+        case DLDI_DATA:
+            dldi_write_data(data);
             break;
         default:
             io9_write16(io, addr, data);

@@ -1,5 +1,5 @@
-#ifndef ARM5_ISA_H
-#define ARM5_ISA_H
+#ifndef _ARM5_ISA_H_
+#define _ARM5_ISA_H_
 
 #include <stdio.h>
 

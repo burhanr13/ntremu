@@ -4,13 +4,14 @@
 #include <fcntl.h>
 #include <math.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "arm4_isa.h"
 #include "arm5_isa.h"
 #include "emulator_state.h"
 #include "nds.h"
-#include "thumb_isa.h"
+#include "thumb.h"
 
 #define TRANSLATE_SPEED 5.0
 #define ROTATE_SPEED 0.02
@@ -68,6 +69,18 @@ int emulator_init(int argc, char** argv) {
         return -1;
     }
 
+    if (ntremu.sd_path) {
+        ntremu.dldi_sd_fd = open(ntremu.sd_path, O_RDWR);
+        if (ntremu.dldi_sd_fd < 0)
+            ntremu.dldi_sd_fd = open(ntremu.sd_path, O_RDONLY);
+        if (ntremu.dldi_sd_fd >= 0) {
+            ntremu.dldi_sd_size = lseek(ntremu.dldi_sd_fd, 0, SEEK_END);
+            eprintf("%d\n", ntremu.dldi_sd_size);
+        }
+    } else {
+        ntremu.dldi_sd_fd = -1;
+    }
+
     arm4_generate_lookup();
     arm5_generate_lookup();
     thumb_generate_lookup();
@@ -82,6 +95,7 @@ int emulator_init(int argc, char** argv) {
 }
 
 void emulator_quit() {
+    close(ntremu.dldi_sd_fd);
     destroy_card(ntremu.card);
     free(ntremu.nds);
     munmap(ntremu.bios7, BIOS7SIZE);
@@ -110,6 +124,13 @@ void read_args(int argc, char** argv) {
                             ntremu.biosPath = argv[++i];
                         } else {
                             eprintf("Missing argument for '-p'\n");
+                        }
+                        break;
+                    case 's':
+                        if (!f[1] && i + 1 < argc) {
+                            ntremu.sd_path = argv[++i];
+                        } else {
+                            eprintf("Missing argument for '-s'\n");
                         }
                         break;
                     default:
@@ -220,8 +241,8 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds,
     int x, y;
     bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
     x = (x - ts_bounds->x) * NDS_SCREEN_W / ts_bounds->w;
-    y = (y - ts_bounds->y) * NDS_SCREEN_H / ts_bounds->h;
-    if (x < 0 || x >= NDS_SCREEN_W || y < 0 || y >= NDS_SCREEN_H)
+    y = (y - ts_bounds->y) * NDS_SCREEN_H_ / ts_bounds->h;
+    if (x < 0 || x >= NDS_SCREEN_W || y < 0 || y >= NDS_SCREEN_H_)
         pressed = false;
     if (pressed) {
         nds->tsc.x = x;
@@ -246,21 +267,21 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds,
                 nds->tsc.x =
                     NDS_SCREEN_W / 2 + (x * (NDS_SCREEN_W / 2 - 10) >> 15);
                 nds->tsc.y =
-                    NDS_SCREEN_H / 2 + (y * (NDS_SCREEN_H / 2 - 10) >> 15);
+                    NDS_SCREEN_H_ / 2 + (y * (NDS_SCREEN_H_ / 2 - 10) >> 15);
             } else {
                 static int prev_x, prev_y, target_x, target_y;
                 if (nds->tsc.x == (u8) -1) {
                     nds->tsc.x = NDS_SCREEN_W / 2;
-                    nds->tsc.y = NDS_SCREEN_H / 2;
+                    nds->tsc.y = NDS_SCREEN_H_ / 2;
                     prev_x = x, prev_y = y;
                     target_x = NDS_SCREEN_W / 2;
-                    target_y = NDS_SCREEN_H / 2;
+                    target_y = NDS_SCREEN_H_ / 2;
                 } else if (abs(x - prev_x) > 10 || abs(y - prev_y) > 10) {
                     prev_x = x, prev_y = y;
                     int tx = target_x + (x >> 12);
                     int ty = target_y + (y >> 12);
                     if (tx >= 0 && tx < NDS_SCREEN_W && ty >= 0 &&
-                        ty < NDS_SCREEN_H) {
+                        ty < NDS_SCREEN_H_) {
                         target_x = tx;
                         target_y = ty;
                     }

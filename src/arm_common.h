@@ -1,5 +1,5 @@
-#ifndef ARM_COMMON_H
-#define ARM_COMMON_H
+#ifndef _ARM_COMMON_H_
+#define _ARM_COMMON_H_
 
 #include <stdio.h>
 

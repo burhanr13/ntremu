@@ -6,7 +6,7 @@
 #include "arm_common.h"
 #include "bus9.h"
 #include "nds.h"
-#include "thumb_isa.h"
+#include "thumb.h"
 #include "types.h"
 
 bool cpu9_step(Arm946E* cpu) {

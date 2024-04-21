@@ -2,11 +2,14 @@
 
 *.bin
 *.bin.*
+*.elf
+
 roms
 build
 release
 *.log
+*.fs
 
-ntremu*
+/ntremu*
 
 perf*

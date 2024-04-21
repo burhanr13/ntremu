@@ -895,7 +895,7 @@ void gxcmd_execute(GPU* gpu) {
             gpu->w_buffer = gpu->param_fifo[0] & 2;
             gpu->autosort = !(gpu->param_fifo[0] & 1);
 
-            if (gpu->drawing || gpu->master->io7.vcount >= NDS_SCREEN_H) {
+            if (gpu->drawing || gpu->master->io7.vcount >= NDS_SCREEN_H_) {
                 gpu->pending_swapbuffers = true;
                 break;
             }
@@ -1048,7 +1048,7 @@ void render_line(GPU* gpu, vertex* v0, vertex* v1) {
         }
         float x = x0;
         if (y0 < 0) y0 = 0;
-        if (y1 >= NDS_SCREEN_H) y1 = NDS_SCREEN_H - 1;
+        if (y1 >= NDS_SCREEN_H_) y1 = NDS_SCREEN_H_ - 1;
         for (int y = y0; y <= y1; y++, x += m) {
             int sx = x;
             if (sx < 0 || sx >= NDS_SCREEN_W) continue;
@@ -1066,7 +1066,7 @@ void render_line(GPU* gpu, vertex* v0, vertex* v1) {
         if (x1 >= NDS_SCREEN_W) x1 = NDS_SCREEN_W - 1;
         for (int x = x0; x <= x1; x++, y += m) {
             int sy = y;
-            if (sy < 0 || sy >= NDS_SCREEN_H) continue;
+            if (sy < 0 || sy >= NDS_SCREEN_H_) continue;
             gpu->screen_back[sy][x] = 0x801f;
         }
     }
@@ -1132,7 +1132,7 @@ void render_line_attrs(GPU* gpu, vertex* v0, vertex* v1,
 
         for (int y = y0; y <= y1; y++, x += m) {
             int sx = x, sy = y;
-            if (sy < 0 || sy >= NDS_SCREEN_H) continue;
+            if (sy < 0 || sy >= NDS_SCREEN_H_) continue;
             if (sx < 0) sx = 0;
             if (sx >= NDS_SCREEN_W) sx = NDS_SCREEN_W - 1;
             if (sx <= left[sy].x) {
@@ -1176,7 +1176,7 @@ void render_line_attrs(GPU* gpu, vertex* v0, vertex* v1,
 
         for (int x = x0; x <= x1; x++, y += m) {
             int sx = x, sy = y;
-            if (sy < 0 || sy >= NDS_SCREEN_H) continue;
+            if (sy < 0 || sy >= NDS_SCREEN_H_) continue;
             if (sx < 0) sx = 0;
             if (sx >= NDS_SCREEN_W) sx = NDS_SCREEN_W - 1;
             if (sx <= left[sy].x) {
@@ -1205,7 +1205,7 @@ void render_polygon(GPU* gpu, poly* p) {
         return;
     }
 
-    int yMin = NDS_SCREEN_H;
+    int yMin = NDS_SCREEN_H_;
     int yMax = -1;
     for (int i = 0; i < p->n; i++) {
         int y = VTX_SCY(*p->p[i]);
@@ -1213,9 +1213,9 @@ void render_polygon(GPU* gpu, poly* p) {
         if (y < yMin) yMin = y;
     }
     if (yMin < 0) yMin = 0;
-    if (yMax > NDS_SCREEN_H) yMax = NDS_SCREEN_H;
+    if (yMax > NDS_SCREEN_H_) yMax = NDS_SCREEN_H_;
 
-    struct interp_attrs left[NDS_SCREEN_H], right[NDS_SCREEN_H];
+    struct interp_attrs left[NDS_SCREEN_H_], right[NDS_SCREEN_H_];
     for (int y = yMin; y < yMax; y++) {
         left[y].x = NDS_SCREEN_W;
         right[y].x = -1;
@@ -1511,7 +1511,7 @@ void render_polygon(GPU* gpu, poly* p) {
 
 void gpu_render(GPU* gpu) {
     if (gpu->master->io9.disp3dcnt.rearplane_mode) {
-        for (int y = 0; y < NDS_SCREEN_H; y++) {
+        for (int y = 0; y < NDS_SCREEN_H_; y++) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {
                 gpu->screen_back[y][x] =
                     *(u16*) &gpu->texram[2][(y * NDS_SCREEN_W + x) << 1];
@@ -1532,7 +1532,7 @@ void gpu_render(GPU* gpu) {
         float clear_depth =
             (gpu->master->io9.clear_depth & 0x7fff) / (float) (1 << 12);
         if (gpu->w_buffer) clear_depth *= 0x200;
-        for (int y = 0; y < NDS_SCREEN_H; y++) {
+        for (int y = 0; y < NDS_SCREEN_H_; y++) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {
                 gpu->screen_back[y][x] = clear_color;
                 gpu->depth_buf[y][x] = clear_depth;
@@ -1565,7 +1565,7 @@ void gpu_render(GPU* gpu) {
         float fog_step =
             (0x400 >> gpu->master->io9.disp3dcnt.fog_shift) / (float) (1 << 12);
         if (gpu->w_buffer) fog_step *= 0x200;
-        for (int y = 0; y < NDS_SCREEN_H; y++) {
+        for (int y = 0; y < NDS_SCREEN_H_; y++) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {
                 if (gpu->attr_buf[y][x].edge &&
                     gpu->master->io9.disp3dcnt.edge_marking) {
@@ -1578,7 +1578,7 @@ void gpu_render(GPU* gpu) {
                         (y > 0 &&
                          gpu->polyid_buf[y][x] != gpu->polyid_buf[y - 1][x] &&
                          gpu->depth_buf[y][x] < gpu->depth_buf[y - 1][x]) ||
-                        (y < NDS_SCREEN_H - 1 &&
+                        (y < NDS_SCREEN_H_ - 1 &&
                          gpu->polyid_buf[y][x] != gpu->polyid_buf[y + 1][x] &&
                          gpu->depth_buf[y][x] < gpu->depth_buf[y + 1][x])) {
                         if (gpu->master->io9.disp3dcnt.anti_aliasing) {
