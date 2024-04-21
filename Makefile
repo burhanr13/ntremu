@@ -1,51 +1,55 @@
 CC := gcc
-CFLAGS := -g -Wall -Wimplicit-fallthrough
-CFLAGSOPT := -O3 -Wall -Wimplicit-fallthrough
-CPPFLAGS := -I/opt/homebrew/include -MP -MMD
-LDFLAGS := $(shell sdl2-config --libs) -lm -lz
+CFLAGS := -Wall -Wimplicit-fallthrough
+CPPFLAGS := -MP -MMD
+LDFLAGS := $(shell sdl2-config --libs) -lm
+
+ifeq ($(shell uname),"Darwin")
+	CPPFLAGS += $(brew --prefix)/include
+endif
 
 BUILD_DIR := build
-RELEASE_DIR := release
 SRC_DIR := src
+
+DEBUG_DIR := $(BUILD_DIR)/debug
+RELEASE_DIR := $(BUILD_DIR)/release
 
 TARGET_EXEC := ntremu
 
-SRCS := $(basename $(notdir $(wildcard $(SRC_DIR)/*.c)))
-OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
-DEPS := $(OBJS:.o=.d)
-OBJS_RELEASE := $(SRCS:%=$(RELEASE_DIR)/%.o)
+SRCS := $(shell find $(SRC_DIR) -name '*.c')
+SRCS := $(SRCS:$(SRC_DIR)/%=%)
+
+OBJS_DEBUG := $(SRCS:%.c=$(DEBUG_DIR)/%.o)
+DEPS_DEBUG := $(OBJS_DEBUG:.o=.d)
+
+OBJS_RELEASE := $(SRCS:%.c=$(RELEASE_DIR)/%.o)
 DEPS_RELEASE := $(OBJS_RELEASE:.o=.d)
 
-target: release
+.PHONY: release, debug, clean
 
-.PHONY: debug
-debug: $(BUILD_DIR)/$(TARGET_EXEC)
-
-.PHONY: release
+release: CFLAGS += -O3 -flto
 release: $(RELEASE_DIR)/$(TARGET_EXEC)
 
-$(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
-	$(CC) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
-	cp $(BUILD_DIR)/$(TARGET_EXEC) ./$(TARGET_EXEC)-dbg
-
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
-	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+debug: CFLAGS += -g
+debug: $(DEBUG_DIR)/$(TARGET_EXEC)
 
 $(RELEASE_DIR)/$(TARGET_EXEC): $(OBJS_RELEASE)
-	$(CC) -o $@ $(CFLAGSOPT) $(CPPFLAGS) $^ $(LDFLAGS)
-	cp $(RELEASE_DIR)/$(TARGET_EXEC) ./$(TARGET_EXEC)
+	$(CC) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
+	cp $@ $(TARGET_EXEC)
 
 $(RELEASE_DIR)/%.o: $(SRC_DIR)/%.c
-	@mkdir -p $(RELEASE_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGSOPT) -c $< -o $@
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-.PHONY: clean
+$(DEBUG_DIR)/$(TARGET_EXEC): $(OBJS_DEBUG)
+	$(CC) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
+	cp $@ $(TARGET_EXEC)
+
+$(DEBUG_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
 clean:
-	rm -rf $(BUILD_DIR)
-	rm -rf $(RELEASE_DIR)
-	rm $(TARGET_EXEC)-dbg
-	rm $(TARGET_EXEC)
+	rm -rf $(BUILD_DIR) $(TARGET_EXEC)
 
--include $(DEPS)
+-include $(DEPS_DEBUG)
 -include $(DEPS_RELEASE)

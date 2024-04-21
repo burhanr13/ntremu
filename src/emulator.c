@@ -71,8 +71,6 @@ int emulator_init(int argc, char** argv) {
 
     if (ntremu.sd_path) {
         ntremu.dldi_sd_fd = open(ntremu.sd_path, O_RDWR);
-        if (ntremu.dldi_sd_fd < 0)
-            ntremu.dldi_sd_fd = open(ntremu.sd_path, O_RDONLY);
         if (ntremu.dldi_sd_fd >= 0) {
             ntremu.dldi_sd_size = lseek(ntremu.dldi_sd_fd, 0, SEEK_END);
         }
