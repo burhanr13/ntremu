@@ -3,8 +3,8 @@ CFLAGS := -Wall -Wimplicit-fallthrough
 CPPFLAGS := -MP -MMD
 LDFLAGS := $(shell sdl2-config --libs) -lm
 
-ifeq ($(shell uname),"Darwin")
-	CPPFLAGS += $(brew --prefix)/include
+ifeq ($(shell uname),Darwin)
+	CPPFLAGS += -I$(shell brew --prefix)/include
 endif
 
 BUILD_DIR := build
@@ -26,7 +26,7 @@ DEPS_RELEASE := $(OBJS_RELEASE:.o=.d)
 
 .PHONY: release, debug, clean
 
-release: CFLAGS += -O3 -flto
+release: CFLAGS += -O3 -flto=auto
 release: $(RELEASE_DIR)/$(TARGET_EXEC)
 
 debug: CFLAGS += -g
