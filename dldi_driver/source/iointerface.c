@@ -84,7 +84,7 @@ bool readSectors(u32 sector, u32 numSectors, void* buffer) {
     for (int i = 0; i < numSectors; i++) {
         DLDI_CTRL = sector + i;
         if (!DLDI_CTRL) return false;
-        for (int j = 0; j < BYTES_PER_READ; j++) {
+        for (int j = 0; j < BYTES_PER_READ / 4; j++) {
             *p++ = DLDI_DATA;
         }
     }
@@ -103,7 +103,7 @@ bool writeSectors(u32 sector, u32 numSectors, void* buffer) {
     for (int i = 0; i < numSectors; i++) {
         DLDI_CTRL = sector + i;
         if (!DLDI_CTRL) return false;
-        for (int j = 0; j < BYTES_PER_READ; j++) {
+        for (int j = 0; j < BYTES_PER_READ / 4; j++) {
             DLDI_DATA = *p++;
         }
     }

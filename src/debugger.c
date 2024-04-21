@@ -88,8 +88,10 @@ void debugger_run() {
                 break;
             case 's': {
                 u32 next_instr_addr;
+                u32* watch;
                 if (ntremu.nds->cur_cpu) {
                     next_instr_addr = ntremu.nds->cpu7.cur_instr_addr;
+                    watch = &ntremu.nds->cpu7.cur_instr_addr;
                     if (ntremu.nds->cpu7.cpsr.t) {
                         next_instr_addr += 2;
                     } else {
@@ -97,15 +99,20 @@ void debugger_run() {
                     }
                 } else {
                     next_instr_addr = ntremu.nds->cpu9.cur_instr_addr;
+                    watch = &ntremu.nds->cpu9.cur_instr_addr;
                     if (ntremu.nds->cpu9.cpsr.t) {
                         next_instr_addr += 2;
                     } else {
                         next_instr_addr += 4;
                     }
                 }
-                ntremu.breakpoint = next_instr_addr;
-                ntremu.running = true;
-                return;
+                while (*watch != next_instr_addr) nds_step(ntremu.nds);
+                if (ntremu.nds->cur_cpu) {
+                    print_cur_instr7(&ntremu.nds->cpu7);
+                } else {
+                    print_cur_instr9(&ntremu.nds->cpu9);
+                }
+                break;
             }
             case 'f':
                 while (!nds_step(ntremu.nds)) {
