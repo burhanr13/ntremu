@@ -164,7 +164,7 @@ void cpu7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w) {
 u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr) {
     cpu->cycles++;
     u16 data = bus7_read16(cpu->master, addr & ~1);
-    if (cpu->master->memerr) {
+    if (cpu->master->memerr && !cpu->master->cpuerr) {
         printf("Invalid CPU7 (thumb) instruction fetch at 0x%08x\n", addr);
         cpu->master->cpuerr = true;
     }
@@ -174,7 +174,7 @@ u16 cpu7_fetch16(Arm7TDMI* cpu, u32 addr) {
 u32 cpu7_fetch32(Arm7TDMI* cpu, u32 addr) {
     cpu->cycles++;
     u32 data = bus7_read32(cpu->master, addr & ~3);
-    if (cpu->master->memerr) {
+    if (cpu->master->memerr && !cpu->master->cpuerr) {
         printf("Invalid CPU7 instruction fetch at 0x%08x\n", addr);
         cpu->master->cpuerr = true;
     }

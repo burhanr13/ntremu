@@ -345,6 +345,12 @@ u32 io7_read32(IO* io, u32 addr) {
             }
             return data;
         }
+        case DLDI_CTRL:
+            return dldi_get_status();
+            break;
+        case DLDI_DATA:
+            return dldi_read_data();
+            break;
         default:
             return io7_read16(io, addr) | (io7_read16(io, addr | 2) << 16);
     }
@@ -379,6 +385,12 @@ void io7_write32(IO* io, u32 addr, u32 data) {
         case IF:
             io->ifl.w &= ~data;
             UPDATE_IRQ(7);
+            break;
+        case DLDI_CTRL:
+            dldi_write_addr(data);
+            break;
+        case DLDI_DATA:
+            dldi_write_data(data);
             break;
         default:
             io7_write16(io, addr, data);

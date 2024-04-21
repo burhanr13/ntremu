@@ -156,6 +156,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
         nds->cpu9.cpsr.m = M_SYSTEM;
         cpu9_flush(&nds->cpu9);
 
+        dldi_patch_binary(&card->rom[header->arm7_rom_offset],
+                          header->arm7_size);
         for (int i = 0; i < header->arm7_size; i += 4) {
             bus7_write32(nds, header->arm7_ram_offset + i,
                          *(u32*) &card->rom[header->arm7_rom_offset + i]);
