@@ -72,7 +72,13 @@ int emulator_init(int argc, char** argv) {
     if (ntremu.sd_path) {
         ntremu.dldi_sd_fd = open(ntremu.sd_path, O_RDWR);
         if (ntremu.dldi_sd_fd >= 0) {
-            ntremu.dldi_sd_size = lseek(ntremu.dldi_sd_fd, 0, SEEK_END);
+            struct stat st;
+            fstat(ntremu.dldi_sd_fd, &st);
+            if (S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) {
+                ntremu.dldi_sd_size = st.st_blocks * st.st_blksize;
+            } else {
+                ntremu.dldi_sd_size = st.st_size;
+            }
         }
     } else {
         ntremu.dldi_sd_fd = -1;
