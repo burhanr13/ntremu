@@ -31,9 +31,10 @@ const char* help = "Debugger commands:\n"
 
 int read_num(char* str, u32* res) {
     if (!str) return -1;
-    if (sscanf(str, "0x%x", res) < 1) {
-        if (sscanf(str, "%d", res) < 1) return -1;
-    }
+    char* end;
+    long tmp = strtol(str, &end, 0);
+    if (end == str) return -1;
+    *res = tmp;
     return 0;
 }
 
@@ -65,7 +66,7 @@ void debugger_run() {
         }
 
         char* com = strtok(buf, " ");
-        if (!(com && *com)) {
+        if (!com) {
             continue;
         }
 
@@ -161,10 +162,10 @@ void debugger_run() {
             case 'r': {
                 if (com[1] == 'e' || com[1] == '\0') {
                     printf("Reset emulation? ");
-                    char ans[5];
-                    fgets(ans, 5, stdin);
-                    if (ans[0] == 'y') {
+                    char ans = getchar();
+                    if (ans == 'y') {
                         emulator_reset();
+                        free(buf);
                         return;
                     }
                     break;
