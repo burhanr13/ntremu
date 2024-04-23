@@ -1,5 +1,7 @@
 #include "debugger.h"
 
+#include <readline/history.h>
+#include <readline/readline.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -36,8 +38,6 @@ int read_num(char* str, u32* res) {
 }
 
 void debugger_run() {
-    static char prev_line[100];
-    static char buf[100];
 
     printf("ntremu Debugger\n");
     if (ntremu.nds->cur_cpu) {
@@ -48,15 +48,23 @@ void debugger_run() {
         print_cur_instr9(&ntremu.nds->cpu9);
     }
 
+    using_history();
+
+    char* buf = NULL;
     while (true) {
-        memcpy(prev_line, buf, sizeof buf);
-        printf("> ");
-        fgets(buf, 100, stdin);
-        if (buf[0] == '\n') {
-            memcpy(buf, prev_line, sizeof buf);
+
+        char* tmp = readline("> ");
+
+        if (!tmp) break;
+        if (!buf || tmp[0]) {
+            free(buf);
+            buf = tmp;
+            add_history(buf);
+        } else {
+            free(tmp);
         }
 
-        char* com = strtok(buf, " \t\n");
+        char* com = strtok(buf, " ");
         if (!(com && *com)) {
             continue;
         }
@@ -64,10 +72,12 @@ void debugger_run() {
         switch (com[0]) {
             case 'q':
                 ntremu.debugger = false;
+                free(buf);
                 return;
             case 'c':
                 nds_step(ntremu.nds);
                 ntremu.running = true;
+                free(buf);
                 return;
             case 'h':
                 printf("%s", help);
@@ -160,7 +170,7 @@ void debugger_run() {
                     break;
                 }
                 u32 addr;
-                if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
+                if (read_num(strtok(NULL, " "), &addr) < 0) {
                     printf("Invalid address\n");
                     break;
                 }
@@ -197,7 +207,7 @@ void debugger_run() {
                         break;
                     case 'm': {
                         u32 n;
-                        if (read_num(strtok(NULL, " \t\n"), &n) < 0) n = 8;
+                        if (read_num(strtok(NULL, " "), &n) < 0) n = 8;
                         printf("[%08x] = ", addr);
                         if (ntremu.nds->cur_cpu) {
                             for (int i = 0; i < n; i++) {
@@ -226,12 +236,12 @@ void debugger_run() {
             }
             case 'w': {
                 u32 addr;
-                if (read_num(strtok(NULL, " \t\n"), &addr) < 0) {
+                if (read_num(strtok(NULL, " "), &addr) < 0) {
                     printf("Invalid address\n");
                     break;
                 }
                 u32 data;
-                if (read_num(strtok(NULL, " \t\n"), &data) < 0) {
+                if (read_num(strtok(NULL, " "), &data) < 0) {
                     printf("Invalid data\n");
                     break;
                 }
@@ -282,17 +292,18 @@ void debugger_run() {
                 print_scheduled_events(&ntremu.nds->sched);
                 break;
             case 'b':
-                if (read_num(strtok(NULL, " \t\n"), &ntremu.breakpoint) < 0)
+                if (read_num(strtok(NULL, " "), &ntremu.breakpoint) < 0)
                     printf("Current breakpoint: 0x%08x\n", ntremu.breakpoint);
                 else printf("Breakpoint set: 0x%08x\n", ntremu.breakpoint);
                 break;
             case 'a':
                 ntremu.running = true;
                 ntremu.frame_adv = true;
+                free(buf);
                 return;
             case 'l': {
                 u32 lines;
-                if (read_num(strtok(NULL, " \t\n"), &lines) < 0) lines = 5;
+                if (read_num(strtok(NULL, " "), &lines) < 0) lines = 5;
                 if (ntremu.nds->cur_cpu) {
                     for (int i = 0; i < 2 * lines; i++) {
                         if (i == lines) printf("-> ");
@@ -351,4 +362,6 @@ void debugger_run() {
                 printf("Invalid command\n");
         }
     }
+
+    free(buf);
 }

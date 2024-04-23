@@ -75,7 +75,7 @@ int emulator_init(int argc, char** argv) {
             struct stat st;
             fstat(ntremu.dldi_sd_fd, &st);
             if (S_ISBLK(st.st_mode)) {
-                ntremu.dldi_sd_size = lseek(fd, 0, SEEK_END);
+                ntremu.dldi_sd_size = lseek(ntremu.dldi_sd_fd, 0, SEEK_END);
             } else {
                 ntremu.dldi_sd_size = st.st_size;
             }

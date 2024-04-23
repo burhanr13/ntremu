@@ -1,10 +1,11 @@
 CC := gcc
 CFLAGS := -Wall -Wimplicit-fallthrough
 CPPFLAGS := -MP -MMD
-LDFLAGS := $(shell sdl2-config --libs) -lm
+LDFLAGS := -lm -lSDL2 -lreadline
 
 ifeq ($(shell uname),Darwin)
 	CPPFLAGS += -I$(shell brew --prefix)/include
+	LDFLAGS := -L$(shell brew --prefix)/lib $(LDFLAGS)
 endif
 
 BUILD_DIR := build
