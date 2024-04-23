@@ -33,6 +33,9 @@ release: $(RELEASE_DIR)/$(TARGET_EXEC)
 debug: CFLAGS += -g
 debug: $(DEBUG_DIR)/$(TARGET_EXEC)
 
+install: release
+	cp $(RELEASE_DIR)/$(TARGET_EXEC) ~/.local/bin
+
 $(RELEASE_DIR)/$(TARGET_EXEC): $(OBJS_RELEASE)
 	$(CC) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
 	cp $@ $(TARGET_EXEC)
