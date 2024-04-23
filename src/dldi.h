@@ -1,5 +1,5 @@
-#ifndef _DLDI_H_
-#define _DLDI_H_
+#ifndef _DLDI_H
+#define _DLDI_H
 
 #include "types.h"
 
@@ -11,7 +11,7 @@ enum { DLDI_CTRL = 0xfff444, DLDI_DATA = 0xfff448 };
 #define DLDI_MAGIC " Chishm"
 
 typedef struct {
-    u32 id; // 0xbf8da5ed
+    u32 id;      // 0xbf8da5ed
     u8 magic[8]; // " Chishm"
     u8 version;
     u8 size;

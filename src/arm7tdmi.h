@@ -1,5 +1,5 @@
-#ifndef _ARM7TDMI_H_
-#define _ARM7TDMI_H_
+#ifndef _ARM7TDMI_H
+#define _ARM7TDMI_H
 
 #include "arm4_isa.h"
 #include "arm_common.h"

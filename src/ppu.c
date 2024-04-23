@@ -343,7 +343,7 @@ void render_obj_line(PPU* ppu, int i) {
         case OBJ_SHAPE_SQR:
             w = h = OBJLAYOUT[o.size][0];
             break;
-        case OBJ_SHAPE_H_ORZ:
+        case OBJ_SHAPE_HORZ:
             w = OBJLAYOUT[o.size][2];
             h = OBJLAYOUT[o.size][1];
             break;
@@ -964,7 +964,7 @@ void lcd_hdraw(NDS* nds) {
     ppu_check_window(&nds->ppuA);
     ppu_check_window(&nds->ppuB);
 
-    if (nds->io7.vcount < NDS_SCREEN_H_) {
+    if (nds->io7.vcount < NDS_SCREEN_H) {
         if (nds->io7.vcount == 0) {
             apply_screenswap(nds);
 
@@ -994,7 +994,7 @@ void lcd_hdraw(NDS* nds) {
                 dma9_activate(&nds->dma9, i);
             }
         }
-    } else if (nds->io7.vcount == NDS_SCREEN_H_) {
+    } else if (nds->io7.vcount == NDS_SCREEN_H) {
         nds->io9.dispcapcnt.enable = 0;
         lcd_vblank(nds);
         nds->frame_complete = true;
@@ -1003,10 +1003,10 @@ void lcd_hdraw(NDS* nds) {
         nds->io9.dispstat.vblank = 0;
     }
 
-    add_event(&nds->sched, EVENT_LCD_H_BLANK,
+    add_event(&nds->sched, EVENT_LCD_HBLANK,
               nds->sched.now + 6 * NDS_SCREEN_W + 70);
 
-    add_event(&nds->sched, EVENT_LCD_H_DRAW, nds->sched.now + 6 * DOTS_W);
+    add_event(&nds->sched, EVENT_LCD_HDRAW, nds->sched.now + 6 * DOTS_W);
 }
 
 void ppu_vblank(PPU* ppu) {
@@ -1079,7 +1079,7 @@ void lcd_hblank(NDS* nds) {
     if (nds->io7.dispstat.hblank_irq) nds->io7.ifl.hblank = 1;
     if (nds->io9.dispstat.hblank_irq) nds->io9.ifl.hblank = 1;
 
-    if (nds->io7.vcount < NDS_SCREEN_H_) {
+    if (nds->io7.vcount < NDS_SCREEN_H) {
         ppu_hblank(&nds->ppuA);
         ppu_hblank(&nds->ppuB);
         for (int i = 0; i < 4; i++) {

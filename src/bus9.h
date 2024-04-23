@@ -1,5 +1,5 @@
-#ifndef _BUS9_H_
-#define _BUS9_H_
+#ifndef _BUS9_H
+#define _BUS9_H
 
 #include "types.h"
 

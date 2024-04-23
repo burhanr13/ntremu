@@ -1,5 +1,5 @@
-#ifndef _GAMECARD_H_
-#define _GAMECARD_H_
+#ifndef _GAMECARD_H
+#define _GAMECARD_H
 
 #include "types.h"
 

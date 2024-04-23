@@ -1,5 +1,5 @@
-#ifndef _EMULATOR_STATE_H_
-#define _EMULATOR_STATE_H_
+#ifndef _EMULATOR_STATE_H
+#define _EMULATOR_STATE_H
 
 #include "gamecard.h"
 #include "nds.h"

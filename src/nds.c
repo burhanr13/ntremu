@@ -108,7 +108,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     *(u16*) &nds->wifi_io[0x03c] = 0x0200;
     nds->wifi_bb_regs[0] = 0x6d;
 
-    nds->next_vblank = NDS_SCREEN_H_ * DOTS_W * 6;
+    nds->next_vblank = NDS_SCREEN_H * DOTS_W * 6;
 
     if (bootbios) {
         encrypt_securearea(card, (u32*) &bios7[0x30]);
@@ -254,7 +254,7 @@ bool nds_step(NDS* nds) {
 
 void firmware_spi_write(NDS* nds, u8 data, bool hold) {
     switch (nds->firmflashst.state) {
-        case FIRMFLASH_IDLE:
+        case FIRMFLASHIDLE:
             switch (data) {
                 case 0x06:
                     nds->firmflashst.write_enable = true;
@@ -263,61 +263,61 @@ void firmware_spi_write(NDS* nds, u8 data, bool hold) {
                     nds->firmflashst.write_enable = false;
                     break;
                 case 0x05:
-                    nds->firmflashst.state = FIRMFLASH_STAT;
+                    nds->firmflashst.state = FIRMFLASHSTAT;
                     break;
                 case 0x03:
                     nds->firmflashst.read = true;
                     nds->firmflashst.addr = 0;
                     nds->firmflashst.i = 0;
-                    nds->firmflashst.state = FIRMFLASH_ADDR;
+                    nds->firmflashst.state = FIRMFLASHADDR;
                     break;
                 case 0x02:
                     nds->firmflashst.read = false;
                     nds->firmflashst.addr = 0;
                     nds->firmflashst.i = 0;
-                    nds->firmflashst.state = FIRMFLASH_ADDR;
+                    nds->firmflashst.state = FIRMFLASHADDR;
                     break;
                 case 0x0b:
                     nds->firmflashst.read = true;
                     nds->firmflashst.addr = 0;
                     nds->firmflashst.i = 0;
-                    nds->firmflashst.state = FIRMFLASH_ADDR;
+                    nds->firmflashst.state = FIRMFLASHADDR;
                     break;
                 case 0x0a:
                     nds->firmflashst.read = false;
                     nds->firmflashst.addr = 0;
                     nds->firmflashst.i = 0;
-                    nds->firmflashst.state = FIRMFLASH_ADDR;
+                    nds->firmflashst.state = FIRMFLASHADDR;
                     break;
                 case 0x9f:
-                    nds->firmflashst.state = FIRMFLASH_ID;
+                    nds->firmflashst.state = FIRMFLASHID;
                     break;
             }
             break;
-        case FIRMFLASH_ADDR:
+        case FIRMFLASHADDR:
             nds->firmflashst.addr <<= 8;
             nds->firmflashst.addr |= data;
             if (++nds->firmflashst.i == 3) {
                 nds->firmflashst.i = 0;
                 nds->firmflashst.state =
-                    nds->firmflashst.read ? FIRMFLASH_READ : FIRMFLASH_WRITE;
+                    nds->firmflashst.read ? FIRMFLASHREAD : FIRMFLASHWRITE;
             }
             break;
-        case FIRMFLASH_READ:
+        case FIRMFLASHREAD:
             nds->io7.spidata = nds->firmware[nds->firmflashst.addr++];
             break;
-        case FIRMFLASH_WRITE:
+        case FIRMFLASHWRITE:
             nds->firmware[nds->firmflashst.addr++] = data;
             break;
-        case FIRMFLASH_STAT:
+        case FIRMFLASHSTAT:
             nds->io7.spidata = nds->firmflashst.write_enable ? 2 : 0;
             break;
-        case FIRMFLASH_ID:
+        case FIRMFLASHID:
             nds->io7.spidata = 0xff;
             break;
     }
     if (!hold) {
-        nds->firmflashst.state = FIRMFLASH_IDLE;
+        nds->firmflashst.state = FIRMFLASHIDLE;
     }
 }
 

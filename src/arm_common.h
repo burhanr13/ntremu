@@ -1,5 +1,5 @@
-#ifndef _ARM_COMMON_H_
-#define _ARM_COMMON_H_
+#ifndef _ARM_COMMON_H
+#define _ARM_COMMON_H
 
 #include <stdio.h>
 

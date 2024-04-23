@@ -1,5 +1,5 @@
-#ifndef _ARM946E_H_
-#define _ARM946E_H_
+#ifndef _ARM946E_H
+#define _ARM946E_H
 
 #include "arm5_isa.h"
 #include "arm_common.h"

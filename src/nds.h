@@ -1,5 +1,5 @@
-#ifndef _NDS_H_
-#define _NDS_H_
+#ifndef _NDS_H
+#define _NDS_H
 
 #include "arm7tdmi.h"
 #include "arm946e.h"
@@ -65,12 +65,12 @@ enum {
 };
 
 typedef enum {
-    FIRMFLASH_IDLE,
-    FIRMFLASH_ADDR,
-    FIRMFLASH_READ,
-    FIRMFLASH_WRITE,
-    FIRMFLASH_STAT,
-    FIRMFLASH_ID
+    FIRMFLASHIDLE,
+    FIRMFLASHADDR,
+    FIRMFLASHREAD,
+    FIRMFLASHWRITE,
+    FIRMFLASHSTAT,
+    FIRMFLASHID
 } firmflashstate;
 
 typedef union {
@@ -166,8 +166,8 @@ typedef struct _NDS {
         VRAMBank arm7[2];
     } vramstate;
 
-    u16 screen_top[NDS_SCREEN_H_][NDS_SCREEN_W];
-    u16 screen_bottom[NDS_SCREEN_H_][NDS_SCREEN_W];
+    u16 screen_top[NDS_SCREEN_H][NDS_SCREEN_W];
+    u16 screen_bottom[NDS_SCREEN_H][NDS_SCREEN_W];
 
     union {
         struct {

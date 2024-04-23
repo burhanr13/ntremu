@@ -1,5 +1,5 @@
-#ifndef _ARM4_ISA_H_
-#define _ARM4_ISA_H_
+#ifndef _ARM4_ISA_H
+#define _ARM4_ISA_H
 
 #include <stdio.h>
 

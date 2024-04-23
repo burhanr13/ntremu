@@ -11,15 +11,15 @@ char wintitle[200];
 
 static inline void center_screen_in_window(int windowW, int windowH,
                                            SDL_Rect* dst) {
-    if (windowW * (2 * NDS_SCREEN_H_) / NDS_SCREEN_W > windowH) {
+    if (windowW * (2 * NDS_SCREEN_H) / NDS_SCREEN_W > windowH) {
         dst->h = windowH;
         dst->y = 0;
-        dst->w = dst->h * NDS_SCREEN_W / (2 * NDS_SCREEN_H_);
+        dst->w = dst->h * NDS_SCREEN_W / (2 * NDS_SCREEN_H);
         dst->x = (windowW - dst->w) / 2;
     } else {
         dst->w = windowW;
         dst->x = 0;
-        dst->h = dst->w * (2 * NDS_SCREEN_H_) / NDS_SCREEN_W;
+        dst->h = dst->w * (2 * NDS_SCREEN_H) / NDS_SCREEN_W;
         dst->y = (windowH - dst->h) / 2;
     }
 }
@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
 
     SDL_Window* window;
     SDL_Renderer* renderer;
-    SDL_CreateWindowAndRenderer(NDS_SCREEN_W * 2, NDS_SCREEN_H_ * 4,
+    SDL_CreateWindowAndRenderer(NDS_SCREEN_W * 2, NDS_SCREEN_H * 4,
                                 SDL_WINDOW_RESIZABLE, &window, &renderer);
     snprintf(wintitle, 199, "ntremu | %s | %.2lf FPS", ntremu.romfilenodir,
              0.0);
@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
 
     SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGR555,
                                              SDL_TEXTUREACCESS_STREAMING,
-                                             NDS_SCREEN_W, 2 * NDS_SCREEN_H_);
+                                             NDS_SCREEN_W, 2 * NDS_SCREEN_H);
 
     SDL_AudioSpec audio_spec = {.freq = SAMPLE_FREQ,
                                 .format = AUDIO_F32,

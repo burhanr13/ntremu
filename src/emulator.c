@@ -74,8 +74,8 @@ int emulator_init(int argc, char** argv) {
         if (ntremu.dldi_sd_fd >= 0) {
             struct stat st;
             fstat(ntremu.dldi_sd_fd, &st);
-            if (S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) {
-                ntremu.dldi_sd_size = st.st_blocks * st.st_blksize;
+            if (S_ISBLK(st.st_mode)) {
+                ntremu.dldi_sd_size = lseek(fd, 0, SEEK_END);
             } else {
                 ntremu.dldi_sd_size = st.st_size;
             }
@@ -244,8 +244,8 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds,
     int x, y;
     bool pressed = SDL_GetMouseState(&x, &y) & SDL_BUTTON(SDL_BUTTON_LEFT);
     x = (x - ts_bounds->x) * NDS_SCREEN_W / ts_bounds->w;
-    y = (y - ts_bounds->y) * NDS_SCREEN_H_ / ts_bounds->h;
-    if (x < 0 || x >= NDS_SCREEN_W || y < 0 || y >= NDS_SCREEN_H_)
+    y = (y - ts_bounds->y) * NDS_SCREEN_H / ts_bounds->h;
+    if (x < 0 || x >= NDS_SCREEN_W || y < 0 || y >= NDS_SCREEN_H)
         pressed = false;
     if (pressed) {
         nds->tsc.x = x;
@@ -270,21 +270,21 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds,
                 nds->tsc.x =
                     NDS_SCREEN_W / 2 + (x * (NDS_SCREEN_W / 2 - 10) >> 15);
                 nds->tsc.y =
-                    NDS_SCREEN_H_ / 2 + (y * (NDS_SCREEN_H_ / 2 - 10) >> 15);
+                    NDS_SCREEN_H / 2 + (y * (NDS_SCREEN_H / 2 - 10) >> 15);
             } else {
                 static int prev_x, prev_y, target_x, target_y;
                 if (nds->tsc.x == (u8) -1) {
                     nds->tsc.x = NDS_SCREEN_W / 2;
-                    nds->tsc.y = NDS_SCREEN_H_ / 2;
+                    nds->tsc.y = NDS_SCREEN_H / 2;
                     prev_x = x, prev_y = y;
                     target_x = NDS_SCREEN_W / 2;
-                    target_y = NDS_SCREEN_H_ / 2;
+                    target_y = NDS_SCREEN_H / 2;
                 } else if (abs(x - prev_x) > 10 || abs(y - prev_y) > 10) {
                     prev_x = x, prev_y = y;
                     int tx = target_x + (x >> 12);
                     int ty = target_y + (y >> 12);
                     if (tx >= 0 && tx < NDS_SCREEN_W && ty >= 0 &&
-                        ty < NDS_SCREEN_H_) {
+                        ty < NDS_SCREEN_H) {
                         target_x = tx;
                         target_y = ty;
                     }

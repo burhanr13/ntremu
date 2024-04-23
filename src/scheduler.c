@@ -25,9 +25,9 @@ int run_next_event(Scheduler* sched) {
     }
     sched->now = e.time;
 
-    if (e.type == EVENT_LCD_H_DRAW) {
+    if (e.type == EVENT_LCD_HDRAW) {
         lcd_hdraw(sched->master);
-    } else if (e.type == EVENT_LCD_H_BLANK) {
+    } else if (e.type == EVENT_LCD_HBLANK) {
         lcd_hblank(sched->master);
     } else if (e.type == EVENT_CARD_DRQ) {
         if (sched->master->io7.exmemcnt.ndscardrights) {

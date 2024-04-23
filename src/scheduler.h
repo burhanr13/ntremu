@@ -1,11 +1,11 @@
-#ifndef _SCHEDULER_H_
-#define _SCHEDULER_H_
+#ifndef _SCHEDULER_H
+#define _SCHEDULER_H
 
 #include "types.h"
 
 typedef enum {
-    EVENT_LCD_H_DRAW,
-    EVENT_LCD_H_BLANK,
+    EVENT_LCD_HDRAW,
+    EVENT_LCD_HBLANK,
     EVENT_CARD_DRQ,
     EVENT_TM07_RELOAD,
     EVENT_TM17_RELOAD,

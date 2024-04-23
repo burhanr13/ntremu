@@ -1,5 +1,5 @@
-#ifndef _GPU_H_
-#define _GPU_H_
+#ifndef _GPU_H
+#define _GPU_H
 
 #include <pthread.h>
 
@@ -173,12 +173,12 @@ typedef struct _NDS NDS;
 typedef struct {
     NDS* master;
 
-    u16 framebuffers[2][NDS_SCREEN_H_][NDS_SCREEN_W];
+    u16 framebuffers[2][NDS_SCREEN_H][NDS_SCREEN_W];
     u16 (*screen)[NDS_SCREEN_W];
     u16 (*screen_back)[NDS_SCREEN_W];
 
-    float depth_buf[NDS_SCREEN_H_][NDS_SCREEN_W];
-    u8 polyid_buf[NDS_SCREEN_H_][NDS_SCREEN_W];
+    float depth_buf[NDS_SCREEN_H][NDS_SCREEN_W];
+    u8 polyid_buf[NDS_SCREEN_H][NDS_SCREEN_W];
     union {
         u8 b;
         struct {
@@ -188,7 +188,7 @@ typedef struct {
             u8 fog : 1;
             u8 pad : 4;
         };
-    } attr_buf[NDS_SCREEN_H_][NDS_SCREEN_W];
+    } attr_buf[NDS_SCREEN_H][NDS_SCREEN_W];
 
     u8* texram[4];
     u16* texpal[6];

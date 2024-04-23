@@ -1,11 +1,11 @@
-#ifndef _PPU_H_
-#define _PPU_H_
+#ifndef _PPU_H
+#define _PPU_H
 
 #include "io.h"
 #include "types.h"
 
 #define NDS_SCREEN_W 256
-#define NDS_SCREEN_H_ 192
+#define NDS_SCREEN_H 192
 #define DOTS_W 355
 #define LINES_H 263
 
@@ -20,7 +20,7 @@ typedef union {
 } BgTile;
 
 enum { OBJ_MODE_NORMAL, OBJ_MODE_SEMITRANS, OBJ_MODE_OBJWIN, OBJ_MODE_BITMAP };
-enum { OBJ_SHAPE_SQR, OBJ_SHAPE_H_ORZ, OBJ_SHAPE_VERT };
+enum { OBJ_SHAPE_SQR, OBJ_SHAPE_HORZ, OBJ_SHAPE_VERT };
 
 typedef struct {
     union {
