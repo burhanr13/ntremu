@@ -1,8 +1,7 @@
 #ifndef _THUMB_H
 #define _THUMB_H
 
-#include "arm5_isa.h"
-#include "arm_common.h"
+#include "arm.h"
 #include "types.h"
 
 typedef union {

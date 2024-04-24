@@ -8,7 +8,7 @@
 #include "nds.h"
 
 #define UPDATE_IRQ(x)                                                          \
-    (io->master->cpu##x.irq = io->ime && (io->ie.w & io->ifl.w))
+    (io->master->cpu##x.c.irq = io->ime && (io->ie.w & io->ifl.w))
 
 u8 io7_read8(IO* io, u32 addr) {
     u16 h = io7_read16(io, addr & ~1);
@@ -183,7 +183,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
                 io->ipcsync.irqsend = 0;
                 if (io->master->io9.ipcsync.irq) {
                     io->master->io9.ifl.ipcsync = 1;
-                    io->master->cpu9.irq =
+                    io->master->cpu9.c.irq =
                         io->master->io9.ime &&
                         (io->master->io9.ie.w & io->master->io9.ifl.w);
                 }
@@ -311,7 +311,7 @@ u32 io7_read32(IO* io, u32 addr) {
                         io->master->io9.ipcfifocnt.sendempty = 1;
                         if (io->master->io9.ipcfifocnt.send_irq) {
                             io->master->io9.ifl.ipcsend = 1;
-                            io->master->cpu9.irq =
+                            io->master->cpu9.c.irq =
                                 io->master->io9.ime &&
                                 (io->master->io9.ie.w & io->master->io9.ifl.w);
                         }
@@ -374,7 +374,7 @@ void io7_write32(IO* io, u32 addr, u32 data) {
                         io->master->io9.ipcfifocnt.recvempty = 0;
                         if (io->master->io9.ipcfifocnt.recv_irq) {
                             io->master->io9.ifl.ipcrecv = 1;
-                            io->master->cpu9.irq =
+                            io->master->cpu9.c.irq =
                                 io->master->io9.ime &&
                                 (io->master->io9.ie.w & io->master->io9.ifl.w);
                         }
@@ -781,7 +781,7 @@ void io9_write16(IO* io, u32 addr, u16 data) {
                 io->ipcsync.irqsend = 0;
                 if (io->master->io7.ipcsync.irq) {
                     io->master->io7.ifl.ipcsync = 1;
-                    io->master->cpu7.irq =
+                    io->master->cpu7.c.irq =
                         io->master->io7.ime &&
                         (io->master->io7.ie.w & io->master->io7.ifl.w);
                 }
@@ -886,7 +886,7 @@ u32 io9_read32(IO* io, u32 addr) {
                         io->master->io7.ipcfifocnt.sendempty = 1;
                         if (io->master->io7.ipcfifocnt.send_irq) {
                             io->master->io7.ifl.ipcsend = 1;
-                            io->master->cpu7.irq =
+                            io->master->cpu7.c.irq =
                                 io->master->io7.ime &&
                                 (io->master->io7.ie.w & io->master->io7.ifl.w);
                         }
@@ -960,7 +960,7 @@ void io9_write32(IO* io, u32 addr, u32 data) {
                         io->master->io7.ipcfifocnt.recvempty = 0;
                         if (io->master->io7.ipcfifocnt.recv_irq) {
                             io->master->io7.ifl.ipcrecv = 1;
-                            io->master->cpu7.irq =
+                            io->master->cpu7.c.irq =
                                 io->master->io7.ime &&
                                 (io->master->io7.ie.w & io->master->io7.ifl.w);
                         }

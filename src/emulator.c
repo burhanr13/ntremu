@@ -7,8 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "arm4_isa.h"
-#include "arm5_isa.h"
+#include "arm.h"
 #include "emulator_state.h"
 #include "nds.h"
 #include "thumb.h"
@@ -84,8 +83,7 @@ int emulator_init(int argc, char** argv) {
         ntremu.dldi_sd_fd = -1;
     }
 
-    arm4_generate_lookup();
-    arm5_generate_lookup();
+    arm_generate_lookup();
     thumb_generate_lookup();
     generate_adpcm_table();
 

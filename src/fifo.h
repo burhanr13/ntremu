@@ -17,5 +17,6 @@
     ((f).d[(f).tail++] = v, (f).tail &= __FIFO_MAX(f) - 1, (f).size++)
 #define FIFO_pop(f, v)                                                         \
     (v = (f).d[(f).head++], (f).head &= __FIFO_MAX(f) - 1, (f).size--)
+#define FIFO_peek(f) ((f).d[(f).head])
 
 #endif

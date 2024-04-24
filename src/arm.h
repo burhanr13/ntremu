@@ -1,31 +1,9 @@
-#ifndef _ARM_COMMON_H
-#define _ARM_COMMON_H
+#ifndef _ARM_H
+#define _ARM_H
 
 #include <stdio.h>
 
 #include "types.h"
-
-typedef enum { B_USER, B_FIQ, B_SVC, B_ABT, B_IRQ, B_UND, B_CT } RegBank;
-typedef enum {
-    M_USER = 0b10000,
-    M_FIQ = 0b10001,
-    M_IRQ = 0b10010,
-    M_SVC = 0b10011,
-    M_ABT = 0b10111,
-    M_UND = 0b11011,
-    M_SYSTEM = 0b11111
-} CpuMode;
-
-typedef enum {
-    I_RESET,
-    I_UND,
-    I_SWI,
-    I_PABT,
-    I_DABT,
-    I_ADDR,
-    I_IRQ,
-    I_FIQ
-} CpuInterrupt;
 
 enum {
     C_EQ,
@@ -183,7 +161,7 @@ typedef union {
         u32 c2 : 4;
         u32 c1 : 8; // 00010110
         u32 cond : 4;
-    } clz;
+    } leading_zeros;
     struct {
         u32 rm : 4;
         u32 c4 : 4; // 0101
@@ -269,8 +247,50 @@ typedef union {
     } sw_intr;
 } ArmInstr;
 
-char* mode_name(CpuMode m);
-RegBank get_bank(CpuMode mode);
+typedef enum {
+    ARM_DATAPROC,
+    ARM_PSRTRANS,
+    ARM_MULTIPLY,
+    ARM_MULTIPLYLONG,
+    ARM_MULTIPLYSHORT,
+    ARM_SWAP,
+    ARM_BRANCHEX,
+    ARM_LEADINGZEROS,
+    ARM_SATARITH,
+    ARM_HALFTRANS,
+    ARM_SINGLETRANS,
+    ARM_UNDEFINED,
+    ARM_BLOCKTRANS,
+    ARM_BRANCH,
+    ARM_CPREGTRANS,
+    ARM_SWINTR
+} ArmInstrFormat;
+
+typedef struct _ArmCore ArmCore;
+
+void arm_generate_lookup();
+ArmInstrFormat arm_decode_instr(ArmInstr instr);
+
+void arm_exec_instr(ArmCore* cpu);
+
+typedef void (*ArmExecFunc)(ArmCore*, ArmInstr);
+
+void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr);
+void exec_arm_psr_trans(ArmCore* cpu, ArmInstr instr);
+void exec_arm_multiply(ArmCore* cpu, ArmInstr instr);
+void exec_arm_multiply_long(ArmCore* cpu, ArmInstr instr);
+void exec_arm_multiply_short(ArmCore* cpu, ArmInstr instr);
+void exec_arm_swap(ArmCore* cpu, ArmInstr instr);
+void exec_arm_branch_ex(ArmCore* cpu, ArmInstr instr);
+void exec_arm_leading_zeros(ArmCore* cpu, ArmInstr instr);
+void exec_arm_sat_arith(ArmCore* cpu, ArmInstr instr);
+void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr);
+void exec_arm_single_trans(ArmCore* cpu, ArmInstr instr);
+void exec_arm_undefined(ArmCore* cpu, ArmInstr instr);
+void exec_arm_block_trans(ArmCore* cpu, ArmInstr instr);
+void exec_arm_branch(ArmCore* cpu, ArmInstr instr);
+void exec_arm_cp_reg_trans(ArmCore* cpu, ArmInstr instr);
+void exec_arm_sw_intr(ArmCore* cpu, ArmInstr instr);
 
 void arm_disassemble(ArmInstr instr, u32 addr, FILE* out);
 

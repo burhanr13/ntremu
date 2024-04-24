@@ -13,6 +13,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     memset(nds, 0, sizeof *nds);
     nds->sched.master = nds;
 
+    arm7_init(&nds->cpu7);
     nds->cpu7.master = nds;
     nds->dma7.master = nds;
     nds->tmc7.master = nds;
@@ -21,6 +22,7 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 
     nds->spu.master = nds;
 
+    arm9_init(&nds->cpu9);
     nds->cpu9.master = nds;
     nds->dma9.master = nds;
     nds->tmc9.master = nds;
@@ -110,11 +112,13 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 
     nds->next_vblank = NDS_SCREEN_H * DOTS_W * 6;
 
+    nds->cur_cpu = (ArmCore*) &nds->cpu9;
+
     if (bootbios) {
         encrypt_securearea(card, (u32*) &bios7[0x30]);
 
-        cpu7_handle_interrupt(&nds->cpu7, I_RESET);
-        cpu9_handle_interrupt(&nds->cpu9, I_RESET);
+        cpu_handle_interrupt((ArmCore*) &nds->cpu7, I_RESET);
+        cpu_handle_interrupt((ArmCore*) &nds->cpu9, I_RESET);
     } else {
 
         nds->io7.wramstat = 3;
@@ -152,9 +156,9 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
         nds->cpu9.itcm_virtsize = 0x2000000;
         nds->cpu9.dtcm_base = 0x3000000;
         nds->cpu9.dtcm_virtsize = DTCMSIZE;
-        nds->cpu9.pc = header->arm9_entry;
-        nds->cpu9.cpsr.m = M_SYSTEM;
-        cpu9_flush(&nds->cpu9);
+        nds->cpu9.c.pc = header->arm9_entry;
+        nds->cpu9.c.cpsr.m = M_SYSTEM;
+        cpu_flush((ArmCore*) &nds->cpu9);
 
         dldi_patch_binary(&card->rom[header->arm7_rom_offset],
                           header->arm7_size);
@@ -162,9 +166,9 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
             bus7_write32(nds, header->arm7_ram_offset + i,
                          *(u32*) &card->rom[header->arm7_rom_offset + i]);
         }
-        nds->cpu7.pc = header->arm7_entry;
-        nds->cpu7.cpsr.m = M_SYSTEM;
-        cpu7_flush(&nds->cpu7);
+        nds->cpu7.c.pc = header->arm7_entry;
+        nds->cpu7.c.cpsr.m = M_SYSTEM;
+        cpu_flush((ArmCore*) &nds->cpu7);
     }
 
     lcd_hdraw(nds);
@@ -172,12 +176,10 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 }
 
 void nds_run(NDS* nds) {
-    nds->cur_cpu = CPU9;
-    nds->last_event = nds->sched.now;
     while (!event_pending(&nds->sched)) {
-        if (cpu9_step(&nds->cpu9)) {
-            nds->sched.now += nds->cpu9.cycles >> 1;
-            if (!(nds->half_tick ^= nds->cpu9.cycles & 1)) {
+        if (arm9_step(&nds->cpu9)) {
+            nds->sched.now += nds->cpu9.c.cycles >> 1;
+            if (!(nds->half_tick ^= nds->cpu9.c.cycles & 1)) {
                 nds->sched.now++;
             }
         } else {
@@ -185,48 +187,51 @@ void nds_run(NDS* nds) {
             break;
         }
     }
-    nds->cur_cpu = CPU7;
+    nds->cur_cpu = (ArmCore*) &nds->cpu7;
+    nds->cur_cpu_type = CPU7;
     nds->sched.now = nds->last_event;
     while (!event_pending(&nds->sched)) {
         if (nds->halt7) {
             if (nds->io7.ie.w & nds->io7.ifl.w) {
                 nds->halt7 = false;
                 nds->io7.haltcnt = 0;
-                nds->cpu7.irq = true;
+                nds->cpu7.c.irq = true;
             } else {
                 nds->sched.now = nds->sched.event_queue[0].time;
                 break;
             }
         } else {
-            cpu7_step(&nds->cpu7);
-            nds->sched.now += nds->cpu7.cycles;
+            arm7_step(&nds->cpu7);
+            nds->sched.now += nds->cpu7.c.cycles;
         }
     }
     run_to_present(&nds->sched);
-    nds->cpu7.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
-    nds->cpu9.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
-    nds->cur_cpu = CPU9;
+    nds->cpu7.c.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
+    nds->cpu9.c.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
+
+    nds->cur_cpu = (ArmCore*) &nds->cpu9;
+    nds->cur_cpu_type = CPU9;
     nds->last_event = nds->sched.now;
 }
 
 bool nds_step(NDS* nds) {
-    if (nds->cur_cpu) {
+    if (nds->cur_cpu_type == CPU7) {
         if (nds->halt7) {
             if (nds->io7.ie.w & nds->io7.ifl.w) {
                 nds->halt7 = false;
                 nds->io7.haltcnt = 0;
-                nds->cpu7.irq = true;
+                nds->cpu7.c.irq = true;
             } else {
                 nds->sched.now = nds->sched.event_queue[0].time;
             }
         } else {
-            cpu7_step(&nds->cpu7);
-            nds->sched.now += nds->cpu7.cycles;
+            arm7_step(&nds->cpu7);
+            nds->sched.now += nds->cpu7.c.cycles;
         }
     } else {
-        if (cpu9_step(&nds->cpu9)) {
-            nds->sched.now += nds->cpu9.cycles >> 1;
-            if (nds->cpu9.cycles & 1) {
+        if (arm9_step(&nds->cpu9)) {
+            nds->sched.now += nds->cpu9.c.cycles >> 1;
+            if (nds->cpu9.c.cycles & 1) {
                 if (nds->half_tick ^= 1) {
                     nds->sched.now++;
                 }
@@ -236,15 +241,17 @@ bool nds_step(NDS* nds) {
         }
     }
     if (event_pending(&nds->sched)) {
-        if (nds->cur_cpu) {
+        if (nds->cur_cpu_type == CPU7) {
             run_to_present(&nds->sched);
-            nds->cpu7.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
-            nds->cpu9.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
+            nds->cpu7.c.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
+            nds->cpu9.c.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
 
-            nds->cur_cpu = CPU9;
+            nds->cur_cpu = (ArmCore*) &nds->cpu9;
+            nds->cur_cpu_type = CPU9;
             nds->last_event = nds->sched.now;
         } else {
-            nds->cur_cpu = CPU7;
+            nds->cur_cpu = (ArmCore*) &nds->cpu7;
+            nds->cur_cpu_type = CPU7;
             nds->sched.now = nds->last_event;
         }
         return true;

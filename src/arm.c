@@ -1,69 +1,83 @@
-#include "arm5_isa.h"
+#include "arm.h"
 
-#include <stdint.h>
-#include <stdio.h>
+#include "arm_core.h"
 
-#include "arm946e.h"
-#include "bus9.h"
+ArmInstrFormat arm_lookup[1 << 8][1 << 4];
 
-Arm5ExecFunc arm5_lookup[1 << 8][1 << 4];
+ArmExecFunc exec_funcs[] = {[ARM_DATAPROC] = exec_arm_data_proc,
+                            [ARM_PSRTRANS] = exec_arm_psr_trans,
+                            [ARM_MULTIPLY] = exec_arm_multiply,
+                            [ARM_MULTIPLYLONG] = exec_arm_multiply_long,
+                            [ARM_MULTIPLYSHORT] = exec_arm_multiply_short,
+                            [ARM_SWAP] = exec_arm_swap,
+                            [ARM_BRANCHEX] = exec_arm_branch_ex,
+                            [ARM_LEADINGZEROS] = exec_arm_leading_zeros,
+                            [ARM_SATARITH] = exec_arm_sat_arith,
+                            [ARM_HALFTRANS] = exec_arm_half_trans,
+                            [ARM_SINGLETRANS] = exec_arm_single_trans,
+                            [ARM_UNDEFINED] = exec_arm_undefined,
+                            [ARM_BLOCKTRANS] = exec_arm_block_trans,
+                            [ARM_BRANCH] = exec_arm_branch,
+                            [ARM_CPREGTRANS] = exec_arm_cp_reg_trans,
+                            [ARM_SWINTR] = exec_arm_sw_intr};
 
-void arm5_generate_lookup() {
+void arm_generate_lookup() {
     for (int dechi = 0; dechi < 1 << 8; dechi++) {
         for (int declo = 0; declo < 1 << 4; declo++) {
-            arm5_lookup[dechi][declo] =
-                arm5_decode_instr((ArmInstr){.dechi = dechi, .declo = declo});
+            arm_lookup[dechi][declo] =
+                arm_decode_instr((ArmInstr){.dechi = dechi, .declo = declo});
         }
     }
 }
 
-Arm5ExecFunc arm5_decode_instr(ArmInstr instr) {
+ArmInstrFormat arm_decode_instr(ArmInstr instr) {
     if (instr.sw_intr.c1 == 0b1111) {
-        return exec_arm5_sw_intr;
+        return ARM_SWINTR;
     } else if (instr.cp_reg_trans.c1 == 0b1110 && instr.cp_reg_trans.c2 == 1) {
-        return exec_arm5_cp_reg_trans;
+        return ARM_CPREGTRANS;
     } else if (instr.branch.c1 == 0b101) {
-        return exec_arm5_branch;
+        return ARM_BRANCH;
     } else if (instr.block_trans.c1 == 0b100) {
-        return exec_arm5_block_trans;
+        return ARM_BLOCKTRANS;
     } else if (instr.undefined.c1 == 0b011 && instr.undefined.c2 == 1) {
-        return exec_arm5_undefined;
+        return ARM_UNDEFINED;
     } else if (instr.single_trans.c1 == 0b01) {
-        return exec_arm5_single_trans;
-    } else if (instr.clz.c1 == 0b00010110 && instr.clz.c4 == 0b0001) {
-        return exec_arm5_clz;
+        return ARM_SINGLETRANS;
+    } else if (instr.leading_zeros.c1 == 0b00010110 &&
+               instr.leading_zeros.c4 == 0b0001) {
+        return ARM_LEADINGZEROS;
     } else if (instr.sat_arith.c1 == 0b00010 && instr.sat_arith.c2 == 0 &&
                instr.sat_arith.c4 == 0b0101) {
-        return exec_arm5_sat_arith;
+        return ARM_SATARITH;
     } else if (instr.branch_ex.c1 == 0b00010010 && instr.branch_ex.c3 == 0b00 &&
                instr.branch_ex.c4 == 1) {
-        return exec_arm5_branch_ex;
+        return ARM_BRANCHEX;
     } else if (instr.swap.c1 == 0b00010 && instr.swap.c2 == 0b00 &&
                instr.swap.c4 == 0b1001) {
-        return exec_arm5_swap;
+        return ARM_SWAP;
     } else if (instr.multiply_short.c1 == 0b00010 &&
                instr.multiply_short.c2 == 0 && instr.multiply_short.c3 == 1 &&
                instr.multiply_short.c4 == 0) {
-        return exec_arm5_multiply_short;
+        return ARM_MULTIPLYSHORT;
     } else if (instr.multiply.c1 == 0b000000 && instr.multiply.c2 == 0b1001) {
-        return exec_arm5_multiply;
+        return ARM_MULTIPLY;
     } else if (instr.multiply_long.c1 == 0b00001 &&
                instr.multiply_long.c2 == 0b1001) {
-        return exec_arm5_multiply_long;
+        return ARM_MULTIPLYLONG;
     } else if (instr.half_trans.c1 == 0b000 && instr.half_trans.c2 == 1 &&
                instr.half_trans.c3 == 1) {
-        return exec_arm5_half_trans;
+        return ARM_HALFTRANS;
     } else if (instr.psr_trans.c1 == 0b00 && instr.psr_trans.c2 == 0b10 &&
                instr.psr_trans.c3 == 0) {
-        return exec_arm5_psr_trans;
+        return ARM_PSRTRANS;
     } else if (instr.data_proc.c1 == 0b00) {
-        return exec_arm5_data_proc;
+        return ARM_DATAPROC;
     } else {
-        return exec_arm5_undefined;
+        return ARM_UNDEFINED;
     }
 }
 
-static bool eval_cond(Arm946E* cpu, ArmInstr instr) {
+static inline bool eval_cond(ArmCore* cpu, ArmInstr instr) {
     if (instr.cond == C_AL) return true;
     switch (instr.cond) {
         case C_EQ:
@@ -99,17 +113,17 @@ static bool eval_cond(Arm946E* cpu, ArmInstr instr) {
     }
 }
 
-void arm5_exec_instr(Arm946E* cpu) {
+void arm_exec_instr(ArmCore* cpu) {
     ArmInstr instr = cpu->cur_instr;
     if (!eval_cond(cpu, instr)) {
-        cpu9_fetch_instr(cpu);
+        cpu_fetch_instr(cpu);
         return;
     }
 
-    arm5_lookup[instr.dechi][instr.declo](cpu, instr);
+    exec_funcs[arm_lookup[instr.dechi][instr.declo]](cpu, instr);
 }
 
-static u32 arm_shifter(Arm946E* cpu, u8 shift, u32 operand, u32* carry) {
+static u32 arm_shifter(ArmCore* cpu, u8 shift, u32 operand, u32* carry) {
     u32 shift_type = (shift >> 1) & 0b11;
     u32 shift_amt = shift >> 3;
     if (shift_amt) {
@@ -145,7 +159,7 @@ static u32 arm_shifter(Arm946E* cpu, u8 shift, u32 operand, u32* carry) {
     return 0;
 }
 
-void exec_arm5_data_proc(Arm946E* cpu, ArmInstr instr) {
+void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr) {
     u32 op1, op2;
 
     u32 z, c = cpu->cpsr.c, n, v = cpu->cpsr.v;
@@ -162,13 +176,13 @@ void exec_arm5_data_proc(Arm946E* cpu, ArmInstr instr) {
             }
         }
         op1 = cpu->r[instr.data_proc.rn];
-        cpu9_fetch_instr(cpu);
+        cpu_fetch_instr(cpu);
     } else {
         u32 rm = instr.data_proc.op2 & 0b1111;
         u32 shift = instr.data_proc.op2 >> 4;
 
         if (shift & 1) {
-            cpu9_fetch_instr(cpu);
+            cpu_fetch_instr(cpu);
             op2 = cpu->r[rm];
 
             u32 rs = shift >> 4;
@@ -210,7 +224,7 @@ void exec_arm5_data_proc(Arm946E* cpu, ArmInstr instr) {
         } else {
             op2 = arm_shifter(cpu, shift, cpu->r[rm], &c);
             op1 = cpu->r[instr.data_proc.rn];
-            cpu9_fetch_instr(cpu);
+            cpu_fetch_instr(cpu);
         }
     }
     if (instr.data_proc.rn == 15 && instr.data_proc.rd != 15) op1 &= ~0b10;
@@ -304,7 +318,7 @@ void exec_arm5_data_proc(Arm946E* cpu, ArmInstr instr) {
             CpuMode mode = cpu->cpsr.m;
             if (!(mode == M_USER || mode == M_SYSTEM)) {
                 cpu->cpsr.w = cpu->spsr;
-                cpu9_update_mode(cpu, mode);
+                cpu_update_mode(cpu, mode);
             }
         } else {
             cpu->cpsr.z = z;
@@ -314,7 +328,7 @@ void exec_arm5_data_proc(Arm946E* cpu, ArmInstr instr) {
         }
         if (save) {
             cpu->r[instr.data_proc.rd] = res;
-            if (instr.data_proc.rd == 15) cpu9_flush(cpu);
+            if (instr.data_proc.rd == 15) cpu_flush(cpu);
         }
     } else {
         u32 rd = instr.data_proc.rd;
@@ -364,11 +378,11 @@ void exec_arm5_data_proc(Arm946E* cpu, ArmInstr instr) {
                 cpu->r[rd] = ~op2;
                 break;
         }
-        if (instr.data_proc.rd == 15) cpu9_flush(cpu);
+        if (instr.data_proc.rd == 15) cpu_flush(cpu);
     }
 }
 
-void exec_arm5_psr_trans(Arm946E* cpu, ArmInstr instr) {
+void exec_arm_psr_trans(ArmCore* cpu, ArmInstr instr) {
     if (instr.psr_trans.op) {
         u32 op2;
         if (instr.psr_trans.i) {
@@ -393,7 +407,7 @@ void exec_arm5_psr_trans(Arm946E* cpu, ArmInstr instr) {
             CpuMode m = cpu->cpsr.m;
             cpu->cpsr.w &= ~mask;
             cpu->cpsr.w |= op2;
-            cpu9_update_mode(cpu, m);
+            cpu_update_mode(cpu, m);
         }
     } else {
         u32 psr;
@@ -404,11 +418,11 @@ void exec_arm5_psr_trans(Arm946E* cpu, ArmInstr instr) {
         }
         cpu->r[instr.psr_trans.rd] = psr;
     }
-    cpu9_fetch_instr(cpu);
+    cpu_fetch_instr(cpu);
 }
 
-void exec_arm5_multiply(Arm946E* cpu, ArmInstr instr) {
-    cpu9_fetch_instr(cpu);
+void exec_arm_multiply(ArmCore* cpu, ArmInstr instr) {
+    cpu_fetch_instr(cpu);
     u32 res = cpu->r[instr.multiply.rm] * cpu->r[instr.multiply.rs];
     if (instr.multiply.a) {
         res += cpu->r[instr.multiply.rn];
@@ -420,8 +434,8 @@ void exec_arm5_multiply(Arm946E* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm5_multiply_long(Arm946E* cpu, ArmInstr instr) {
-    cpu9_fetch_instr(cpu);
+void exec_arm_multiply_long(ArmCore* cpu, ArmInstr instr) {
+    cpu_fetch_instr(cpu);
     u64 res;
     if (instr.multiply_long.u) {
         s64 sres;
@@ -444,8 +458,13 @@ void exec_arm5_multiply_long(Arm946E* cpu, ArmInstr instr) {
     cpu->r[instr.multiply_long.rdhi] = res >> 32;
 }
 
-void exec_arm5_multiply_short(Arm946E* cpu, ArmInstr instr) {
-    cpu9_fetch_instr(cpu);
+void exec_arm_multiply_short(ArmCore* cpu, ArmInstr instr) {
+    if (!cpu->v5) {
+        cpu_handle_interrupt(cpu, I_UND);
+        return;
+    }
+
+    cpu_fetch_instr(cpu);
 
     s64 op1 = (s16) (cpu->r[instr.multiply_short.rs] >>
                      (16 * instr.multiply_short.y));
@@ -487,36 +506,41 @@ void exec_arm5_multiply_short(Arm946E* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm5_swap(Arm946E* cpu, ArmInstr instr) {
+void exec_arm_swap(ArmCore* cpu, ArmInstr instr) {
     u32 addr = cpu->r[instr.swap.rn];
-    cpu9_fetch_instr(cpu);
+    cpu_fetch_instr(cpu);
     if (instr.swap.b) {
-        u8 data = cpu9_read8(cpu, addr, false);
-        cpu9_write8(cpu, addr, cpu->r[instr.swap.rm]);
+        u8 data = cpu->read8(cpu, addr, false);
+        cpu->write8(cpu, addr, cpu->r[instr.swap.rm]);
         cpu->r[instr.swap.rd] = data;
     } else {
-        u32 data = cpu9_read32(cpu, addr);
-        cpu9_write32(cpu, addr, cpu->r[instr.swap.rm]);
+        u32 data = cpu->read32(cpu, addr);
+        cpu->write32(cpu, addr, cpu->r[instr.swap.rm]);
         cpu->r[instr.swap.rd] = data;
     }
 }
 
-void exec_arm5_branch_ex(Arm946E* cpu, ArmInstr instr) {
-    if (instr.branch_ex.l) {
+void exec_arm_branch_ex(ArmCore* cpu, ArmInstr instr) {
+    if (instr.branch_ex.l && cpu->v5) {
         if (cpu->cpsr.t) {
             cpu->lr = (cpu->pc - 2) | 1;
         } else {
             cpu->lr = cpu->pc - 4;
         }
     }
-    cpu9_fetch_instr(cpu);
+    cpu_fetch_instr(cpu);
     cpu->pc = cpu->r[instr.branch_ex.rn];
     cpu->cpsr.t = cpu->pc & 1;
-    cpu9_flush(cpu);
+    cpu_flush(cpu);
 }
 
-void exec_arm5_clz(Arm946E* cpu, ArmInstr instr) {
-    u32 op = cpu->r[instr.clz.rm];
+void exec_arm_leading_zeros(ArmCore* cpu, ArmInstr instr) {
+    if (!cpu->v5) {
+        cpu_handle_interrupt(cpu, I_UND);
+        return;
+    }
+
+    u32 op = cpu->r[instr.leading_zeros.rm];
     u32 ct = 0;
     if (op == 0) ct = 32;
     else
@@ -524,11 +548,16 @@ void exec_arm5_clz(Arm946E* cpu, ArmInstr instr) {
             op <<= 1;
             ct++;
         }
-    cpu->r[instr.clz.rd] = ct;
-    cpu9_fetch_instr(cpu);
+    cpu->r[instr.leading_zeros.rd] = ct;
+    cpu_fetch_instr(cpu);
 }
 
-void exec_arm5_sat_arith(Arm946E* cpu, ArmInstr instr) {
+void exec_arm_sat_arith(ArmCore* cpu, ArmInstr instr) {
+    if (!cpu->v5) {
+        cpu_handle_interrupt(cpu, I_UND);
+        return;
+    }
+
     s64 op1 = (s32) cpu->r[instr.sat_arith.rm];
     s64 op2 = (s32) cpu->r[instr.sat_arith.rn];
     if (instr.sat_arith.d) {
@@ -555,13 +584,13 @@ void exec_arm5_sat_arith(Arm946E* cpu, ArmInstr instr) {
     }
     cpu->r[instr.sat_arith.rd] = res;
 
-    cpu9_fetch_instr(cpu);
+    cpu_fetch_instr(cpu);
 }
 
-void exec_arm5_half_trans(Arm946E* cpu, ArmInstr instr) {
-    if (!instr.half_trans.l && instr.half_trans.s &&
+void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr) {
+    if (cpu->v5 && !instr.half_trans.l && instr.half_trans.s &&
         (instr.half_trans.rd & 1)) {
-        cpu9_handle_interrupt(cpu, I_UND);
+        cpu_handle_interrupt(cpu, I_UND);
         return;
     }
 
@@ -572,7 +601,7 @@ void exec_arm5_half_trans(Arm946E* cpu, ArmInstr instr) {
     } else {
         offset = cpu->r[instr.half_trans.offlo];
     }
-    cpu9_fetch_instr(cpu);
+    cpu_fetch_instr(cpu);
 
     if (!instr.half_trans.u) offset = -offset;
     u32 wback = addr + offset;
@@ -584,15 +613,15 @@ void exec_arm5_half_trans(Arm946E* cpu, ArmInstr instr) {
                 cpu->r[instr.half_trans.rn] = wback;
             }
             if (instr.half_trans.h) {
-                cpu->r[instr.half_trans.rd] = cpu9_read16(cpu, addr, true);
+                cpu->r[instr.half_trans.rd] = cpu->read16(cpu, addr, true);
             } else {
-                cpu->r[instr.half_trans.rd] = cpu9_read8(cpu, addr, true);
+                cpu->r[instr.half_trans.rd] = cpu->read8(cpu, addr, true);
             }
-            if (instr.half_trans.rd == 15) cpu9_flush(cpu);
-        } else {
+            if (instr.half_trans.rd == 15) cpu_flush(cpu);
+        } else if (cpu->v5) {
             if (instr.half_trans.h) {
-                cpu9_write32m(cpu, addr, 0, cpu->r[instr.half_trans.rd]);
-                cpu9_write32m(cpu, addr, 1, cpu->r[instr.half_trans.rd + 1]);
+                cpu->write32m(cpu, addr, 0, cpu->r[instr.half_trans.rd]);
+                cpu->write32m(cpu, addr, 1, cpu->r[instr.half_trans.rd + 1]);
                 if (instr.half_trans.w || !instr.half_trans.p) {
                     cpu->r[instr.half_trans.rn] = wback;
                 }
@@ -600,22 +629,21 @@ void exec_arm5_half_trans(Arm946E* cpu, ArmInstr instr) {
                 if (instr.half_trans.w || !instr.half_trans.p) {
                     cpu->r[instr.half_trans.rn] = wback;
                 }
-                cpu->r[instr.half_trans.rd] = cpu9_read32m(cpu, addr, 0);
-                cpu->r[instr.half_trans.rd + 1] = cpu9_read32m(cpu, addr, 1);
+                cpu->r[instr.half_trans.rd] = cpu->read32m(cpu, addr, 0);
+                cpu->r[instr.half_trans.rd + 1] = cpu->read32m(cpu, addr, 1);
             }
         }
     } else if (instr.half_trans.h) {
         if (instr.half_trans.l) {
-            if (instr.half_trans.w || !instr.half_trans.p) {
+            if (instr.half_trans.w || !instr.half_trans.    p) {
                 cpu->r[instr.half_trans.rn] = wback;
             }
-            cpu->r[instr.half_trans.rd] = cpu9_read16(cpu, addr, false);
+            cpu->r[instr.half_trans.rd] = cpu->read16(cpu, addr, false);
             if (instr.half_trans.rd == 15) {
-                cpu->cpsr.t = cpu->pc & 1;
-                cpu9_flush(cpu);
+                cpu_flush(cpu);
             }
         } else {
-            cpu9_write16(cpu, addr, cpu->r[instr.half_trans.rd]);
+            cpu->write16(cpu, addr, cpu->r[instr.half_trans.rd]);
             if (instr.half_trans.w || !instr.half_trans.p) {
                 cpu->r[instr.half_trans.rn] = wback;
             }
@@ -623,9 +651,9 @@ void exec_arm5_half_trans(Arm946E* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm5_single_trans(Arm946E* cpu, ArmInstr instr) {
-    if (instr.cond == 0xf) {
-        cpu9_fetch_instr(cpu);
+void exec_arm_single_trans(ArmCore* cpu, ArmInstr instr) {
+    if (instr.cond == 0xf && cpu->v5) {
+        cpu_fetch_instr(cpu);
         return;
     }
 
@@ -642,7 +670,7 @@ void exec_arm5_single_trans(Arm946E* cpu, ArmInstr instr) {
         offset = instr.single_trans.offset;
     }
 
-    cpu9_fetch_instr(cpu);
+    cpu_fetch_instr(cpu);
 
     if (!instr.single_trans.u) offset = -offset;
     u32 wback = addr + offset;
@@ -653,10 +681,10 @@ void exec_arm5_single_trans(Arm946E* cpu, ArmInstr instr) {
             if (instr.single_trans.w || !instr.single_trans.p) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
-            cpu->r[instr.single_trans.rd] = cpu9_read8(cpu, addr, false);
-            if (instr.single_trans.rd == 15) cpu9_flush(cpu);
+            cpu->r[instr.single_trans.rd] = cpu->read8(cpu, addr, false);
+            if (instr.single_trans.rd == 15) cpu_flush(cpu);
         } else {
-            cpu9_write8(cpu, addr, cpu->r[instr.single_trans.rd]);
+            cpu->write8(cpu, addr, cpu->r[instr.single_trans.rd]);
             if (instr.single_trans.w || !instr.single_trans.p) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
@@ -666,13 +694,13 @@ void exec_arm5_single_trans(Arm946E* cpu, ArmInstr instr) {
             if (instr.single_trans.w || !instr.single_trans.p) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
-            cpu->r[instr.single_trans.rd] = cpu9_read32(cpu, addr);
+            cpu->r[instr.single_trans.rd] = cpu->read32(cpu, addr);
             if (instr.single_trans.rd == 15) {
-                cpu->cpsr.t = cpu->pc & 1;
-                cpu9_flush(cpu);
+                if (cpu->v5) cpu->cpsr.t = cpu->pc & 1;
+                cpu_flush(cpu);
             }
         } else {
-            cpu9_write32(cpu, addr, cpu->r[instr.single_trans.rd]);
+            cpu->write32(cpu, addr, cpu->r[instr.single_trans.rd]);
             if (instr.single_trans.w || !instr.single_trans.p) {
                 cpu->r[instr.single_trans.rn] = wback;
             }
@@ -680,11 +708,11 @@ void exec_arm5_single_trans(Arm946E* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm5_undefined(Arm946E* cpu, ArmInstr instr) {
-    cpu9_handle_interrupt(cpu, I_UND);
+void exec_arm_undefined(ArmCore* cpu, ArmInstr instr) {
+    cpu_handle_interrupt(cpu, I_UND);
 }
 
-u32* get_user_reg9(Arm946E* cpu, int reg) {
+static u32* get_user_reg(ArmCore* cpu, int reg) {
     if (reg < 8 || reg == 15) return &cpu->r[reg];
     if (reg < 13) {
         if (cpu->cpsr.m == M_FIQ) return &cpu->banked_r8_12[0][reg - 8];
@@ -695,7 +723,7 @@ u32* get_user_reg9(Arm946E* cpu, int reg) {
     return NULL;
 }
 
-void exec_arm5_block_trans(Arm946E* cpu, ArmInstr instr) {
+void exec_arm_block_trans(ArmCore* cpu, ArmInstr instr) {
     int rcount = 0;
     int rlist[16];
     u32 addr = cpu->r[instr.block_trans.rn];
@@ -711,7 +739,12 @@ void exec_arm5_block_trans(Arm946E* cpu, ArmInstr instr) {
             addr = wback;
         }
     } else {
-        rcount = 0;
+        if (cpu->v5) {
+            rcount = 0;
+        } else {
+            rcount = 1;
+            rlist[0] = 15;
+        }
         if (instr.block_trans.u) {
             wback += 0x40;
         } else {
@@ -721,7 +754,7 @@ void exec_arm5_block_trans(Arm946E* cpu, ArmInstr instr) {
     }
 
     if (instr.block_trans.p == instr.block_trans.u) addr += 4;
-    cpu9_fetch_instr(cpu);
+    cpu_fetch_instr(cpu);
 
     if (instr.block_trans.s &&
         !((instr.block_trans.rlist & (1 << 15)) && instr.block_trans.l)) {
@@ -729,55 +762,63 @@ void exec_arm5_block_trans(Arm946E* cpu, ArmInstr instr) {
             for (int i = 0; i < rcount; i++) {
                 if (i == rcount - 1 && instr.block_trans.w)
                     cpu->r[instr.block_trans.rn] = wback;
-                *get_user_reg9(cpu, rlist[i]) = cpu9_read32m(cpu, addr, i);
+                *get_user_reg(cpu, rlist[i]) = cpu->read32m(cpu, addr, i);
             }
             if (rcount < 2 && instr.block_trans.w)
                 cpu->r[instr.block_trans.rn] = wback;
         } else {
             for (int i = 0; i < rcount; i++) {
-                cpu9_write32m(cpu, addr, i, *get_user_reg9(cpu, rlist[i]));
+                cpu->write32m(cpu, addr, i, *get_user_reg(cpu, rlist[i]));
             }
             if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         }
     } else {
         if (instr.block_trans.l) {
-            if (cpu->cpsr.t) {
+            if (cpu->cpsr.t || !cpu->v5) {
                 if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
                 for (int i = 0; i < rcount; i++) {
-                    cpu->r[rlist[i]] = cpu9_read32m(cpu, addr, i);
+                    cpu->r[rlist[i]] = cpu->read32m(cpu, addr, i);
                 }
             } else {
                 for (int i = 0; i < rcount; i++) {
                     if (i == rcount - 1 && instr.block_trans.w)
                         cpu->r[instr.block_trans.rn] = wback;
-                    cpu->r[rlist[i]] = cpu9_read32m(cpu, addr, i);
+                    cpu->r[rlist[i]] = cpu->read32m(cpu, addr, i);
                 }
                 if (rcount < 2 && instr.block_trans.w)
                     cpu->r[instr.block_trans.rn] = wback;
             }
             if (instr.block_trans.rlist & (1 << 15)) {
-                cpu->cpsr.t = cpu->pc & 1;
+                if (cpu->v5) cpu->cpsr.t = cpu->pc & 1;
                 if (instr.block_trans.s) {
                     CpuMode mode = cpu->cpsr.m;
                     if (!(mode == M_USER || mode == M_SYSTEM)) {
                         cpu->cpsr.w = cpu->spsr;
-                        cpu9_update_mode(cpu, mode);
+                        cpu_update_mode(cpu, mode);
                     }
                 }
-                cpu9_flush(cpu);
+                cpu_flush(cpu);
             }
         } else {
-            for (int i = 0; i < rcount; i++) {
-                cpu9_write32m(cpu, addr, i, cpu->r[rlist[i]]);
+            if (cpu->v5) {
+                for (int i = 0; i < rcount; i++) {
+                    cpu->write32m(cpu, addr, i, cpu->r[rlist[i]]);
+                }
+                if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
+            } else {
+                for (int i = 0; i < rcount; i++) {
+                    cpu->write32m(cpu, addr, i, cpu->r[rlist[i]]);
+                    if (i == 0 && instr.block_trans.w)
+                        cpu->r[instr.block_trans.rn] = wback;
+                }
             }
-            if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         }
     }
 }
 
-void exec_arm5_branch(Arm946E* cpu, ArmInstr instr) {
+void exec_arm_branch(ArmCore* cpu, ArmInstr instr) {
     u32 offset = instr.branch.offset;
-    if (offset & (1 << 23)) offset |= 0xff000000;
+    offset = (s32) (offset << 8) >> 8;
     if (cpu->cpsr.t) offset <<= 1;
     else offset <<= 2;
     u32 dest = cpu->pc + offset;
@@ -788,31 +829,36 @@ void exec_arm5_branch(Arm946E* cpu, ArmInstr instr) {
                 cpu->lr += offset;
                 dest = cpu->lr;
                 cpu->lr = (cpu->pc - 2) | 1;
-                cpu9_fetch_instr(cpu);
-                if (instr.cond == 0xf) {
+                cpu_fetch_instr(cpu);
+                if (instr.cond == 0xf && cpu->v5) {
                     cpu->cpsr.t = 0;
                 }
             } else {
                 if (offset & (1 << 22)) dest += 0xff800000;
                 cpu->lr = dest;
-                cpu9_fetch_instr(cpu);
+                cpu_fetch_instr(cpu);
                 return;
             }
         } else {
             cpu->lr = (cpu->pc - 4) & ~0b11;
-            cpu9_fetch_instr(cpu);
-            if (instr.cond == 0xf) {
+            cpu_fetch_instr(cpu);
+            if (instr.cond == 0xf && cpu->v5) {
                 dest += instr.branch.l << 1;
                 cpu->cpsr.t = 1;
             }
         }
     }
     cpu->pc = dest;
-    cpu9_flush(cpu);
+    cpu_flush(cpu);
 }
 
-void exec_arm5_cp_reg_trans(Arm946E* cpu, ArmInstr instr) {
-    cpu9_fetch_instr(cpu);
+void exec_arm_cp_reg_trans(ArmCore* cpu, ArmInstr instr) {
+    if (!cpu->v5) {
+        cpu_handle_interrupt(cpu, I_UND);
+        return;
+    }
+
+    cpu_fetch_instr(cpu);
 
     if (instr.cp_reg_trans.cpnum == 15 && instr.cp_reg_trans.cpopc == 0) {
         if (instr.cp_reg_trans.l) {
@@ -826,6 +872,297 @@ void exec_arm5_cp_reg_trans(Arm946E* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm5_sw_intr(Arm946E* cpu, ArmInstr instr) {
-    cpu9_handle_interrupt(cpu, I_SWI);
+void exec_arm_sw_intr(ArmCore* cpu, ArmInstr instr) {
+    cpu_handle_interrupt(cpu, I_SWI);
+}
+
+void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
+
+    static char* reg_names[16] = {"r0", "r1", "r2", "r3", "r4",  "r5",
+                                  "r6", "r7", "r8", "r9", "r10", "r11",
+                                  "ip", "sp", "lr", "pc"};
+    static char* cond_names[16] = {"eq", "ne", "hs", "lo", "mi", "pl",
+                                   "vs", "vc", "hi", "ls", "ge", "lt",
+                                   "gt", "le", "",   ""};
+    static char* alu_names[16] = {"and", "eor", "sub", "rsb", "add", "adc",
+                                  "sbc", "rsc", "tst", "teq", "cmp", "cmn",
+                                  "orr", "mov", "bic", "mvn"};
+    static char* shift_names[5] = {"lsl", "lsr", "asr", "ror", "rrx"};
+
+    char* cond = cond_names[instr.cond];
+
+    switch (arm_decode_instr(instr)) {
+        case ARM_SWINTR:
+            fprintf(out, "swi%s 0x%x", cond, instr.sw_intr.arg);
+            break;
+        case ARM_BRANCH: {
+            u32 off = instr.branch.offset;
+            if (off & (1 << 23)) off |= 0xff000000;
+            if (instr.cond == 0xf) {
+                fprintf(out, "blx 0x%x",
+                        addr + 8 * (off << 2) + (instr.branch.l << 1));
+            } else {
+                fprintf(out, "b%s%s 0x%x", instr.branch.l ? "l" : "", cond,
+                        addr + 8 + (off << 2));
+            }
+            break;
+        }
+        case ARM_CPREGTRANS:
+            fprintf(out, "%s%s p%d, %d, %s, c%d, c%d, %d",
+                    instr.cp_reg_trans.l ? "mrc" : "mcr",
+                    cond_names[instr.cond], instr.cp_reg_trans.cpnum,
+                    instr.cp_reg_trans.cpopc, reg_names[instr.cp_reg_trans.rd],
+                    instr.cp_reg_trans.crn, instr.cp_reg_trans.crm,
+                    instr.cp_reg_trans.cp);
+            break;
+        case ARM_BLOCKTRANS:
+            if (instr.block_trans.rn == 13 &&
+                (instr.block_trans.u != instr.block_trans.p) &&
+                instr.block_trans.u == instr.block_trans.l &&
+                instr.block_trans.w) {
+                fprintf(out, "%s%s {", instr.block_trans.l ? "pop" : "push",
+                        cond);
+            } else {
+                fprintf(out, "%s%s%s%s %s%s, {",
+                        instr.block_trans.l ? "ldm" : "stm",
+                        instr.block_trans.u ? "i" : "d",
+                        instr.block_trans.p ? "b" : "a", cond,
+                        reg_names[instr.block_trans.rn],
+                        instr.block_trans.w ? "!" : "");
+            }
+            u16 rlist = instr.block_trans.rlist;
+            for (int i = 0; i < 16; i++) {
+                if (rlist & 1) {
+                    fprintf(out, "%s", reg_names[i]);
+                    rlist >>= 1;
+                    if (rlist) {
+                        fprintf(out, ", ");
+                    }
+                } else rlist >>= 1;
+            }
+            fprintf(out, "}%s", instr.block_trans.s ? "^" : "");
+            break;
+        case ARM_UNDEFINED:
+            fprintf(out, "undefined");
+            break;
+        case ARM_SINGLETRANS:
+            if (instr.cond == 0xf) {
+                fprintf(out, "pld");
+                return;
+            }
+
+            if (!instr.single_trans.i && instr.single_trans.rn == 15 &&
+                instr.single_trans.p) {
+                fprintf(out, "%s%s%s %s, [",
+                        instr.single_trans.l ? "ldr" : "str",
+                        instr.single_trans.b ? "b" : "", cond,
+                        reg_names[instr.single_trans.rd]);
+
+                u32 offset = instr.single_trans.offset;
+                if (!instr.single_trans.u) offset = -offset;
+                fprintf(out, "0x%x", addr + 8 + offset);
+                fprintf(out, "]%s", instr.single_trans.w ? "!" : "");
+            } else if (instr.single_trans.rn == 13 &&
+                       instr.single_trans.offset == 4 &&
+                       (!instr.single_trans.p || instr.single_trans.w) &&
+                       !instr.single_trans.b && !instr.single_trans.i &&
+                       instr.single_trans.l == instr.single_trans.u &&
+                       instr.single_trans.u != instr.single_trans.p) {
+                fprintf(out, "%s%s %s", instr.single_trans.l ? "pop" : "push",
+                        cond, reg_names[instr.single_trans.rd]);
+            } else {
+                fprintf(out, "%s%s%s %s, [%s",
+                        instr.single_trans.l ? "ldr" : "str",
+                        instr.single_trans.b ? "b" : "", cond,
+                        reg_names[instr.single_trans.rd],
+                        reg_names[instr.single_trans.rn]);
+                if (!instr.single_trans.p) {
+                    fprintf(out, "]");
+                }
+                if (instr.single_trans.i) {
+                    u32 rm = instr.single_trans.offset & 0b1111;
+                    u32 shift = instr.single_trans.offset >> 4;
+                    fprintf(out, ", %s%s", instr.single_trans.u ? "" : "-",
+                            reg_names[rm]);
+                    if (shift) {
+                        u32 shift_type = (shift >> 1) & 0b11;
+                        u32 shift_amt = (shift >> 3) & 0b11111;
+                        if (!shift_amt) {
+                            if (shift_type == S_ROR) {
+                                shift_type = 4;
+                                shift_amt = 1;
+                            } else {
+                                shift_amt = 32;
+                            }
+                        }
+                        fprintf(out, ", %s #%d", shift_names[shift_type],
+                                shift_amt);
+                    }
+                } else if (instr.single_trans.offset) {
+                    fprintf(out, ", #%s0x%x", instr.single_trans.u ? "" : "-",
+                            instr.single_trans.offset);
+                }
+                if (instr.single_trans.p) {
+                    fprintf(out, "]%s", instr.single_trans.w ? "!" : "");
+                }
+            }
+            break;
+        case ARM_LEADINGZEROS:
+            fprintf(out, "leading_zeros %s, %s",
+                    reg_names[instr.leading_zeros.rd],
+                    reg_names[instr.leading_zeros.rm]);
+            break;
+        case ARM_BRANCHEX:
+            fprintf(out, "%s%s %s", instr.branch_ex.l ? "blx" : "bx", cond,
+                    reg_names[instr.branch_ex.rn]);
+            break;
+        case ARM_SWAP:
+            fprintf(out, "swap%s%s %s, %s, [%s]", instr.swap.b ? "b" : "", cond,
+                    reg_names[instr.swap.rd], reg_names[instr.swap.rm],
+                    reg_names[instr.swap.rn]);
+            break;
+        case ARM_MULTIPLY:
+            if (instr.multiply.a) {
+                fprintf(
+                    out, "mla%s%s %s, %s, %s, %s", instr.multiply.s ? "s" : "",
+                    cond, reg_names[instr.multiply.rd],
+                    reg_names[instr.multiply.rm], reg_names[instr.multiply.rs],
+                    reg_names[instr.multiply.rn]);
+            } else {
+                fprintf(out, "mul%s%s %s, %s, %s", instr.multiply.s ? "s" : "",
+                        cond, reg_names[instr.multiply.rd],
+                        reg_names[instr.multiply.rm],
+                        reg_names[instr.multiply.rs]);
+            }
+            break;
+        case ARM_MULTIPLYLONG:
+            fprintf(out, "%s%s%s%s %s, %s, %s, %s",
+                    instr.multiply_long.u ? "s" : "u",
+                    instr.multiply_long.a ? "mlal" : "mull",
+                    instr.multiply_long.s ? "s" : "", cond,
+                    reg_names[instr.multiply_long.rdlo],
+                    reg_names[instr.multiply_long.rdhi],
+                    reg_names[instr.multiply_long.rm],
+                    reg_names[instr.multiply_long.rs]);
+            break;
+        case ARM_HALFTRANS:
+            if (instr.half_trans.i && instr.half_trans.rn == 15 &&
+                instr.half_trans.p) {
+                fprintf(out, "%s%s%s%s %s, [",
+                        instr.half_trans.l ? "ldr" : "str",
+                        instr.half_trans.s ? "s" : "",
+                        instr.half_trans.h ? "h" : "b", cond,
+                        reg_names[instr.half_trans.rd]);
+
+                u32 offset =
+                    instr.half_trans.offlo | (instr.half_trans.offhi << 4);
+                if (!instr.half_trans.u) offset = -offset;
+                fprintf(out, "0x%x", addr + 8 + offset);
+                fprintf(out, "]%s", instr.half_trans.w ? "!" : "");
+            } else {
+                if (!instr.half_trans.l && instr.half_trans.s) {
+                    fprintf(out, "%s", instr.half_trans.h ? "strd" : "ldrd");
+                } else {
+                    fprintf(out, "%s%s%s", instr.half_trans.l ? "ldr" : "str",
+                            instr.half_trans.s ? "s" : "",
+                            instr.half_trans.h ? "h" : "b");
+                }
+                fprintf(out, "%s %s, [%s", cond, reg_names[instr.half_trans.rd],
+                        reg_names[instr.half_trans.rn]);
+                if (!instr.half_trans.p) {
+                    fprintf(out, "]");
+                }
+                if (instr.half_trans.i) {
+                    u32 offset =
+                        instr.half_trans.offlo | (instr.half_trans.offhi << 4);
+                    if (offset) {
+                        fprintf(out, ", #%s0x%x", instr.half_trans.u ? "" : "-",
+                                offset);
+                    }
+                } else {
+                    fprintf(out, ", %s%s", instr.half_trans.u ? "" : "-",
+                            reg_names[instr.half_trans.offlo]);
+                }
+                if (instr.half_trans.p) {
+                    fprintf(out, "]%s", instr.half_trans.w ? "!" : "");
+                }
+            }
+            break;
+        case ARM_PSRTRANS:
+            if (instr.psr_trans.op) {
+                fprintf(out, "msr%s %s_%s%s, ", cond,
+                        instr.psr_trans.p ? "spsr" : "cpsr",
+                        instr.psr_trans.c ? "c" : "",
+                        instr.psr_trans.f ? "f" : "");
+                if (instr.psr_trans.i) {
+                    u32 op2 = instr.psr_trans.op2 & 0xff;
+                    u32 rot = (instr.psr_trans.op2 >> 8) << 1;
+                    op2 = (op2 >> rot) | (op2 << (32 - rot));
+                    fprintf(out, "#0x%x", op2);
+                } else {
+                    fprintf(out, "%s", reg_names[instr.psr_trans.op2 & 0xf]);
+                }
+            } else {
+                fprintf(out, "mrs%s %s, %s", cond,
+                        reg_names[instr.psr_trans.rd],
+                        instr.psr_trans.p ? "spsr" : "cpsr");
+            }
+            break;
+        case ARM_DATAPROC:
+            if (instr.data_proc.i && instr.data_proc.rn == 15 &&
+                (instr.data_proc.opcode == A_ADD ||
+                 instr.data_proc.opcode == A_SUB)) {
+                fprintf(out, "adr%s%s %s, [", instr.data_proc.s ? "s" : "",
+                        cond, reg_names[instr.data_proc.rd]);
+                u32 offset = instr.data_proc.op2 & 0xff;
+                u32 rot = (instr.data_proc.op2 >> 8) << 1;
+                offset = (offset >> rot) | (offset << (32 - rot));
+                if (instr.data_proc.opcode == A_SUB) offset = -offset;
+                fprintf(out, "0x%x]", addr + 8 + offset);
+            } else {
+
+                if (instr.data_proc.opcode >> 2 == 0b10) {
+                    fprintf(out, "%s%s %s", alu_names[instr.data_proc.opcode],
+                            cond, reg_names[instr.data_proc.rn]);
+                } else {
+                    fprintf(out, "%s%s%s %s", alu_names[instr.data_proc.opcode],
+                            instr.data_proc.s ? "s" : "", cond,
+                            reg_names[instr.data_proc.rd]);
+                    if (!(instr.data_proc.opcode == A_MOV ||
+                          instr.data_proc.opcode == A_MVN ||
+                          instr.data_proc.rd == instr.data_proc.rn)) {
+                        fprintf(out, ", %s", reg_names[instr.data_proc.rn]);
+                    }
+                }
+
+                if (instr.data_proc.i) {
+                    u32 op2 = instr.data_proc.op2 & 0xff;
+                    u32 rot = (instr.data_proc.op2 >> 8) << 1;
+                    fprintf(out, ", #0x%x", (op2 >> rot) | (op2 << (32 - rot)));
+                } else {
+                    u32 rm = instr.data_proc.op2 & 0b1111;
+                    u32 shift = instr.data_proc.op2 >> 4;
+                    fprintf(out, ", %s", reg_names[rm]);
+                    u32 shift_type = (shift >> 1) & 0b11;
+                    if (shift & 1) {
+                        u32 shift_reg = shift >> 4;
+                        fprintf(out, ", %s %s", shift_names[shift_type],
+                                reg_names[shift_reg]);
+                    } else if (shift) {
+                        u32 shift_amt = (shift >> 3) & 0b11111;
+                        if (!shift_amt) {
+                            if (shift_type == S_ROR) {
+                                shift_type = 4;
+                                shift_amt = 1;
+                            } else {
+                                shift_amt = 32;
+                            }
+                        }
+                        fprintf(out, ", %s #%d", shift_names[shift_type],
+                                shift_amt);
+                    }
+                }
+            }
+            break;
+    }
 }

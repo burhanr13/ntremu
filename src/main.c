@@ -81,11 +81,8 @@ int main(int argc, char** argv) {
                 do {
                     while (!ntremu.nds->frame_complete) {
                         if (ntremu.debugger) {
-                            u32 cur_instr_addr =
-                                ntremu.nds->cur_cpu
-                                    ? ntremu.nds->cpu7.cur_instr_addr
-                                    : ntremu.nds->cpu9.cur_instr_addr;
-                            if (cur_instr_addr == ntremu.breakpoint) {
+                            if (ntremu.nds->cur_cpu->cur_instr_addr ==
+                                ntremu.breakpoint) {
                                 bkpthit = true;
                                 break;
                             }
