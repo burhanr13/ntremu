@@ -21,11 +21,14 @@ ArmExecFunc exec_funcs[] = {[ARM_DATAPROC] = exec_arm_data_proc,
                             [ARM_CPREGTRANS] = exec_arm_cp_reg_trans,
                             [ARM_SWINTR] = exec_arm_sw_intr};
 
+ArmExecFunc func_lookup[1 << 8][1 << 4];
+
 void arm_generate_lookup() {
     for (int dechi = 0; dechi < 1 << 8; dechi++) {
         for (int declo = 0; declo < 1 << 4; declo++) {
             arm_lookup[dechi][declo] =
                 arm_decode_instr((ArmInstr){.dechi = dechi, .declo = declo});
+            func_lookup[dechi][declo] = exec_funcs[arm_lookup[dechi][declo]];
         }
     }
 }
@@ -120,10 +123,11 @@ void arm_exec_instr(ArmCore* cpu) {
         return;
     }
 
-    exec_funcs[arm_lookup[instr.dechi][instr.declo]](cpu, instr);
+    func_lookup[instr.dechi][instr.declo](cpu, instr);
 }
 
 static u32 arm_shifter(ArmCore* cpu, u8 shift, u32 operand, u32* carry) {
+    if (shift == 0) return operand;
     u32 shift_type = (shift >> 1) & 0b11;
     u32 shift_amt = shift >> 3;
     if (shift_amt) {
@@ -332,53 +336,57 @@ void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr) {
         }
     } else {
         u32 rd = instr.data_proc.rd;
-        switch (instr.data_proc.opcode) {
-            case A_AND:
-                cpu->r[rd] = op1 & op2;
-                break;
-            case A_EOR:
-                cpu->r[rd] = op1 ^ op2;
-                break;
-            case A_SUB:
-                cpu->r[rd] = op1 - op2;
-                break;
-            case A_RSB:
-                cpu->r[rd] = op2 - op1;
-                break;
-            case A_ADD:
-                cpu->r[rd] = op1 + op2;
-                break;
-            case A_ADC:
-                cpu->r[rd] = op1 + op2 + cpu->cpsr.c;
-                break;
-            case A_SBC:
-                cpu->r[rd] = op1 - op2 - 1 + cpu->cpsr.c;
-                break;
-            case A_RSC:
-                cpu->r[rd] = op2 - op1 - 1 + cpu->cpsr.c;
-                break;
-            case A_TST:
-                return;
-            case A_TEQ:
-                return;
-            case A_CMP:
-                return;
-            case A_CMN:
-                return;
-            case A_ORR:
-                cpu->r[rd] = op1 | op2;
-                break;
-            case A_MOV:
-                cpu->r[rd] = op2;
-                break;
-            case A_BIC:
-                cpu->r[rd] = op1 & ~op2;
-                break;
-            case A_MVN:
-                cpu->r[rd] = ~op2;
-                break;
+        if (instr.data_proc.opcode == A_MOV) {
+            cpu->r[rd] = op2;
+        } else {
+            switch (instr.data_proc.opcode) {
+                case A_AND:
+                    cpu->r[rd] = op1 & op2;
+                    break;
+                case A_EOR:
+                    cpu->r[rd] = op1 ^ op2;
+                    break;
+                case A_SUB:
+                    cpu->r[rd] = op1 - op2;
+                    break;
+                case A_RSB:
+                    cpu->r[rd] = op2 - op1;
+                    break;
+                case A_ADD:
+                    cpu->r[rd] = op1 + op2;
+                    break;
+                case A_ADC:
+                    cpu->r[rd] = op1 + op2 + cpu->cpsr.c;
+                    break;
+                case A_SBC:
+                    cpu->r[rd] = op1 - op2 - 1 + cpu->cpsr.c;
+                    break;
+                case A_RSC:
+                    cpu->r[rd] = op2 - op1 - 1 + cpu->cpsr.c;
+                    break;
+                case A_TST:
+                    return;
+                case A_TEQ:
+                    return;
+                case A_CMP:
+                    return;
+                case A_CMN:
+                    return;
+                case A_ORR:
+                    cpu->r[rd] = op1 | op2;
+                    break;
+                case A_MOV:
+                    cpu->r[rd] = op2;
+                    break;
+                case A_BIC:
+                    cpu->r[rd] = op1 & ~op2;
+                    break;
+                case A_MVN:
+                    cpu->r[rd] = ~op2;
+                    break;
+            }
         }
-        if (instr.data_proc.rd == 15) cpu_flush(cpu);
+        if (rd == 15) cpu_flush(cpu);
     }
 }
 
@@ -635,7 +643,7 @@ void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr) {
         }
     } else if (instr.half_trans.h) {
         if (instr.half_trans.l) {
-            if (instr.half_trans.w || !instr.half_trans.    p) {
+            if (instr.half_trans.w || !instr.half_trans.p) {
                 cpu->r[instr.half_trans.rn] = wback;
             }
             cpu->r[instr.half_trans.rd] = cpu->read16(cpu, addr, false);
