@@ -13,3 +13,5 @@ release
 /ntremu*
 
 perf*
+
+.DS_Store
