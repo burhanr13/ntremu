@@ -8,7 +8,8 @@
 
 void run_to_present(Scheduler* sched) {
     u64 end_time = sched->now;
-    while (sched->n_events && sched->event_queue[0].time <= end_time) {
+    while (sched->event_queue.size &&
+           FIFO_peek(sched->event_queue).time <= end_time) {
         run_next_event(sched);
         if (sched->now > end_time) end_time = sched->now;
     }
@@ -16,13 +17,10 @@ void run_to_present(Scheduler* sched) {
 }
 
 int run_next_event(Scheduler* sched) {
-    if (sched->n_events == 0) return 0;
+    if (sched->event_queue.size == 0) return 0;
 
-    Event e = sched->event_queue[0];
-    sched->n_events--;
-    for (int i = 0; i < sched->n_events; i++) {
-        sched->event_queue[i] = sched->event_queue[i + 1];
-    }
+    Event e;
+    FIFO_pop(sched->event_queue, e);
     sched->now = e.time;
 
     if (e.type == EVENT_LCD_HDRAW) {
@@ -61,28 +59,30 @@ int run_next_event(Scheduler* sched) {
 }
 
 void add_event(Scheduler* sched, EventType t, u64 time) {
-    if (sched->n_events == EVENT_MAX) return;
+    if (sched->event_queue.size == EVENT_MAX) return;
 
-    int i = sched->n_events;
-    sched->event_queue[sched->n_events].type = t;
-    sched->event_queue[sched->n_events].time = time;
-    sched->n_events++;
+    FIFO_push(sched->event_queue, ((Event){.type = t, .time = time}));
 
-    while (i > 0 &&
-           sched->event_queue[i].time < sched->event_queue[i - 1].time) {
-        Event tmp = sched->event_queue[i - 1];
-        sched->event_queue[i - 1] = sched->event_queue[i];
-        sched->event_queue[i] = tmp;
-        i--;
+    u32 i = (sched->event_queue.tail - 1) % EVENT_MAX;
+    while (i != sched->event_queue.head &&
+           sched->event_queue.d[i].time <
+               sched->event_queue.d[(i - 1) % EVENT_MAX].time) {
+        Event tmp = sched->event_queue.d[(i - 1) % EVENT_MAX];
+        sched->event_queue.d[(i - 1) % EVENT_MAX] = sched->event_queue.d[i];
+        sched->event_queue.d[i] = tmp;
+        i = (i - 1) % EVENT_MAX;
     }
 }
 
 void remove_event(Scheduler* sched, EventType t) {
-    for (int i = 0; i < sched->n_events; i++) {
-        if (sched->event_queue[i].type == t) {
-            sched->n_events--;
-            for (int j = i; j < sched->n_events; j++) {
-                sched->event_queue[j] = sched->event_queue[j + 1];
+    FIFO_foreach(i, sched->event_queue) {
+        if (sched->event_queue.d[i].type == t) {
+            sched->event_queue.size--;
+            sched->event_queue.tail = (sched->event_queue.tail - 1) % EVENT_MAX;
+            for (u32 j = i; j != sched->event_queue.tail;
+                 j = (j + 1) % EVENT_MAX) {
+                sched->event_queue.d[j] =
+                    sched->event_queue.d[(j + 1) % EVENT_MAX];
             }
             return;
         }
@@ -90,9 +90,9 @@ void remove_event(Scheduler* sched, EventType t) {
 }
 
 u64 find_event(Scheduler* sched, EventType t) {
-    for (int i = 0; i < sched->n_events; i++) {
-        if (sched->event_queue[i].type == t) {
-            return sched->event_queue[i].time;
+    FIFO_foreach(i, sched->event_queue) {
+        if (sched->event_queue.d[i].type == t) {
+            return sched->event_queue.d[i].time;
         }
     }
     return -1;
@@ -105,13 +105,13 @@ void print_scheduled_events(Scheduler* sched) {
         "TM1-9 Reload", "TM2-9 Reload", "TM3-9 Reload", "SPU Sample"};
 
     printf("Now: %ld\n", sched->now);
-    for (int i = 0; i < sched->n_events; i++) {
-        if (sched->event_queue[i].type < EVENT_SPU_CH0) {
-            printf("%ld => %s\n", sched->event_queue[i].time,
-                   event_names[sched->event_queue[i].type]);
+    FIFO_foreach(i, sched->event_queue) {
+        if (sched->event_queue.d[i].type < EVENT_SPU_CH0) {
+            printf("%ld => %s\n", sched->event_queue.d[i].time,
+                   event_names[sched->event_queue.d[i].type]);
         } else {
-            printf("%ld => SPU CH%x Reload\n", sched->event_queue[i].time,
-                   sched->event_queue[i].type - EVENT_SPU_CH0);
+            printf("%ld => SPU CH%x Reload\n", sched->event_queue.d[i].time,
+                   sched->event_queue.d[i].type - EVENT_SPU_CH0);
         }
     }
 }

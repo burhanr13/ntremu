@@ -183,7 +183,7 @@ void nds_run(NDS* nds) {
                 nds->sched.now++;
             }
         } else {
-            nds->sched.now = nds->sched.event_queue[0].time;
+            nds->sched.now = FIFO_peek(nds->sched.event_queue).time;
             break;
         }
     }
@@ -197,7 +197,7 @@ void nds_run(NDS* nds) {
                 nds->io7.haltcnt = 0;
                 nds->cpu7.c.irq = true;
             } else {
-                nds->sched.now = nds->sched.event_queue[0].time;
+                nds->sched.now = FIFO_peek(nds->sched.event_queue).time;
                 break;
             }
         } else {
@@ -222,7 +222,7 @@ bool nds_step(NDS* nds) {
                 nds->io7.haltcnt = 0;
                 nds->cpu7.c.irq = true;
             } else {
-                nds->sched.now = nds->sched.event_queue[0].time;
+                nds->sched.now = FIFO_peek(nds->sched.event_queue).time;
             }
         } else {
             arm7_step(&nds->cpu7);
@@ -237,7 +237,7 @@ bool nds_step(NDS* nds) {
                 }
             }
         } else {
-            nds->sched.now = nds->sched.event_queue[0].time;
+            nds->sched.now = FIFO_peek(nds->sched.event_queue).time;
         }
     }
     if (event_pending(&nds->sched)) {

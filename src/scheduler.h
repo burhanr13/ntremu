@@ -19,7 +19,7 @@ typedef enum {
     EVENT_SPU_CH0,
     EVENT_SPU_CAP0 = EVENT_SPU_CH0 + 16,
     EVENT_SPU_CAP1,
-    EVENT_MAX
+    EVENT_MAX = 32
 } EventType;
 
 typedef struct {
@@ -34,15 +34,14 @@ typedef struct {
 
     u64 now;
 
-    Event event_queue[EVENT_MAX];
-    int n_events;
+    FIFO(Event, EVENT_MAX) event_queue;
 } Scheduler;
 
 void run_to_present(Scheduler* sched);
 int run_next_event(Scheduler* sched);
 
 static inline bool event_pending(Scheduler* sched) {
-    return sched->n_events && sched->now >= sched->event_queue[0].time;
+    return sched->event_queue.size && sched->now >= FIFO_peek(sched->event_queue).time;
 }
 
 void add_event(Scheduler* sched, EventType t, u64 time);
