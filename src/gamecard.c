@@ -221,13 +221,13 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
                     break;
                 case 0x0b:
                     card->eepromst.read = true;
-                    card->eepromst.addr = (card->addrtype == 1) ? 1 : 0;
+                    card->eepromst.addr = card->addrtype == 1;
                     card->eepromst.i = 0;
                     card->eeprom_state = CARDEEPROM_ADDR;
                     break;
                 case 0x0a:
                     card->eepromst.read = false;
-                    card->eepromst.addr = (card->addrtype == 1) ? 1 : 0;
+                    card->eepromst.addr = card->addrtype == 1;
                     card->eepromst.i = 0;
                     card->eeprom_state = CARDEEPROM_ADDR;
                     break;

@@ -263,7 +263,8 @@ typedef enum {
     ARM_BLOCKTRANS,
     ARM_BRANCH,
     ARM_CPREGTRANS,
-    ARM_SWINTR
+    ARM_SWINTR,
+    ARM_MOV
 } ArmInstrFormat;
 
 typedef struct _ArmCore ArmCore;
@@ -275,6 +276,7 @@ void arm_exec_instr(ArmCore* cpu);
 
 typedef void (*ArmExecFunc)(ArmCore*, ArmInstr);
 
+void exec_arm_mov(ArmCore* cpu, ArmInstr instr);
 void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr);
 void exec_arm_psr_trans(ArmCore* cpu, ArmInstr instr);
 void exec_arm_multiply(ArmCore* cpu, ArmInstr instr);

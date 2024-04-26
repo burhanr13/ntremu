@@ -19,7 +19,8 @@ ArmExecFunc exec_funcs[] = {[ARM_DATAPROC] = exec_arm_data_proc,
                             [ARM_BLOCKTRANS] = exec_arm_block_trans,
                             [ARM_BRANCH] = exec_arm_branch,
                             [ARM_CPREGTRANS] = exec_arm_cp_reg_trans,
-                            [ARM_SWINTR] = exec_arm_sw_intr};
+                            [ARM_SWINTR] = exec_arm_sw_intr,
+                            [ARM_MOV] = exec_arm_mov};
 
 ArmExecFunc func_lookup[1 << 8][1 << 4];
 
@@ -72,8 +73,13 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
         return ARM_HALFTRANS;
     } else if (instr.psr_trans.c1 == 0b00 && instr.psr_trans.c2 == 0b10 &&
                instr.psr_trans.c3 == 0) {
-        return ARM_PSRTRANS;
+        if (instr.psr_trans.i || !(instr.psr_trans.op2 & 0x0f0))
+            return ARM_PSRTRANS;
+        else return ARM_UNDEFINED;
     } else if (instr.data_proc.c1 == 0b00) {
+        if (instr.data_proc.opcode == A_MOV && !instr.data_proc.i &&
+            !(instr.data_proc.op2 & 0x70))
+            return ARM_MOV;
         return ARM_DATAPROC;
     } else {
         return ARM_UNDEFINED;
@@ -127,7 +133,6 @@ void arm_exec_instr(ArmCore* cpu) {
 }
 
 static u32 arm_shifter(ArmCore* cpu, u8 shift, u32 operand, u32* carry) {
-    if (shift == 0) return operand;
     u32 shift_type = (shift >> 1) & 0b11;
     u32 shift_amt = shift >> 3;
     if (shift_amt) {
@@ -161,6 +166,32 @@ static u32 arm_shifter(ArmCore* cpu, u8 shift, u32 operand, u32* carry) {
         }
     }
     return 0;
+}
+
+void exec_arm_mov(ArmCore* cpu, ArmInstr instr) {
+    u32 op2 = cpu->r[instr.data_proc.op2 & 0xf];
+    u32 shift = instr.data_proc.op2 >> 7;
+    u32 c = cpu->cpsr.c;
+    if (shift) {
+        c = (op2 >> (32 - shift)) & 1;
+        op2 <<= shift;
+    }
+    cpu_fetch_instr(cpu);
+    if (instr.data_proc.s) {
+        if (instr.data_proc.rd == 15) {
+            CpuMode mode = cpu->cpsr.m;
+            if (!(mode == M_USER || mode == M_SYSTEM)) {
+                cpu->cpsr.w = cpu->spsr;
+                cpu_update_mode(cpu, mode);
+            }
+        } else {
+            cpu->cpsr.c = c;
+            cpu->cpsr.z = op2 == 0;
+            cpu->cpsr.n = op2 >> 31;
+        }
+    }
+    cpu->r[instr.data_proc.rd] = op2;
+    if (instr.data_proc.rd == 15) cpu_flush(cpu);
 }
 
 void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr) {
@@ -315,8 +346,8 @@ void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr) {
             res += car;
             v = (op1 >> 31) == (op2 >> 31) && (op1 >> 31) != (res >> 31);
         }
-        z = (res == 0) ? 1 : 0;
-        n = (res >> 31) & 1;
+        z = res == 0;
+        n = res >> 31;
 
         if (instr.data_proc.rd == 15) {
             CpuMode mode = cpu->cpsr.m;
@@ -336,55 +367,51 @@ void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr) {
         }
     } else {
         u32 rd = instr.data_proc.rd;
-        if (instr.data_proc.opcode == A_MOV) {
-            cpu->r[rd] = op2;
-        } else {
-            switch (instr.data_proc.opcode) {
-                case A_AND:
-                    cpu->r[rd] = op1 & op2;
-                    break;
-                case A_EOR:
-                    cpu->r[rd] = op1 ^ op2;
-                    break;
-                case A_SUB:
-                    cpu->r[rd] = op1 - op2;
-                    break;
-                case A_RSB:
-                    cpu->r[rd] = op2 - op1;
-                    break;
-                case A_ADD:
-                    cpu->r[rd] = op1 + op2;
-                    break;
-                case A_ADC:
-                    cpu->r[rd] = op1 + op2 + cpu->cpsr.c;
-                    break;
-                case A_SBC:
-                    cpu->r[rd] = op1 - op2 - 1 + cpu->cpsr.c;
-                    break;
-                case A_RSC:
-                    cpu->r[rd] = op2 - op1 - 1 + cpu->cpsr.c;
-                    break;
-                case A_TST:
-                    return;
-                case A_TEQ:
-                    return;
-                case A_CMP:
-                    return;
-                case A_CMN:
-                    return;
-                case A_ORR:
-                    cpu->r[rd] = op1 | op2;
-                    break;
-                case A_MOV:
-                    cpu->r[rd] = op2;
-                    break;
-                case A_BIC:
-                    cpu->r[rd] = op1 & ~op2;
-                    break;
-                case A_MVN:
-                    cpu->r[rd] = ~op2;
-                    break;
-            }
+        switch (instr.data_proc.opcode) {
+            case A_AND:
+                cpu->r[rd] = op1 & op2;
+                break;
+            case A_EOR:
+                cpu->r[rd] = op1 ^ op2;
+                break;
+            case A_SUB:
+                cpu->r[rd] = op1 - op2;
+                break;
+            case A_RSB:
+                cpu->r[rd] = op2 - op1;
+                break;
+            case A_ADD:
+                cpu->r[rd] = op1 + op2;
+                break;
+            case A_ADC:
+                cpu->r[rd] = op1 + op2 + cpu->cpsr.c;
+                break;
+            case A_SBC:
+                cpu->r[rd] = op1 - op2 - 1 + cpu->cpsr.c;
+                break;
+            case A_RSC:
+                cpu->r[rd] = op2 - op1 - 1 + cpu->cpsr.c;
+                break;
+            case A_TST:
+                return;
+            case A_TEQ:
+                return;
+            case A_CMP:
+                return;
+            case A_CMN:
+                return;
+            case A_ORR:
+                cpu->r[rd] = op1 | op2;
+                break;
+            case A_MOV:
+                cpu->r[rd] = op2;
+                break;
+            case A_BIC:
+                cpu->r[rd] = op1 & ~op2;
+                break;
+            case A_MVN:
+                cpu->r[rd] = ~op2;
+                break;
         }
         if (rd == 15) cpu_flush(cpu);
     }
@@ -437,8 +464,8 @@ void exec_arm_multiply(ArmCore* cpu, ArmInstr instr) {
     }
     cpu->r[instr.multiply.rd] = res;
     if (instr.multiply.s) {
-        cpu->cpsr.z = (cpu->r[instr.multiply.rd] == 0) ? 1 : 0;
-        cpu->cpsr.n = (cpu->r[instr.multiply.rd] >> 31) & 1;
+        cpu->cpsr.z = cpu->r[instr.multiply.rd] == 0;
+        cpu->cpsr.n = cpu->r[instr.multiply.rd] >> 31;
     }
 }
 
@@ -459,8 +486,8 @@ void exec_arm_multiply_long(ArmCore* cpu, ArmInstr instr) {
                ((u64) cpu->r[instr.multiply_long.rdhi] << 32);
     }
     if (instr.multiply_long.s) {
-        cpu->cpsr.z = (res == 0) ? 1 : 0;
-        cpu->cpsr.n = (res >> 63) & 1;
+        cpu->cpsr.z = res == 0;
+        cpu->cpsr.n = res >> 63;
     }
     cpu->r[instr.multiply_long.rdlo] = res;
     cpu->r[instr.multiply_long.rdhi] = res >> 32;

@@ -45,7 +45,7 @@ typedef enum {
 #define OAMOBJS 128
 
 #define BIOS7SIZE (1 << 14)
-#define BIOS9SIZE (1 << 15)
+#define BIOS9SIZE (1 << 12)
 #define FIRMWARESIZE (1 << 18)
 
 typedef enum { CPU9, CPU7 } CPUType;

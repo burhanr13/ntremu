@@ -86,7 +86,7 @@ void gxfifo_write(GPU* gpu, u32 command) {
     gpu->master->io9.gxstat.gxfifo_empty =
         gpu->master->io9.gxstat.gxfifo_size ? 0 : 1;
     gpu->master->io9.gxstat.gxfifo_half =
-        (gpu->master->io9.gxstat.gxfifo_size < 128) ? 1 : 0;
+        gpu->master->io9.gxstat.gxfifo_size < 128;
     gpu->master->io9.ifl.gxfifo = (gpu->master->io9.gxstat.irq_empty &&
                                    gpu->master->io9.gxstat.gxfifo_empty) ||
                                   (gpu->master->io9.gxstat.irq_half &&

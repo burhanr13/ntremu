@@ -468,7 +468,7 @@ void render_obj_line(PPU* ppu, int i) {
                     ppu->draw_obj = true;
                     ppu->layerlines[LOBJ][sx] = col;
                     ppu->objdotattrs[sx].semitrans =
-                        (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
+                        o.mode == OBJ_MODE_SEMITRANS;
                     ppu->objdotattrs[sx].mosaic = o.mosaic;
                     ppu->objdotattrs[sx].priority = o.priority;
                 }
@@ -519,7 +519,7 @@ void render_obj_line(PPU* ppu, int i) {
                             ppu->draw_obj = true;
                             ppu->layerlines[LOBJ][sx] = col | (1 << 15);
                             ppu->objdotattrs[sx].semitrans =
-                                (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
+                                o.mode == OBJ_MODE_SEMITRANS;
                             ppu->objdotattrs[sx].mosaic = o.mosaic;
                             ppu->objdotattrs[sx].priority = o.priority;
                         }
@@ -582,7 +582,7 @@ void render_obj_line(PPU* ppu, int i) {
                             ppu->draw_obj = true;
                             ppu->layerlines[LOBJ][sx] = col | (1 << 15);
                             ppu->objdotattrs[sx].semitrans =
-                                (o.mode == OBJ_MODE_SEMITRANS) ? 1 : 0;
+                                o.mode == OBJ_MODE_SEMITRANS;
                             ppu->objdotattrs[sx].mosaic = o.mosaic;
                             ppu->objdotattrs[sx].priority = o.priority;
                         }
