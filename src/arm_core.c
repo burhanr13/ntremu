@@ -6,14 +6,14 @@ void cpu_fetch_instr(ArmCore* cpu) {
     cpu->cur_instr = cpu->next_instr;
     if (cpu->cpsr.t) {
         cpu->next_instr = thumb_lookup[cpu->fetch16(cpu, cpu->pc)];
-        cpu->pc += 2;
         cpu->cur_instr_addr += 2;
         cpu->next_instr_addr += 2;
+        cpu->pc += 2;
     } else {
         cpu->next_instr.w = cpu->fetch32(cpu, cpu->pc);
-        cpu->pc += 4;
         cpu->cur_instr_addr += 4;
         cpu->next_instr_addr += 4;
+        cpu->pc += 4;
     }
 }
 
@@ -31,7 +31,7 @@ void cpu_flush(ArmCore* cpu) {
         cpu->cur_instr_addr = cpu->pc;
         cpu->cur_instr.w = cpu->fetch32(cpu, cpu->pc);
         cpu->pc += 4;
-        cpu->cur_instr_addr = cpu->pc;
+        cpu->next_instr_addr = cpu->pc;
         cpu->next_instr.w = cpu->fetch32(cpu, cpu->pc);
         cpu->pc += 4;
     }
@@ -77,6 +77,18 @@ void cpu_update_mode(ArmCore* cpu, CpuMode old) {
             cpu->banked_r8_12[0][i] = cpu->r[8 + i];
             cpu->r[8 + i] = cpu->banked_r8_12[1][i];
         }
+    }
+    switch (cpu->cpsr.m) {
+        case M_USER:
+        case M_FIQ:
+        case M_IRQ:
+        case M_SVC:
+        case M_ABT:
+        case M_UND:
+        case M_SYSTEM:
+            return;
+        default:
+            eprintf("illegal cpu mode: pc = %08x\n", cpu->pc);
     }
 }
 

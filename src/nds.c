@@ -176,7 +176,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 }
 
 void nds_run(NDS* nds) {
-    while (!event_pending(&nds->sched)) {
+    while (nds->sched.now - nds->last_event < 512 &&
+           !event_pending(&nds->sched)) {
         if (arm9_step(&nds->cpu9)) {
             nds->sched.now += nds->cpu9.c.cycles >> 1;
             if (!(nds->half_tick ^= nds->cpu9.c.cycles & 1)) {
@@ -190,7 +191,8 @@ void nds_run(NDS* nds) {
     nds->cur_cpu = (ArmCore*) &nds->cpu7;
     nds->cur_cpu_type = CPU7;
     nds->sched.now = nds->last_event;
-    while (!event_pending(&nds->sched)) {
+    while (nds->sched.now - nds->last_event < 512 &&
+           !event_pending(&nds->sched)) {
         if (nds->halt7) {
             if (nds->io7.ie.w & nds->io7.ifl.w) {
                 nds->halt7 = false;
@@ -240,7 +242,7 @@ bool nds_step(NDS* nds) {
             nds->sched.now = FIFO_peek(nds->sched.event_queue).time;
         }
     }
-    if (event_pending(&nds->sched)) {
+    if (nds->sched.now - nds->last_event >= 512 || event_pending(&nds->sched)) {
         if (nds->cur_cpu_type == CPU7) {
             run_to_present(&nds->sched);
             nds->cpu7.c.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);

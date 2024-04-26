@@ -11,6 +11,8 @@
 
 void arm9_init(Arm946E* cpu) {
 
+    cpu->cp15_control = 0x0005307d;
+
     cpu->c.read8 = (void*) arm9_read8;
     cpu->c.read16 = (void*) arm9_read16;
     cpu->c.read32 = (void*) arm9_read32;
@@ -155,42 +157,85 @@ u32 arm9_fetch32(Arm946E* cpu, u32 addr) {
 }
 
 u32 cp15_read(Arm946E* cpu, u32 cn, u32 cm, u32 cp) {
-    if (cn == 0 && cm == 0) {
-        if (cp == 0) {
-            return 0x41059460;
-        }
-    }
-    if (cn == 9 && cm == 1) {
-        u32 virtsize = 0, base = 0;
-        if (cp == 0) {
-            virtsize = cpu->dtcm_virtsize;
-            base = cpu->dtcm_base;
-        } else if (cp == 1) {
-            virtsize = cpu->itcm_virtsize;
-        }
-        virtsize >>= 10;
-        while (virtsize) {
-            base += 2;
-            virtsize >>= 1;
-        }
-        return base;
+    switch (cn) {
+        case 0:
+            switch (cm) {
+                case 0:
+                    switch (cp) {
+                        case 0:
+                            return 0x41059461;
+                        case 1:
+                            return 0x0f0d2112;
+                        case 2:
+                            return 0x00140180;
+                        default:
+                            return 0x41059461;
+                    }
+                    break;
+            }
+            break;
+        case 1:
+            if (cm == 0 && cp == 0) {
+                return cpu->cp15_control;
+            }
+            break;
+        case 9:
+            switch (cm) {
+                case 1: {
+                    u32 virtsize = 0, base = 0;
+                    if (cp == 0) {
+                        virtsize = cpu->dtcm_virtsize;
+                        base = cpu->dtcm_base;
+                    } else if (cp == 1) {
+                        virtsize = cpu->itcm_virtsize;
+                    }
+                    virtsize >>= 10;
+                    while (virtsize) {
+                        base += 2;
+                        virtsize >>= 1;
+                    }
+                    return base;
+                }
+            }
+            break;
     }
     return 0;
 }
 
 void cp15_write(Arm946E* cpu, u32 cn, u32 cm, u32 cp, u32 data) {
-    if (cn == 7) {
-        if ((cm == 0 && cp == 4) || (cm == 8 && cp == 2)) {
-            cpu->halt = true;
-        }
-    } else if (cn == 9 && cm == 1) {
-        u32 virtsize = 512 << ((data & 0x3e) >> 1);
-        u32 base = data & 0xfffff000;
-        if (cp == 0) {
-            cpu->dtcm_virtsize = virtsize;
-            cpu->dtcm_base = base;
-        } else if (cp == 1) {
-            cpu->itcm_virtsize = virtsize;
-        }
+    switch (cn) {
+        case 1:
+            if (cm == 0 && cp == 0) {
+                u32 mask = 0x000ff085;
+                data &= mask;
+                cpu->cp15_control &= ~mask;
+                cpu->cp15_control |= data;
+                if (cpu->cp15_control & (1 << 13)) {
+                    cpu->c.vector_base = 0xffff0000;
+                } else {
+                    cpu->c.vector_base = 0x00000000;
+                }
+                return;
+            }
+            break;
+        case 7:
+            if ((cm == 0 && cp == 4) || (cm == 8 && cp == 2)) {
+                cpu->halt = true;
+                return;
+            }
+            break;
+        case 9:
+            if (cn == 9 && cm == 1) {
+                u32 virtsize = 512 << ((data & 0x3e) >> 1);
+                u32 base = data & 0xfffff000;
+                if (cp == 0) {
+                    cpu->dtcm_virtsize = virtsize;
+                    cpu->dtcm_base = base;
+                } else if (cp == 1) {
+                    cpu->itcm_virtsize = virtsize;
+                }
+                return;
+            }
+            break;
     }
 }

@@ -422,7 +422,7 @@ void exec_arm_psr_trans(ArmCore* cpu, ArmInstr instr) {
         u32 op2;
         if (instr.psr_trans.i) {
             op2 = instr.psr_trans.op2 & 0xff;
-            u32 rot = instr.psr_trans.op2 >> 7;
+            u32 rot = instr.psr_trans.op2 >> 8 << 1;
             op2 = (op2 >> rot) | (op2 << (32 - rot));
         } else {
             u32 rm = instr.psr_trans.op2 & 0b1111;

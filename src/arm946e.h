@@ -17,6 +17,8 @@ typedef struct _Arm946E {
 
     bool halt;
 
+    u32 cp15_control;
+
     u8 itcm[ITCMSIZE];
     u8 dtcm[DTCMSIZE];
 

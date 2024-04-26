@@ -111,8 +111,7 @@ void debugger_run() {
                 break;
             }
             case 'f':
-                while (!nds_step(ntremu.nds)) {
-                }
+                while (!nds_step(ntremu.nds)) {}
                 cpu_print_state(ntremu.nds->cur_cpu);
                 cpu_print_cur_instr(ntremu.nds->cur_cpu);
                 break;
@@ -139,6 +138,7 @@ void debugger_run() {
                 if (com[1] == 'e' || com[1] == '\0') {
                     printf("Reset emulation? ");
                     char ans = getchar();
+                    while (getchar() != '\n') {}
                     if (ans == 'y') {
                         emulator_reset();
                         free(buf);
