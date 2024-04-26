@@ -195,8 +195,7 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             io->ipcfifocnt.w |= data & mask;
             if (data & (1 << 14)) io->ipcfifocnt.error = 0;
             if (data & (1 << 3)) {
-                io->master->ipcfifo7to9_size = 0;
-                io->master->ipcfifo7to9[0] = 0;
+                FIFO_clear(io->master->ipcfifo7to9);
                 io->ipcfifocnt.sendempty = 1;
                 io->ipcfifocnt.sendfull = 0;
                 io->master->io9.ipcfifocnt.recvempty = 1;
@@ -302,11 +301,15 @@ u32 io7_read32(IO* io, u32 addr) {
     switch (addr) {
         case IPCFIFORECV:
             if (io->ipcfifocnt.fifo_enable) {
-                u32 data = io->master->ipcfifo9to7[0];
-                if (io->master->ipcfifo9to7_size == 0) {
+                if (io->master->ipcfifo9to7.size == 0) {
                     io->ipcfifocnt.error = 1;
+                    return FIFO_peek(io->master->ipcfifo9to7);
                 } else {
-                    if (--io->master->ipcfifo9to7_size == 0) {
+                    u32 data;
+                    FIFO_pop(io->master->ipcfifo9to7, data);
+                    io->ipcfifocnt.recvfull = 0;
+                    io->master->io9.ipcfifocnt.sendfull = 0;
+                    if (io->master->ipcfifo9to7.size == 0) {
                         io->ipcfifocnt.recvempty = 1;
                         io->master->io9.ipcfifocnt.sendempty = 1;
                         if (io->master->io9.ipcfifocnt.send_irq) {
@@ -316,16 +319,10 @@ u32 io7_read32(IO* io, u32 addr) {
                                 (io->master->io9.ie.w & io->master->io9.ifl.w);
                         }
                     }
-                    io->ipcfifocnt.recvfull = 0;
-                    io->master->io9.ipcfifocnt.sendfull = 0;
-                    for (int i = 0; i < io->master->ipcfifo9to7_size; i++) {
-                        io->master->ipcfifo9to7[i] =
-                            io->master->ipcfifo9to7[i + 1];
-                    }
+                    return data;
                 }
-                return data;
             } else {
-                return io->master->ipcfifo9to7[0];
+                return FIFO_peek(io->master->ipcfifo9to7);
             }
             break;
         case GAMECARDIN: {
@@ -361,15 +358,14 @@ void io7_write32(IO* io, u32 addr, u32 data) {
         case IPCFIFOSEND:
             io->ipcfifosend = data;
             if (io->ipcfifocnt.fifo_enable) {
-                if (io->master->ipcfifo7to9_size == 16) {
+                if (io->master->ipcfifo7to9.size == 16) {
                     io->ipcfifocnt.error = 1;
                 } else {
-                    io->master->ipcfifo7to9[io->master->ipcfifo7to9_size++] =
-                        data;
-                    if (io->master->ipcfifo7to9_size == 16) {
+                    FIFO_push(io->master->ipcfifo7to9, data);
+                    if (io->master->ipcfifo7to9.size == 16) {
                         io->ipcfifocnt.sendfull = 1;
                         io->master->io9.ipcfifocnt.recvfull = 1;
-                    } else if (io->master->ipcfifo7to9_size == 1) {
+                    } else if (io->master->ipcfifo7to9.size == 1) {
                         io->ipcfifocnt.sendempty = 0;
                         io->master->io9.ipcfifocnt.recvempty = 0;
                         if (io->master->io9.ipcfifocnt.recv_irq) {
@@ -793,8 +789,7 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             io->ipcfifocnt.w |= data & mask;
             if (data & (1 << 14)) io->ipcfifocnt.error = 0;
             if (data & (1 << 3)) {
-                io->master->ipcfifo9to7_size = 0;
-                io->master->ipcfifo9to7[0] = 0;
+                FIFO_clear(io->master->ipcfifo9to7);
                 io->ipcfifocnt.sendempty = 1;
                 io->ipcfifocnt.sendfull = 0;
                 io->master->io7.ipcfifocnt.recvempty = 1;
@@ -877,11 +872,15 @@ u32 io9_read32(IO* io, u32 addr) {
     switch (addr) {
         case IPCFIFORECV:
             if (io->ipcfifocnt.fifo_enable) {
-                u32 data = io->master->ipcfifo7to9[0];
-                if (io->master->ipcfifo7to9_size == 0) {
+                if (io->master->ipcfifo7to9.size == 0) {
                     io->ipcfifocnt.error = 1;
+                    return FIFO_peek(io->master->ipcfifo7to9);
                 } else {
-                    if (--io->master->ipcfifo7to9_size == 0) {
+                    u32 data;
+                    FIFO_pop(io->master->ipcfifo7to9, data);
+                    io->ipcfifocnt.recvfull = 0;
+                    io->master->io7.ipcfifocnt.sendfull = 0;
+                    if (io->master->ipcfifo7to9.size == 0) {
                         io->ipcfifocnt.recvempty = 1;
                         io->master->io7.ipcfifocnt.sendempty = 1;
                         if (io->master->io7.ipcfifocnt.send_irq) {
@@ -891,16 +890,10 @@ u32 io9_read32(IO* io, u32 addr) {
                                 (io->master->io7.ie.w & io->master->io7.ifl.w);
                         }
                     }
-                    io->ipcfifocnt.recvfull = 0;
-                    io->master->io7.ipcfifocnt.sendfull = 0;
-                    for (int i = 0; i < io->master->ipcfifo7to9_size; i++) {
-                        io->master->ipcfifo7to9[i] =
-                            io->master->ipcfifo7to9[i + 1];
-                    }
+                    return data;
                 }
-                return data;
             } else {
-                return io->master->ipcfifo7to9[0];
+                return FIFO_peek(io->master->ipcfifo7to9);
             }
             break;
         case GAMECARDIN: {
@@ -947,15 +940,14 @@ void io9_write32(IO* io, u32 addr, u32 data) {
         case IPCFIFOSEND:
             io->ipcfifosend = data;
             if (io->ipcfifocnt.fifo_enable) {
-                if (io->master->ipcfifo9to7_size == 16) {
+                if (io->master->ipcfifo9to7.size == 16) {
                     io->ipcfifocnt.error = 1;
                 } else {
-                    io->master->ipcfifo9to7[io->master->ipcfifo9to7_size++] =
-                        data;
-                    if (io->master->ipcfifo9to7_size == 16) {
+                    FIFO_push(io->master->ipcfifo9to7, data);
+                    if (io->master->ipcfifo9to7.size == 16) {
                         io->ipcfifocnt.sendfull = 1;
                         io->master->io7.ipcfifocnt.recvfull = 1;
-                    } else if (io->master->ipcfifo9to7_size == 1) {
+                    } else if (io->master->ipcfifo9to7.size == 1) {
                         io->ipcfifocnt.sendempty = 0;
                         io->master->io7.ipcfifocnt.recvempty = 0;
                         if (io->master->io7.ipcfifocnt.recv_irq) {

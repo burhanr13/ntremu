@@ -35,5 +35,6 @@ typedef int64_t s64;
 #define FIFO_foreach(i, f)                                                     \
     for (u32 _i = 0, i = (f).head; _i < (f).size;                              \
          _i++, i = (i + 1) & (__FIFO_MAX(f) - 1))
+#define FIFO_clear(f) ((f).d[0] = (f).head = (f).tail = (f).size = 0)
 
 #endif

@@ -203,10 +203,7 @@ typedef struct _NDS {
 
     GameCard* card;
 
-    u32 ipcfifo7to9[16];
-    u32 ipcfifo7to9_size;
-    u32 ipcfifo9to7[16];
-    u32 ipcfifo9to7_size;
+    FIFO(u32, 16) ipcfifo7to9, ipcfifo9to7;
 
     bool halt7;
 

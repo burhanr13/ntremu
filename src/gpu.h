@@ -209,10 +209,8 @@ typedef struct {
     bool drawing;
     bool pending_swapbuffers;
 
-    u8 cmd_fifo[256];
-    u32 param_fifo[256];
-    u8 cmd_fifosize;
-    u8 param_fifosize;
+    FIFO(u8, 256) cmd_fifo;
+    FIFO(u32, 256) param_fifo;
     u8 params_pending;
 
     mat4 projmtx;
@@ -252,7 +250,7 @@ typedef struct {
     u16 lightcol[4];
     Material0 cur_mtl0;
     Material1 cur_mtl1;
-    u8 shininess[256];
+    u8 shininess[128];
 
     TexParam cur_texparam;
     u32 cur_pltt_base;

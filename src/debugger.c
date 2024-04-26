@@ -120,13 +120,13 @@ void debugger_run() {
                 switch (com[1]) {
                     case 'p':
                         printf("fifo 7to9: {");
-                        for (int i = 0; i < ntremu.nds->ipcfifo7to9_size; i++) {
-                            printf("%x ", ntremu.nds->ipcfifo7to9[i]);
+                        FIFO_foreach(i, ntremu.nds->ipcfifo7to9) {
+                            printf("%x ", ntremu.nds->ipcfifo7to9.d[i]);
                         }
                         printf("}\n");
                         printf("fifo 9to7: {");
-                        for (int i = 0; i < ntremu.nds->ipcfifo9to7_size; i++) {
-                            printf("%x ", ntremu.nds->ipcfifo9to7[i]);
+                        FIFO_foreach(i, ntremu.nds->ipcfifo9to7) {
+                            printf("%x ", ntremu.nds->ipcfifo9to7.d[i]);
                         }
                         printf("}\n");
                         break;

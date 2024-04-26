@@ -61,7 +61,7 @@ void gxfifo_write(GPU* gpu, u32 command) {
     }
 
     if (gpu->params_pending) {
-        gpu->param_fifo[gpu->param_fifosize++] = command;
+        FIFO_push(gpu->param_fifo, command);
         gpu->params_pending--;
         gpu->master->io9.gxstat.gxfifo_size++;
     } else {
@@ -71,7 +71,7 @@ void gxfifo_write(GPU* gpu, u32 command) {
             u8 l = cmd & 0xf;
             int nparms = 0;
             if (h < 8) nparms = cmd_parms[h][l];
-            gpu->cmd_fifo[gpu->cmd_fifosize++] = cmd;
+            FIFO_push(gpu->cmd_fifo, cmd);
             gpu->params_pending += nparms;
             if (!nparms) gpu->master->io9.gxstat.gxfifo_size++;
 
@@ -95,7 +95,7 @@ void gxfifo_write(GPU* gpu, u32 command) {
 
 void gxcmd_execute_all(GPU* gpu) {
     if (!gpu->params_pending) {
-        while (!gpu->blocked && gpu->cmd_fifosize) {
+        while (!gpu->blocked && gpu->cmd_fifo.size) {
             gxcmd_execute(gpu);
         }
     }
@@ -403,10 +403,13 @@ void normalize_vtxs(GPU* gpu) {
 }
 
 void gxcmd_execute(GPU* gpu) {
-    u8 cmd = gpu->cmd_fifo[0];
+    u8 cmd;
+    FIFO_pop(gpu->cmd_fifo, cmd);
+    u32 p0, p1, p2;
     switch (cmd) {
         case MTX_MODE:
-            gpu->mtx_mode = gpu->param_fifo[0] & 3;
+            FIFO_pop(gpu->param_fifo, p0);
+            gpu->mtx_mode = p0 & 3;
             break;
         case MTX_PUSH:
             switch (gpu->mtx_mode) {
@@ -435,6 +438,7 @@ void gxcmd_execute(GPU* gpu) {
             }
             break;
         case MTX_POP:
+            FIFO_pop(gpu->param_fifo, p0);
             switch (gpu->mtx_mode) {
                 case MM_PROJ:
                     gpu->projstk_size = 0;
@@ -443,7 +447,7 @@ void gxcmd_execute(GPU* gpu) {
                     break;
                 case MM_POS:
                 case MM_POSVEC:
-                    gpu->mtxstk_size -= (s32) gpu->param_fifo[0] << 26 >> 26;
+                    gpu->mtxstk_size -= (s32) p0 << 26 >> 26;
                     gpu->mtxstk_size &= 31;
                     gpu->posmtx = gpu->posmtx_stk[gpu->mtxstk_size];
                     gpu->vecmtx = gpu->vecmtx_stk[gpu->mtxstk_size];
@@ -456,13 +460,14 @@ void gxcmd_execute(GPU* gpu) {
             gpu->mtx_dirty = true;
             break;
         case MTX_STORE:
+            FIFO_pop(gpu->param_fifo, p0);
             switch (gpu->mtx_mode) {
                 case MM_PROJ:
                     gpu->projmtx_stk[0] = gpu->projmtx;
                     break;
                 case MM_POS:
                 case MM_POSVEC: {
-                    int i = gpu->param_fifo[0] & 31;
+                    int i = p0 & 31;
                     gpu->posmtx_stk[i] = gpu->posmtx;
                     gpu->vecmtx_stk[i] = gpu->vecmtx;
                     break;
@@ -473,13 +478,14 @@ void gxcmd_execute(GPU* gpu) {
             }
             break;
         case MTX_RESTORE:
+            FIFO_pop(gpu->param_fifo, p0);
             switch (gpu->mtx_mode) {
                 case MM_PROJ:
                     gpu->projmtx = gpu->projmtx_stk[0];
                     break;
                 case MM_POS:
                 case MM_POSVEC: {
-                    int i = gpu->param_fifo[0] & 31;
+                    int i = p0 & 31;
                     gpu->posmtx = gpu->posmtx_stk[i];
                     gpu->vecmtx = gpu->vecmtx_stk[i];
                     break;
@@ -516,10 +522,11 @@ void gxcmd_execute(GPU* gpu) {
         }
         case MTX_LOAD_44: {
             mat4 m;
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
-                    m.p[i][j] =
-                        (s32) gpu->param_fifo[4 * j + i] / (float) (1 << 12);
+            for (int j = 0; j < 4; j++) {
+                for (int i = 0; i < 4; i++) {
+                    s32 p;
+                    FIFO_pop(gpu->param_fifo, p);
+                    m.p[i][j] = (s32) p / (float) (1 << 12);
                 }
             }
             switch (gpu->mtx_mode) {
@@ -542,10 +549,11 @@ void gxcmd_execute(GPU* gpu) {
         }
         case MTX_LOAD_43: {
             mat4 m;
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 4; j++) {
-                    m.p[i][j] =
-                        (s32) gpu->param_fifo[3 * j + i] / (float) (1 << 12);
+            for (int j = 0; j < 4; j++) {
+                for (int i = 0; i < 3; i++) {
+                    s32 p;
+                    FIFO_pop(gpu->param_fifo, p);
+                    m.p[i][j] = p / (float) (1 << 12);
                 }
             }
             m.p[3][0] = m.p[3][1] = m.p[3][2] = 0;
@@ -570,10 +578,11 @@ void gxcmd_execute(GPU* gpu) {
         }
         case MTX_MULT_44: {
             mat4 m;
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
-                    m.p[i][j] =
-                        (s32) gpu->param_fifo[4 * j + i] / (float) (1 << 12);
+            for (int j = 0; j < 4; j++) {
+                for (int i = 0; i < 4; i++) {
+                    s32 p;
+                    FIFO_pop(gpu->param_fifo, p);
+                    m.p[i][j] = p / (float) (1 << 12);
                 }
             }
             switch (gpu->mtx_mode) {
@@ -596,10 +605,11 @@ void gxcmd_execute(GPU* gpu) {
         }
         case MTX_MULT_43: {
             mat4 m;
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 4; j++) {
-                    m.p[i][j] =
-                        (s32) gpu->param_fifo[3 * j + i] / (float) (1 << 12);
+            for (int j = 0; j < 4; j++) {
+                for (int i = 0; i < 3; i++) {
+                    s32 p;
+                    FIFO_pop(gpu->param_fifo, p);
+                    m.p[i][j] = p / (float) (1 << 12);
                 }
             }
             m.p[3][0] = m.p[3][1] = m.p[3][2] = 0;
@@ -624,10 +634,11 @@ void gxcmd_execute(GPU* gpu) {
         }
         case MTX_MULT_33: {
             mat4 m;
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 3; j++) {
-                    m.p[i][j] =
-                        (s32) gpu->param_fifo[3 * j + i] / (float) (1 << 12);
+            for (int j = 0; j < 3; j++) {
+                for (int i = 0; i < 3; i++) {
+                    s32 p;
+                    FIFO_pop(gpu->param_fifo, p);
+                    m.p[i][j] = p / (float) (1 << 12);
                 }
             }
             m.p[3][0] = m.p[3][1] = m.p[3][2] = 0;
@@ -653,9 +664,13 @@ void gxcmd_execute(GPU* gpu) {
         }
         case MTX_SCALE: {
             mat4 m = {0};
-            m.p[0][0] = (s32) gpu->param_fifo[0] / (float) (1 << 12);
-            m.p[1][1] = (s32) gpu->param_fifo[1] / (float) (1 << 12);
-            m.p[2][2] = (s32) gpu->param_fifo[2] / (float) (1 << 12);
+            s32 p;
+            FIFO_pop(gpu->param_fifo, p);
+            m.p[0][0] = p / (float) (1 << 12);
+            FIFO_pop(gpu->param_fifo, p);
+            m.p[1][1] = p / (float) (1 << 12);
+            FIFO_pop(gpu->param_fifo, p);
+            m.p[2][2] = p / (float) (1 << 12);
             m.p[3][3] = 1;
             switch (gpu->mtx_mode) {
                 case MM_PROJ:
@@ -677,9 +692,13 @@ void gxcmd_execute(GPU* gpu) {
             m.p[0][0] = 1;
             m.p[1][1] = 1;
             m.p[2][2] = 1;
-            m.p[0][3] = (s32) gpu->param_fifo[0] / (float) (1 << 12);
-            m.p[1][3] = (s32) gpu->param_fifo[1] / (float) (1 << 12);
-            m.p[2][3] = (s32) gpu->param_fifo[2] / (float) (1 << 12);
+            s32 p;
+            FIFO_pop(gpu->param_fifo, p);
+            m.p[0][3] = p / (float) (1 << 12);
+            FIFO_pop(gpu->param_fifo, p);
+            m.p[1][3] = p / (float) (1 << 12);
+            FIFO_pop(gpu->param_fifo, p);
+            m.p[2][3] = p / (float) (1 << 12);
             m.p[3][3] = 1;
             switch (gpu->mtx_mode) {
                 case MM_PROJ:
@@ -700,7 +719,8 @@ void gxcmd_execute(GPU* gpu) {
             break;
         }
         case COLOR: {
-            u16 color = gpu->param_fifo[0];
+            u16 color;
+            FIFO_pop(gpu->param_fifo, color);
             gpu->cur_vtx.r = color & 0x1f;
             gpu->cur_vtx.g = (color >> 5) & 0x1f;
             gpu->cur_vtx.b = (color >> 10) & 0x1f;
@@ -708,12 +728,12 @@ void gxcmd_execute(GPU* gpu) {
         }
         case NORMAL: {
             vec4 normal;
-            normal.p[0] = ((s32) (gpu->param_fifo[0] & 0x3ff) << 22) /
-                          (float) (u32) (1 << 31);
-            normal.p[1] = ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12) /
-                          (float) (u32) (1 << 31);
-            normal.p[2] = ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2) /
-                          (float) (u32) (1 << 31);
+            FIFO_pop(gpu->param_fifo, p0);
+            normal.p[0] = ((s32) (p0 & 0x3ff) << 22) / (float) (u32) (1 << 31);
+            normal.p[1] =
+                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) (1 << 31);
+            normal.p[2] =
+                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) (1 << 31);
             normal.p[3] = 0;
 
             if (gpu->cur_texparam.transform == TEXTF_NORMAL) {
@@ -743,8 +763,9 @@ void gxcmd_execute(GPU* gpu) {
                            normal.p[2] * gpu->halfvec[l].p[2];
                 if (sh < 0) sh = 0;
                 if (sh > 1) sh = 1;
+                sh *= sh;
                 if (gpu->cur_mtl1.shininess)
-                    sh = gpu->shininess[(int) (sh * 255)] / (float) 256;
+                    sh = gpu->shininess[(int) (sh * 127)] / (float) 256;
 
                 u16 lr = gpu->lightcol[l] & 0x1f;
                 u16 lg = (gpu->lightcol[l] >> 5) & 0x1f;
@@ -771,10 +792,11 @@ void gxcmd_execute(GPU* gpu) {
             break;
         }
         case TEXCOORD:
+            FIFO_pop(gpu->param_fifo, p0);
             gpu->cur_texcoord.p[0] =
-                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 20);
+                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 20);
             gpu->cur_texcoord.p[1] =
-                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 20);
+                (s32) (p0 & 0xffff0000) / (float) (1 << 20);
             gpu->cur_vtx.vt = gpu->cur_texcoord;
             if (gpu->cur_texparam.transform == TEXTF_TEXCOORD) {
                 gpu->cur_vtx.vt.p[2] = 0.0625f;
@@ -783,71 +805,70 @@ void gxcmd_execute(GPU* gpu) {
             }
             break;
         case VTX_16:
+            FIFO_pop(gpu->param_fifo, p0);
+            FIFO_pop(gpu->param_fifo, p1);
             gpu->cur_vtx.v.p[0] =
-                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[1] =
-                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
+                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
             gpu->cur_vtx.v.p[2] =
-                ((s32) (gpu->param_fifo[1] & 0xffff) << 16) / (float) (1 << 28);
+                ((s32) (p1 & 0xffff) << 16) / (float) (1 << 28);
             gpu->cur_vtx.v.p[3] = 1;
             add_vtx(gpu);
             break;
         case VTX_10:
+            FIFO_pop(gpu->param_fifo, p0);
             gpu->cur_vtx.v.p[0] =
-                ((s32) (gpu->param_fifo[0] & 0x3ff) << 22) / (float) (1 << 28);
+                ((s32) (p0 & 0x3ff) << 22) / (float) (1 << 28);
             gpu->cur_vtx.v.p[1] =
-                ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12) /
-                (float) (1 << 28);
+                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (1 << 28);
             gpu->cur_vtx.v.p[2] =
-                ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2) /
-                (float) (1 << 28);
+                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (1 << 28);
             gpu->cur_vtx.v.p[3] = 1;
             add_vtx(gpu);
             break;
         case VTX_XY:
+            FIFO_pop(gpu->param_fifo, p0);
             gpu->cur_vtx.v.p[0] =
-                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[1] =
-                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
+                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
             add_vtx(gpu);
             break;
         case VTX_XZ:
+            FIFO_pop(gpu->param_fifo, p0);
             gpu->cur_vtx.v.p[0] =
-                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[2] =
-                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
+                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[2] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
             add_vtx(gpu);
             break;
         case VTX_YZ:
+            FIFO_pop(gpu->param_fifo, p0);
             gpu->cur_vtx.v.p[1] =
-                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[2] =
-                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
+                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[2] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
             add_vtx(gpu);
             break;
         case VTX_DIFF:
+            FIFO_pop(gpu->param_fifo, p0);
             gpu->cur_vtx.v.p[0] +=
-                ((s32) (gpu->param_fifo[0] & 0x3ff) << 22 >> 6) /
-                (float) (1 << 28);
+                ((s32) (p0 & 0x3ff) << 22 >> 6) / (float) (1 << 28);
             gpu->cur_vtx.v.p[1] +=
-                ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12 >> 6) /
-                (float) (1 << 28);
+                ((s32) (p0 & (0x3ff << 10)) << 12 >> 6) / (float) (1 << 28);
             gpu->cur_vtx.v.p[2] +=
-                ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2 >> 6) /
-                (float) (1 << 28);
+                ((s32) (p0 & (0x3ff << 20)) << 2 >> 6) / (float) (1 << 28);
             add_vtx(gpu);
             break;
         case POLYGON_ATTR:
-            gpu->cur_attr.w = gpu->param_fifo[0];
+            FIFO_pop(gpu->param_fifo, gpu->cur_attr.w);
             break;
         case TEXIMAGE_PARAM:
-            gpu->cur_texparam.w = gpu->param_fifo[0];
+            FIFO_pop(gpu->param_fifo, gpu->cur_texparam.w);
             break;
         case PLTT_BASE:
-            gpu->cur_pltt_base = gpu->param_fifo[0] & 0x1fff;
+            FIFO_pop(gpu->param_fifo, gpu->cur_pltt_base);
+            gpu->cur_pltt_base &= 0x1fff;
             break;
         case DIF_AMB:
-            gpu->cur_mtl0.w = gpu->param_fifo[0];
+            FIFO_pop(gpu->param_fifo, gpu->cur_mtl0.w);
             if (gpu->cur_mtl0.vtx_color) {
                 gpu->cur_vtx.r = gpu->cur_mtl0.dif_r;
                 gpu->cur_vtx.g = gpu->cur_mtl0.dif_g;
@@ -855,45 +876,48 @@ void gxcmd_execute(GPU* gpu) {
             }
             break;
         case SPE_EMI:
-            gpu->cur_mtl1.w = gpu->param_fifo[0];
+            FIFO_pop(gpu->param_fifo, gpu->cur_mtl1.w);
             break;
         case LIGHT_VECTOR: {
-            int l = gpu->param_fifo[0] >> 30;
-            gpu->lightvec[l].p[0] = ((s32) (gpu->param_fifo[0] & 0x3ff) << 22) /
-                                    (float) (u32) (1 << 31);
+            FIFO_pop(gpu->param_fifo, p0);
+            int l = p0 >> 30;
+            gpu->lightvec[l].p[0] =
+                ((s32) (p0 & 0x3ff) << 22) / (float) (u32) (1 << 31);
             gpu->lightvec[l].p[1] =
-                ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12) /
-                (float) (u32) (1 << 31);
+                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) (1 << 31);
             gpu->lightvec[l].p[2] =
-                ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2) /
-                (float) (u32) (1 << 31);
+                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) (1 << 31);
             gpu->lightvec[l].p[3] = 0;
             vecmul(&gpu->vecmtx, &gpu->lightvec[l]);
             gpu->halfvec[l].p[0] = gpu->lightvec[l].p[0] / 2;
             gpu->halfvec[l].p[1] = gpu->lightvec[l].p[1] / 2;
             gpu->halfvec[l].p[2] = (gpu->lightvec[l].p[2] + 1) / 2;
-
             break;
         }
         case LIGHT_COLOR: {
-            int l = gpu->param_fifo[0] >> 30;
-            gpu->lightcol[l] = gpu->param_fifo[0];
+            FIFO_pop(gpu->param_fifo, p0);
+            int l = p0 >> 30;
+            gpu->lightcol[l] = p0;
             break;
         }
         case SHININESS:
-            memcpy(gpu->shininess, gpu->param_fifo, sizeof gpu->shininess);
+            for (int i = 0; i < 128; i += 4) {
+                FIFO_pop(gpu->param_fifo, *(u32*) &gpu->shininess[i]);
+            }
             break;
         case BEGIN_VTXS:
             gpu->cur_vtx_ct = 0;
             gpu->tri_orient = false;
-            gpu->poly_mode = gpu->param_fifo[0] & 3;
+            FIFO_pop(gpu->param_fifo, gpu->poly_mode);
+            gpu->poly_mode &= 3;
             break;
         case END_VTXS:
             break;
         case SWAP_BUFFERS: {
             gpu->blocked = true;
-            gpu->w_buffer = gpu->param_fifo[0] & 2;
-            gpu->autosort = !(gpu->param_fifo[0] & 1);
+            FIFO_pop(gpu->param_fifo, p0);
+            gpu->w_buffer = p0 & 2;
+            gpu->autosort = !(p0 & 1);
 
             if (gpu->drawing || gpu->master->io7.vcount >= NDS_SCREEN_H) {
                 gpu->pending_swapbuffers = true;
@@ -904,10 +928,11 @@ void gxcmd_execute(GPU* gpu) {
         }
         case VIEWPORT: {
             int x0, y0, x1, y1;
-            x0 = gpu->param_fifo[0] & 0xff;
-            y0 = (gpu->param_fifo[0] >> 8) & 0xff;
-            x1 = (gpu->param_fifo[0] >> 0x10) & 0xff;
-            y1 = (gpu->param_fifo[0] >> 0x18) & 0xff;
+            FIFO_pop(gpu->param_fifo, p0);
+            x0 = p0 & 0xff;
+            y0 = (p0 >> 8) & 0xff;
+            x1 = (p0 >> 0x10) & 0xff;
+            y1 = (p0 >> 0x18) & 0xff;
             gpu->view_x = x0;
             gpu->view_y = y0;
             gpu->view_w = x1 - x0 + 1;
@@ -916,20 +941,17 @@ void gxcmd_execute(GPU* gpu) {
         }
         case BOX_TEST: {
             update_mtxs(gpu);
+            FIFO_pop(gpu->param_fifo, p0);
+            FIFO_pop(gpu->param_fifo, p1);
+            FIFO_pop(gpu->param_fifo, p2);
             vec4 p;
-            p.p[0] =
-                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            p.p[1] =
-                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
-            p.p[2] =
-                ((s32) (gpu->param_fifo[1] & 0xffff) << 16) / (float) (1 << 28);
+            p.p[0] = ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
+            p.p[1] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
+            p.p[2] = ((s32) (p1 & 0xffff) << 16) / (float) (1 << 28);
             p.p[3] = 1;
-            float w =
-                (s32) (gpu->param_fifo[1] & 0xffff0000) / (float) (1 << 28);
-            float h =
-                ((s32) (gpu->param_fifo[2] & 0xffff) << 16) / (float) (1 << 28);
-            float d =
-                (s32) (gpu->param_fifo[2] & 0xffff0000) / (float) (1 << 28);
+            float w = (s32) (p1 & 0xffff0000) / (float) (1 << 28);
+            float h = ((s32) (p2 & 0xffff) << 16) / (float) (1 << 28);
+            float d = (s32) (p2 & 0xffff0000) / (float) (1 << 28);
             vec4 box[8];
             for (int i = 0; i < 8; i++) {
                 box[i] = p;
@@ -958,12 +980,13 @@ void gxcmd_execute(GPU* gpu) {
             break;
         }
         case POS_TEST:
+            FIFO_pop(gpu->param_fifo, p0);
+            FIFO_pop(gpu->param_fifo, p1);
             gpu->cur_vtx.v.p[0] =
-                ((s32) (gpu->param_fifo[0] & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[1] =
-                (s32) (gpu->param_fifo[0] & 0xffff0000) / (float) (1 << 28);
+                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
             gpu->cur_vtx.v.p[2] =
-                ((s32) (gpu->param_fifo[1] & 0xffff) << 16) / (float) (1 << 28);
+                ((s32) (p1 & 0xffff) << 16) / (float) (1 << 28);
             gpu->cur_vtx.v.p[3] = 1;
             update_mtxs(gpu);
             vec4 pos = gpu->cur_vtx.v;
@@ -974,13 +997,13 @@ void gxcmd_execute(GPU* gpu) {
             gpu->master->io9.pos_result[3] = pos.p[3] * (1 << 12);
             break;
         case VEC_TEST: {
+            FIFO_pop(gpu->param_fifo, p0);
             vec4 v;
-            v.p[0] = ((s32) (gpu->param_fifo[0] & 0x3ff) << 22) /
-                     (float) (u32) (1 << 31);
-            v.p[1] = ((s32) (gpu->param_fifo[0] & (0x3ff << 10)) << 12) /
-                     (float) (u32) (1 << 31);
-            v.p[2] = ((s32) (gpu->param_fifo[0] & (0x3ff << 20)) << 2) /
-                     (float) (u32) (1 << 31);
+            v.p[0] = ((s32) (p0 & 0x3ff) << 22) / (float) (u32) (1 << 31);
+            v.p[1] =
+                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) (1 << 31);
+            v.p[2] =
+                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) (1 << 31);
             v.p[3] = 0;
             vecmul(&gpu->vecmtx, &v);
             gpu->master->io9.vec_result[0] = v.p[0] * (1 << 12);
@@ -993,15 +1016,7 @@ void gxcmd_execute(GPU* gpu) {
     u8 l = cmd & 0xf;
     int nparms = 0;
     if (h < 8) nparms = cmd_parms[h][l];
-    gpu->cmd_fifosize--;
-    gpu->param_fifosize -= nparms;
-    for (int i = 0; i < gpu->cmd_fifosize; i++) {
-        gpu->cmd_fifo[i] = gpu->cmd_fifo[i + 1];
-    }
     if (nparms) {
-        for (int i = 0; i < gpu->param_fifosize; i++) {
-            gpu->param_fifo[i] = gpu->param_fifo[i + nparms];
-        }
         gpu->master->io9.gxstat.gxfifo_size -= nparms;
     } else {
         gpu->master->io9.gxstat.gxfifo_size--;
