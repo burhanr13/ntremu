@@ -1043,8 +1043,7 @@ void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
             }
             break;
         case ARM_LEADINGZEROS:
-            fprintf(out, "leading_zeros %s, %s",
-                    reg_names[instr.leading_zeros.rd],
+            fprintf(out, "clz %s, %s", reg_names[instr.leading_zeros.rd],
                     reg_names[instr.leading_zeros.rm]);
             break;
         case ARM_BRANCHEX:
@@ -1056,6 +1055,26 @@ void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
                     reg_names[instr.swap.rd], reg_names[instr.swap.rm],
                     reg_names[instr.swap.rn]);
             break;
+        case ARM_SATARITH:
+            fprintf(out, "q%s%s %s, %s, %s", instr.sat_arith.d ? "d" : "",
+                    instr.sat_arith.op ? "sub" : "add",
+                    reg_names[instr.sat_arith.rd],
+                    reg_names[instr.sat_arith.rm],
+                    reg_names[instr.sat_arith.rn]);
+            break;
+        case ARM_MULTIPLYSHORT: {
+            char* smul_names[] = {"smla", "smulw", "smlal", "smul"};
+            fprintf(out, "%s", smul_names[instr.multiply_short.op]);
+            if (instr.multiply_short.op != 1)
+                fprintf(out, "%s", instr.multiply_short.x ? "t" : "b");
+            fprintf(out, "%s %s, %s, %s, %s",
+                    instr.multiply_short.y ? "t" : "b",
+                    reg_names[instr.multiply_short.rd],
+                    reg_names[instr.multiply_short.rn],
+                    reg_names[instr.multiply_short.rs],
+                    reg_names[instr.multiply_short.rm]);
+            break;
+        }
         case ARM_MULTIPLY:
             if (instr.multiply.a) {
                 fprintf(
@@ -1144,6 +1163,7 @@ void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
             }
             break;
         case ARM_DATAPROC:
+        case ARM_MOV:
             if (instr.data_proc.i && instr.data_proc.rn == 15 &&
                 (instr.data_proc.opcode == A_ADD ||
                  instr.data_proc.opcode == A_SUB)) {
