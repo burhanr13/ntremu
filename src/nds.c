@@ -157,6 +157,10 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
         nds->cpu9.dtcm_base = 0x3000000;
         nds->cpu9.dtcm_virtsize = DTCMSIZE;
         nds->cpu9.c.pc = header->arm9_entry;
+        nds->cpu9.c.sp = 0x3002f7c;
+        nds->cpu9.c.banked_sp[B_IRQ] = 0x3003f80;
+        nds->cpu9.c.banked_sp[B_SVC] = 0x3003fc0;
+        nds->cpu9.c.lr = header->arm9_entry;
         nds->cpu9.c.cpsr.m = M_SYSTEM;
         cpu_flush((ArmCore*) &nds->cpu9);
 
@@ -166,6 +170,10 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
             bus7_write32(nds, header->arm7_ram_offset + i,
                          *(u32*) &card->rom[header->arm7_rom_offset + i]);
         }
+        nds->cpu7.c.sp = 0x380fd80;
+        nds->cpu7.c.banked_sp[B_IRQ] = 0x380ff80;
+        nds->cpu7.c.banked_sp[B_SVC] = 0x380ffc0;
+        nds->cpu7.c.lr = header->arm7_entry;
         nds->cpu7.c.pc = header->arm7_entry;
         nds->cpu7.c.cpsr.m = M_SYSTEM;
         cpu_flush((ArmCore*) &nds->cpu7);
