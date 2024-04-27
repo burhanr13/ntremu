@@ -124,6 +124,13 @@ static inline bool eval_cond(ArmCore* cpu, ArmInstr instr) {
 
 void arm_exec_instr(ArmCore* cpu) {
     ArmInstr instr = cpu->cur_instr;
+
+#ifdef CPULOG
+    cpu->log[cpu->log_idx].addr = cpu->cur_instr_addr;
+    cpu->log[cpu->log_idx].instr = instr;
+    cpu->log_idx = (cpu->log_idx + 1) % LOGMAX;
+#endif
+
     if (!eval_cond(cpu, instr)) {
         cpu_fetch_instr(cpu);
         return;

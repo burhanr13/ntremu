@@ -88,6 +88,15 @@ typedef struct _ArmCore {
 
     bool irq;
 
+#ifdef CPULOG
+#define LOGMAX (1 << 15)
+    struct {
+        u32 addr;
+        ArmInstr instr;
+    } log[LOGMAX];
+    u32 log_idx;
+#endif
+
 } ArmCore;
 
 void cpu_fetch_instr(ArmCore* cpu);

@@ -187,6 +187,18 @@ int main(int argc, char** argv) {
         }
     }
 
+#ifdef CPULOG
+    FILE* fp = fopen("arm7.log", "w");
+    for (int i = 0; i < LOGMAX; i++) {
+        u32 li = (ntremu.nds->cpu7.c.log_idx + i) % LOGMAX;
+        fprintf(fp, "%08x: ", ntremu.nds->cpu7.c.log[li].addr);
+        arm_disassemble(ntremu.nds->cpu7.c.log[li].instr,
+                        ntremu.nds->cpu7.c.log[li].addr, fp);
+        fprintf(fp, "\n");
+    }
+    fclose(fp);
+#endif
+
     if (controller) SDL_GameControllerClose(controller);
 
     SDL_CloseAudioDevice(audio);

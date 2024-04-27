@@ -31,6 +31,7 @@ release: CFLAGS += -O3 -flto=auto
 release: $(RELEASE_DIR)/$(TARGET_EXEC)
 
 debug: CFLAGS += -g
+debug: CPPFLAGS += -DCPULOG
 debug: $(DEBUG_DIR)/$(TARGET_EXEC)
 
 install: release
