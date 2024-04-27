@@ -33,6 +33,9 @@
             case R_OAM:                                                        \
                 return *(u##size*) (&nds->oam[addr % (2 * OAMSIZE)]);          \
                 break;                                                         \
+            case R_GBAROM:                                                     \
+            case R_GBAROMEX:                                                   \
+                return *(u##size*) &nds->expansionram[addr % (1 << 25)];       \
             default:                                                           \
                 if (addr >= 0xffff0000 && addr < (0xffff0000 + BIOS9SIZE))     \
                     return *(u##size*) (&nds->bios9[addr - 0xffff0000]);       \
@@ -72,6 +75,10 @@
                 break;                                                         \
             case R_OAM:                                                        \
                 *(u##size*) (&nds->oam[addr % (2 * OAMSIZE)]) = data;          \
+                break;                                                         \
+            case R_GBAROM:                                                     \
+            case R_GBAROMEX:                                                   \
+                *(u##size*) &nds->expansionram[addr % (1 << 25)] = data;       \
                 break;                                                         \
         }                                                                      \
     }
