@@ -62,4 +62,4 @@ On Linux you can create a FAT filesystem image with `mkfs.fat`.
 
 - [GBATEK](https://www.problemkaputt.de/gbatek.htm)
 - [melonDS](https://melonds.kuribo64.net/)
-- [EmuDev Discord Server](https://discord.gg/dkmJAes)
+- [Emulator Development Discord Server](https://discord.gg/dkmJAes)
