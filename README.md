@@ -3,6 +3,11 @@ Nintendo DS Emulator. Can play many games, but some may
 still be buggy. Has generally complete 2d/3d graphics, audio, and most of the hardware. Has some cool features like debugger, free camera, and DLDI
 support.
 
+![](images/firmware.png)
+![](images/pokemon.png)
+![](images/mariokart.png)
+![](images/linux.png)
+
 ## Building
 
 This project requires SDL2 as a dependency to build and run.
