@@ -208,6 +208,7 @@ typedef struct _NDS {
     FIFO(u32, 16) ipcfifo7to9, ipcfifo9to7;
 
     bool halt7;
+    bool sleep;
 
     CPUType cur_cpu_type;
     ArmCore* cur_cpu;

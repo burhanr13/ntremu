@@ -20,7 +20,9 @@ EmulatorState ntremu;
 const char usage[] = "ntremu [options] <romfile>\n"
                      "-b -- boot from firmware\n"
                      "-d -- run the debugger\n"
-                     "-p <path> -- path to bios/firmware files\n";
+                     "-p <path> -- path to bios/firmware files\n"
+                     "-s <path> -- path to SD card image for DLDI\n"
+                     "-h -- print help";
 
 int emulator_init(int argc, char** argv) {
     read_args(argc, argv);
@@ -134,6 +136,9 @@ void read_args(int argc, char** argv) {
                             eprintf("Missing argument for '-s'\n");
                         }
                         break;
+                    case 'h':
+                        eprintf(usage);
+                        exit(0);
                     default:
                         eprintf("Invalid argument\n");
                 }
