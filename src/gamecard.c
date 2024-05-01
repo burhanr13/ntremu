@@ -30,8 +30,10 @@ GameCard* create_card(char* filename) {
     v++;
     if (v < (1 << 17)) v = 1 << 17;
     card->rom_size = v;
-    card->rom =
-        mmap(NULL, card->rom_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    card->rom = mmap(NULL, card->rom_size, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANON, -1, 0);
+    card->rom = mmap(card->rom, st.st_size, PROT_READ | PROT_WRITE,
+                     MAP_FIXED | MAP_PRIVATE, fd, 0);
     close(fd);
 
     card->rom_filename = strdup(filename);
@@ -83,8 +85,6 @@ void destroy_card(GameCard* card) {
 void encrypt_securearea(GameCard* card, u32* keys) {
     if (card->encrypted) return;
     card->encrypted = true;
-
-    if (card->rom_size < 0x4800) return;
 
     memcpy(&card->rom[0x4000], "encryObj", 8);
 
