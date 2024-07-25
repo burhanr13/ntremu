@@ -17,7 +17,20 @@ typedef struct _Arm946E {
 
     bool halt;
 
-    u32 cp15_control;
+    union {
+        u32 w;
+        struct {
+            u32 whatever1 : 13;
+            u32 vector_base : 1;
+            u32 whatever2 : 1;
+            u32 v4mode : 1;
+            u32 dtcm_on : 1;
+            u32 dtcm_load : 1;
+            u32 itcm_on : 1;
+            u32 itcm_load : 1;
+            u32 whatever3 : 12;
+        };
+    } cp15_control;
 
     u8 itcm[ITCMSIZE];
     u8 dtcm[DTCMSIZE];
@@ -35,12 +48,10 @@ bool arm9_step(Arm946E* cpu);
 u32 arm9_read8(Arm946E* cpu, u32 addr, bool sx);
 u32 arm9_read16(Arm946E* cpu, u32 addr, bool sx);
 u32 arm9_read32(Arm946E* cpu, u32 addr);
-u32 arm9_read32m(Arm946E* cpu, u32 addr, int i);
 
 void arm9_write8(Arm946E* cpu, u32 addr, u8 b);
 void arm9_write16(Arm946E* cpu, u32 addr, u16 h);
 void arm9_write32(Arm946E* cpu, u32 addr, u32 w);
-void arm9_write32m(Arm946E* cpu, u32 addr, int i, u32 w);
 
 u16 arm9_fetch16(Arm946E* cpu, u32 addr);
 u32 arm9_fetch32(Arm946E* cpu, u32 addr);

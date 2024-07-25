@@ -14,13 +14,13 @@ void arm7_init(Arm7TDMI* cpu) {
     cpu->c.read8 = (void*) arm7_read8;
     cpu->c.read16 = (void*) arm7_read16;
     cpu->c.read32 = (void*) arm7_read32;
-    cpu->c.read32m = (void*) arm7_read32m;
     cpu->c.write8 = (void*) arm7_write8;
     cpu->c.write16 = (void*) arm7_write16;
     cpu->c.write32 = (void*) arm7_write32;
-    cpu->c.write32m = (void*) arm7_write32m;
     cpu->c.fetch16 = (void*) arm7_fetch16;
     cpu->c.fetch32 = (void*) arm7_fetch32;
+    cpu->c.cp15_read = NULL;
+    cpu->c.cp15_write = NULL;
 }
 
 void arm7_step(Arm7TDMI* cpu) {
@@ -60,11 +60,6 @@ u32 arm7_read32(Arm7TDMI* cpu, u32 addr) {
     return data;
 }
 
-u32 arm7_read32m(Arm7TDMI* cpu, u32 addr, int i) {
-    cpu->c.cycles++;
-    return bus7_read32(cpu->master, (addr & ~3) + 4 * i);
-}
-
 void arm7_write8(Arm7TDMI* cpu, u32 addr, u8 b) {
     cpu->c.cycles++;
     bus7_write8(cpu->master, addr, b);
@@ -78,11 +73,6 @@ void arm7_write16(Arm7TDMI* cpu, u32 addr, u16 h) {
 void arm7_write32(Arm7TDMI* cpu, u32 addr, u32 w) {
     cpu->c.cycles++;
     bus7_write32(cpu->master, addr & ~3, w);
-}
-
-void arm7_write32m(Arm7TDMI* cpu, u32 addr, int i, u32 w) {
-    cpu->c.cycles++;
-    bus7_write32(cpu->master, (addr & ~3) + 4 * i, w);
 }
 
 u16 arm7_fetch16(Arm7TDMI* cpu, u32 addr) {

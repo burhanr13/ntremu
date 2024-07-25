@@ -11,18 +11,18 @@
 
 void arm9_init(Arm946E* cpu) {
 
-    cpu->cp15_control = 0x0005307d;
+    cpu->cp15_control.w = 0x0005307d;
 
     cpu->c.read8 = (void*) arm9_read8;
     cpu->c.read16 = (void*) arm9_read16;
     cpu->c.read32 = (void*) arm9_read32;
-    cpu->c.read32m = (void*) arm9_read32m;
     cpu->c.write8 = (void*) arm9_write8;
     cpu->c.write16 = (void*) arm9_write16;
     cpu->c.write32 = (void*) arm9_write32;
-    cpu->c.write32m = (void*) arm9_write32m;
     cpu->c.fetch16 = (void*) arm9_fetch16;
     cpu->c.fetch32 = (void*) arm9_fetch32;
+    cpu->c.cp15_read = (void*) cp15_read;
+    cpu->c.cp15_write = (void*) cp15_write;
 
     cpu->c.v5 = true;
     cpu->c.vector_base = 0xffff0000;
@@ -46,13 +46,19 @@ bool arm9_step(Arm946E* cpu) {
     return true;
 }
 
+#define READ(size, addr)                                                       \
+    if (cpu->cp15_control.itcm_on && !cpu->cp15_control.itcm_load &&           \
+        (addr) < cpu->itcm_virtsize)                                           \
+        data = *(u##size*) &cpu->itcm[(addr) % ITCMSIZE];                      \
+    else if (cpu->cp15_control.dtcm_on && !cpu->cp15_control.dtcm_load &&      \
+             (addr) - cpu->dtcm_base < cpu->dtcm_virtsize)                     \
+        data = *(u##size*) &cpu->dtcm[(addr) % DTCMSIZE];                      \
+    else data = bus9_read##size(cpu->master, addr);
+
 u32 arm9_read8(Arm946E* cpu, u32 addr, bool sx) {
     cpu->c.cycles++;
     u32 data;
-    if (addr < cpu->itcm_virtsize) data = *(u8*) &cpu->itcm[addr % ITCMSIZE];
-    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
-        data = *(u8*) &cpu->dtcm[addr % DTCMSIZE];
-    else data = bus9_read8(cpu->master, addr);
+    READ(8, addr);
     if (sx) data = (s8) data;
     return data;
 }
@@ -60,11 +66,7 @@ u32 arm9_read8(Arm946E* cpu, u32 addr, bool sx) {
 u32 arm9_read16(Arm946E* cpu, u32 addr, bool sx) {
     cpu->c.cycles++;
     u32 data;
-    if (addr < cpu->itcm_virtsize)
-        data = *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE];
-    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
-        data = *(u16*) &cpu->dtcm[(addr & ~1) % DTCMSIZE];
-    else data = bus9_read16(cpu->master, addr & ~1);
+    READ(16, addr & ~1);
     if (sx) data = (s16) data;
     return data;
 }
@@ -72,11 +74,7 @@ u32 arm9_read16(Arm946E* cpu, u32 addr, bool sx) {
 u32 arm9_read32(Arm946E* cpu, u32 addr) {
     cpu->c.cycles++;
     u32 data;
-    if (addr < cpu->itcm_virtsize)
-        data = *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE];
-    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
-        data = *(u32*) &cpu->dtcm[(addr & ~3) % DTCMSIZE];
-    else data = bus9_read32(cpu->master, addr & ~3);
+    READ(32, addr & ~3);
     if (addr & 0b11) {
         data =
             (data >> (8 * (addr & 0b11))) | (data << (32 - 8 * (addr & 0b11)));
@@ -84,53 +82,33 @@ u32 arm9_read32(Arm946E* cpu, u32 addr) {
     return data;
 }
 
-u32 arm9_read32m(Arm946E* cpu, u32 addr, int i) {
+#define WRITE(size, addr)                                                      \
+    if (cpu->cp15_control.itcm_on && (addr) < cpu->itcm_virtsize)              \
+        *(u##size*) &cpu->itcm[(addr) % ITCMSIZE] = data;                      \
+    else if (cpu->cp15_control.dtcm_on &&                                      \
+             (addr) - cpu->dtcm_base < cpu->dtcm_virtsize)                     \
+        *(u##size*) &cpu->dtcm[(addr) % DTCMSIZE] = data;                      \
+    else bus9_write##size(cpu->master, addr, data);
+
+void arm9_write8(Arm946E* cpu, u32 addr, u8 data) {
     cpu->c.cycles++;
-    if (addr < cpu->itcm_virtsize)
-        return *(u32*) &cpu->itcm[((addr & ~3) + 4 * i) % ITCMSIZE];
-    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
-        return *(u32*) &cpu->dtcm[((addr & ~3) + 4 * i) % DTCMSIZE];
-    else return bus9_read32(cpu->master, (addr & ~3) + 4 * i);
+    WRITE(8,addr);
 }
 
-void arm9_write8(Arm946E* cpu, u32 addr, u8 b) {
+void arm9_write16(Arm946E* cpu, u32 addr, u16 data) {
     cpu->c.cycles++;
-    if (addr < cpu->itcm_virtsize) *(u8*) &cpu->itcm[addr % ITCMSIZE] = b;
-    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
-        *(u8*) &cpu->dtcm[addr % DTCMSIZE] = b;
-    else bus9_write8(cpu->master, addr, b);
+    WRITE(16, addr & ~1);
 }
 
-void arm9_write16(Arm946E* cpu, u32 addr, u16 h) {
+void arm9_write32(Arm946E* cpu, u32 addr, u32 data) {
     cpu->c.cycles++;
-    if (addr < cpu->itcm_virtsize)
-        *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE] = h;
-    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
-        *(u16*) &cpu->dtcm[(addr & ~1) % DTCMSIZE] = h;
-    else bus9_write16(cpu->master, addr & ~1, h);
-}
-
-void arm9_write32(Arm946E* cpu, u32 addr, u32 w) {
-    cpu->c.cycles++;
-    if (addr < cpu->itcm_virtsize)
-        *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE] = w;
-    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
-        *(u32*) &cpu->dtcm[(addr & ~3) % DTCMSIZE] = w;
-    else bus9_write32(cpu->master, addr & ~3, w);
-}
-
-void arm9_write32m(Arm946E* cpu, u32 addr, int i, u32 w) {
-    cpu->c.cycles++;
-    if (addr < cpu->itcm_virtsize)
-        *(u32*) &cpu->itcm[((addr & ~3) + 4 * i) % ITCMSIZE] = w;
-    else if (addr - cpu->dtcm_base < cpu->dtcm_virtsize)
-        *(u32*) &cpu->dtcm[((addr & ~3) + 4 * i) % DTCMSIZE] = w;
-    else bus9_write32(cpu->master, (addr & ~3) + 4 * i, w);
+    WRITE(32, addr & ~3);
 }
 
 u16 arm9_fetch16(Arm946E* cpu, u32 addr) {
     u16 data;
-    if (addr < cpu->itcm_virtsize)
+    if (cpu->cp15_control.itcm_on && !cpu->cp15_control.itcm_load &&
+        addr < cpu->itcm_virtsize)
         data = *(u16*) &cpu->itcm[(addr & ~1) % ITCMSIZE];
     else {
         data = bus9_read16(cpu->master, addr & ~1);
@@ -144,7 +122,8 @@ u16 arm9_fetch16(Arm946E* cpu, u32 addr) {
 
 u32 arm9_fetch32(Arm946E* cpu, u32 addr) {
     u32 data;
-    if (addr < cpu->itcm_virtsize)
+    if (cpu->cp15_control.itcm_on && !cpu->cp15_control.itcm_load &&
+        addr < cpu->itcm_virtsize)
         data = *(u32*) &cpu->itcm[(addr & ~3) % ITCMSIZE];
     else {
         data = bus9_read32(cpu->master, addr & ~3);
@@ -176,7 +155,7 @@ u32 cp15_read(Arm946E* cpu, u32 cn, u32 cm, u32 cp) {
             break;
         case 1:
             if (cm == 0 && cp == 0) {
-                return cpu->cp15_control;
+                return cpu->cp15_control.w;
             }
             break;
         case 9:
@@ -208,13 +187,14 @@ void cp15_write(Arm946E* cpu, u32 cn, u32 cm, u32 cp, u32 data) {
             if (cm == 0 && cp == 0) {
                 u32 mask = 0x000ff085;
                 data &= mask;
-                cpu->cp15_control &= ~mask;
-                cpu->cp15_control |= data;
-                if (cpu->cp15_control & (1 << 13)) {
+                cpu->cp15_control.w &= ~mask;
+                cpu->cp15_control.w |= data;
+                if (cpu->cp15_control.vector_base) {
                     cpu->c.vector_base = 0xffff0000;
                 } else {
                     cpu->c.vector_base = 0x00000000;
                 }
+                cpu->c.v5 = !cpu->cp15_control.v4mode;
                 return;
             }
             break;

@@ -177,8 +177,8 @@ void debugger_run() {
                         for (int i = 0; i < n; i++) {
                             if (i > 0 && !(i & 7)) printf("             ");
                             printf("0x%08x ",
-                                   ntremu.nds->cur_cpu->read32m(
-                                       ntremu.nds->cur_cpu, addr, i));
+                                   ntremu.nds->cur_cpu->read32(
+                                       ntremu.nds->cur_cpu, addr + (i << 2)));
                             if ((i & 7) == 7) printf("\n");
                         }
                         if (n & 7) printf("\n");

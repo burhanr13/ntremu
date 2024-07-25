@@ -71,15 +71,16 @@ typedef struct _ArmCore {
     u32 (*read8)(ArmCore* cpu, u32 addr, bool sx);
     u32 (*read16)(ArmCore* cpu, u32 addr, bool sx);
     u32 (*read32)(ArmCore* cpu, u32 addr);
-    u32 (*read32m)(ArmCore* cpu, u32 addr, int i);
 
     void (*write8)(ArmCore* cpu, u32 addr, u8 b);
     void (*write16)(ArmCore* cpu, u32 addr, u16 h);
     void (*write32)(ArmCore* cpu, u32 addr, u32 w);
-    void (*write32m)(ArmCore* cpu, u32 addr, int i, u32 w);
 
     u16 (*fetch16)(ArmCore* cpu, u32 addr);
     u32 (*fetch32)(ArmCore* cpu, u32 addr);
+
+    u32 (*cp15_read)(ArmCore* cpu, u32 cn, u32 cm, u32 cp);
+    void (*cp15_write)(ArmCore* cpu, u32 cn, u32 cm, u32 cp, u32 data);
 
     bool v5;
     u32 vector_base;

@@ -1,6 +1,13 @@
+TARGET_EXEC := ntremu
+
 CC := gcc
-CFLAGS := -Wall -Wimplicit-fallthrough
+
+CFLAGS := -Wall -Wimplicit-fallthrough -Werror
+CFLAGS_RELEASE := -O3 -flto
+CFLAGS_DEBUG := -g -DCPULOG
+
 CPPFLAGS := -MP -MMD
+
 LDFLAGS := -lm -lSDL2 -lreadline
 
 ifeq ($(shell uname),Darwin)
@@ -14,8 +21,6 @@ SRC_DIR := src
 DEBUG_DIR := $(BUILD_DIR)/debug
 RELEASE_DIR := $(BUILD_DIR)/release
 
-TARGET_EXEC := ntremu
-
 SRCS := $(shell find $(SRC_DIR) -name '*.c')
 SRCS := $(SRCS:$(SRC_DIR)/%=%)
 
@@ -27,15 +32,11 @@ DEPS_RELEASE := $(OBJS_RELEASE:.o=.d)
 
 .PHONY: release, debug, clean
 
-release: CFLAGS += -O3 -flto=auto
+release: CFLAGS += $(CFLAGS_RELEASE)
 release: $(RELEASE_DIR)/$(TARGET_EXEC)
 
-debug: CFLAGS += -g
-debug: CPPFLAGS += -DCPULOG
+debug: CFLAGS += $(CFLAGS_DEBUG)
 debug: $(DEBUG_DIR)/$(TARGET_EXEC)
-
-install: release
-	cp $(RELEASE_DIR)/$(TARGET_EXEC) ~/.local/bin
 
 $(RELEASE_DIR)/$(TARGET_EXEC): $(OBJS_RELEASE)
 	$(CC) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)

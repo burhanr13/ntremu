@@ -99,14 +99,14 @@ void dldi_write_data(u32 data) {
     dldi.secbuf[dldi.i++] = data;
     if (dldi.i == SECTOR_SIZE / 4) {
         dldi.i = 0;
-        write(ntremu.dldi_sd_fd, dldi.secbuf, SECTOR_SIZE);
+        (void) !write(ntremu.dldi_sd_fd, dldi.secbuf, SECTOR_SIZE);
     }
 }
 
 u32 dldi_read_data() {
     if (ntremu.dldi_sd_fd < 0) return -1;
     if (dldi.i == 0) {
-        read(ntremu.dldi_sd_fd, dldi.secbuf, SECTOR_SIZE);
+        (void) !read(ntremu.dldi_sd_fd, dldi.secbuf, SECTOR_SIZE);
     }
     u32 a = dldi.secbuf[dldi.i++];
     if (dldi.i == SECTOR_SIZE / 4) dldi.i = 0;

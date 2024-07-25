@@ -662,8 +662,9 @@ void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr) {
             if (instr.half_trans.rd == 15) cpu_flush(cpu);
         } else if (cpu->v5) {
             if (instr.half_trans.h) {
-                cpu->write32m(cpu, addr, 0, cpu->r[instr.half_trans.rd]);
-                cpu->write32m(cpu, addr, 1, cpu->r[instr.half_trans.rd + 1]);
+                cpu->write32(cpu, addr & ~3, cpu->r[instr.half_trans.rd]);
+                cpu->write32(cpu, (addr & ~3) + 4,
+                             cpu->r[instr.half_trans.rd + 1]);
                 if (instr.half_trans.w || !instr.half_trans.p) {
                     cpu->r[instr.half_trans.rn] = wback;
                 }
@@ -671,8 +672,9 @@ void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr) {
                 if (instr.half_trans.w || !instr.half_trans.p) {
                     cpu->r[instr.half_trans.rn] = wback;
                 }
-                cpu->r[instr.half_trans.rd] = cpu->read32m(cpu, addr, 0);
-                cpu->r[instr.half_trans.rd + 1] = cpu->read32m(cpu, addr, 1);
+                cpu->r[instr.half_trans.rd] = cpu->read32(cpu, addr & ~3);
+                cpu->r[instr.half_trans.rd + 1] =
+                    cpu->read32(cpu, (addr & ~3) + 4);
             }
         }
     } else if (instr.half_trans.h) {
@@ -804,13 +806,15 @@ void exec_arm_block_trans(ArmCore* cpu, ArmInstr instr) {
             for (int i = 0; i < rcount; i++) {
                 if (i == rcount - 1 && instr.block_trans.w)
                     cpu->r[instr.block_trans.rn] = wback;
-                *get_user_reg(cpu, rlist[i]) = cpu->read32m(cpu, addr, i);
+                *get_user_reg(cpu, rlist[i]) =
+                    cpu->read32(cpu, (addr & ~3) + (i << 2));
             }
             if (rcount < 2 && instr.block_trans.w)
                 cpu->r[instr.block_trans.rn] = wback;
         } else {
             for (int i = 0; i < rcount; i++) {
-                cpu->write32m(cpu, addr, i, *get_user_reg(cpu, rlist[i]));
+                cpu->write32(cpu, (addr & ~3) + (i << 2),
+                             *get_user_reg(cpu, rlist[i]));
             }
             if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
         }
@@ -819,13 +823,13 @@ void exec_arm_block_trans(ArmCore* cpu, ArmInstr instr) {
             if (cpu->cpsr.t || !cpu->v5) {
                 if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
                 for (int i = 0; i < rcount; i++) {
-                    cpu->r[rlist[i]] = cpu->read32m(cpu, addr, i);
+                    cpu->r[rlist[i]] = cpu->read32(cpu, (addr & ~3) + (i << 2));
                 }
             } else {
                 for (int i = 0; i < rcount; i++) {
                     if (i == rcount - 1 && instr.block_trans.w)
                         cpu->r[instr.block_trans.rn] = wback;
-                    cpu->r[rlist[i]] = cpu->read32m(cpu, addr, i);
+                    cpu->r[rlist[i]] = cpu->read32(cpu, (addr & ~3) + (i << 2));
                 }
                 if (rcount < 2 && instr.block_trans.w)
                     cpu->r[instr.block_trans.rn] = wback;
@@ -844,12 +848,12 @@ void exec_arm_block_trans(ArmCore* cpu, ArmInstr instr) {
         } else {
             if (cpu->v5) {
                 for (int i = 0; i < rcount; i++) {
-                    cpu->write32m(cpu, addr, i, cpu->r[rlist[i]]);
+                    cpu->write32(cpu, (addr & ~3) + (i << 2), cpu->r[rlist[i]]);
                 }
                 if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
             } else {
                 for (int i = 0; i < rcount; i++) {
-                    cpu->write32m(cpu, addr, i, cpu->r[rlist[i]]);
+                    cpu->write32(cpu, (addr & ~3) + (i << 2), cpu->r[rlist[i]]);
                     if (i == 0 && instr.block_trans.w)
                         cpu->r[instr.block_trans.rn] = wback;
                 }
@@ -895,7 +899,7 @@ void exec_arm_branch(ArmCore* cpu, ArmInstr instr) {
 }
 
 void exec_arm_cp_reg_trans(ArmCore* cpu, ArmInstr instr) {
-    if (!cpu->v5) {
+    if (!cpu->cp15_read || !cpu->cp15_write) {
         cpu_handle_interrupt(cpu, I_UND);
         return;
     }
@@ -905,11 +909,12 @@ void exec_arm_cp_reg_trans(ArmCore* cpu, ArmInstr instr) {
     if (instr.cp_reg_trans.cpnum == 15 && instr.cp_reg_trans.cpopc == 0) {
         if (instr.cp_reg_trans.l) {
             cpu->r[instr.cp_reg_trans.rd] =
-                cp15_read(cpu, instr.cp_reg_trans.crn, instr.cp_reg_trans.crm,
-                          instr.cp_reg_trans.cp);
+                cpu->cp15_read(cpu, instr.cp_reg_trans.crn,
+                               instr.cp_reg_trans.crm, instr.cp_reg_trans.cp);
         } else {
-            cp15_write(cpu, instr.cp_reg_trans.crn, instr.cp_reg_trans.crm,
-                       instr.cp_reg_trans.cp, cpu->r[instr.cp_reg_trans.rd]);
+            cpu->cp15_write(cpu, instr.cp_reg_trans.crn, instr.cp_reg_trans.crm,
+                            instr.cp_reg_trans.cp,
+                            cpu->r[instr.cp_reg_trans.rd]);
         }
     }
 }
