@@ -563,6 +563,7 @@ void exec_arm_swap(ArmCore* cpu, ArmInstr instr) {
 }
 
 void exec_arm_branch_ex(ArmCore* cpu, ArmInstr instr) {
+    u32 dest = cpu->r[instr.branch_ex.rn];
     if (instr.branch_ex.l && cpu->v5) {
         if (cpu->cpsr.t) {
             cpu->lr = (cpu->pc - 2) | 1;
@@ -571,7 +572,7 @@ void exec_arm_branch_ex(ArmCore* cpu, ArmInstr instr) {
         }
     }
     cpu_fetch_instr(cpu);
-    cpu->pc = cpu->r[instr.branch_ex.rn];
+    cpu->pc = dest;
     cpu->cpsr.t = cpu->pc & 1;
     cpu_flush(cpu);
 }
