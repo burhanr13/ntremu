@@ -151,6 +151,7 @@ typedef struct {
     vec4 v;
     vec4 vt;
     float r, g, b;
+    int sx, sy;
 } vertex;
 
 typedef struct {

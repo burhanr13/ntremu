@@ -278,7 +278,11 @@ bool add_poly(GPU* gpu, int n_orig, bool strip) {
     }
 
     gpu->polygonram[gpu->n_polys].n = n;
-
+    for (int i = 0; i < n; i++) {
+        vertex* v = gpu->polygonram[gpu->n_polys].p[i];
+        v->sx = ((v->v.p[0] / v->v.p[3]) + 1) * gpu->view_w / 2 + gpu->view_x;
+        v->sy = (1 - (v->v.p[1] / v->v.p[3])) * gpu->view_h / 2 + gpu->view_y;
+    }
     gpu->polygonram[gpu->n_polys].attr = gpu->cur_attr;
     gpu->polygonram[gpu->n_polys].texparam = gpu->cur_texparam;
     gpu->polygonram[gpu->n_polys].pltt_base = gpu->cur_pltt_base;
@@ -1044,14 +1048,11 @@ void swap_buffers(GPU* gpu) {
     pthread_mutex_unlock(&gpu_mutex);
 }
 
-#define VTX_SCX(_v) (((_v).v.p[0] + 1) * gpu->view_w / 2 + gpu->view_x)
-#define VTX_SCY(_v) ((1 - (_v).v.p[1]) * gpu->view_h / 2 + gpu->view_y)
-
 void render_line(GPU* gpu, vertex* v0, vertex* v1) {
-    int x0 = VTX_SCX(*v0);
-    int y0 = VTX_SCY(*v0);
-    int x1 = VTX_SCX(*v1);
-    int y1 = VTX_SCY(*v1);
+    int x0 = v0->sx;
+    int y0 = v0->sy;
+    int x1 = v1->sx;
+    int y1 = v1->sy;
 
     float m = (float) (y1 - y0) / (x1 - x0);
     if (fabsf(m) > 1) {
@@ -1098,10 +1099,10 @@ void render_polygon_wireframe(GPU* gpu, poly* p) {
 void render_line_attrs(GPU* gpu, vertex* v0, vertex* v1,
                        struct interp_attrs* left, struct interp_attrs* right) {
 
-    int x0 = VTX_SCX(*v0);
-    int y0 = VTX_SCY(*v0);
-    int x1 = VTX_SCX(*v1);
-    int y1 = VTX_SCY(*v1);
+    int x0 = v0->sx;
+    int y0 = v0->sy;
+    int x1 = v1->sx;
+    int y1 = v1->sy;
 
     struct interp_attrs i0, i1;
 
@@ -1224,7 +1225,7 @@ void render_polygon(GPU* gpu, poly* p) {
     int yMin = NDS_SCREEN_H;
     int yMax = -1;
     for (int i = 0; i < p->n; i++) {
-        int y = VTX_SCY(*p->p[i]);
+        int y = p->p[i]->sy;
         if (y > yMax) yMax = y;
         if (y < yMin) yMin = y;
     }
