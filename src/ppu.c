@@ -690,7 +690,7 @@ void compose_lines(PPU* ppu) {
     if (evb > 16) evb = 16;
     if (evy > 16) evy = 16;
 
-    if (effect || ppu->obj_semitrans) {
+    if (effect || ppu->obj_semitrans || ppu->bg0_3d) {
         for (int x = 0; x < NDS_SCREEN_W; x++) {
             u8 layers[6];
             bool win_ena =
@@ -716,7 +716,7 @@ void compose_lines(PPU* ppu) {
             }
             layers[l++] = LBD;
 
-            u16 color1 = ppu->layerlines[layers[0]][x];
+            u32 color1 = ppu->layerlines[layers[0]][x];
 
             if (layers[0] == LOBJ && ppu->objdotattrs[x].semitrans && l > 1 &&
                 (ppu->io->bldcnt.target2 & (1 << layers[1]))) {
@@ -735,7 +735,8 @@ void compose_lines(PPU* ppu) {
                 if (b1 > 31) b1 = 31;
                 ppu->cur_line[x] = (b1 << 10) | (g1 << 5) | r1;
             } else if ((ppu->io->bldcnt.target1 & (1 << layers[0])) &&
-                       (!win_ena || ppu->io->wincnt[win].effects_enable)) {
+                       (!win_ena || ppu->io->wincnt[win].effects_enable ||
+                        (layers[0] == LBG0 && ppu->bg0_3d))) {
                 u8 r1 = color1 & 0x1f;
                 u8 g1 = (color1 >> 5) & 0x1f;
                 u8 b1 = (color1 >> 10) & 0x1f;
@@ -744,20 +745,23 @@ void compose_lines(PPU* ppu) {
                         if (l == 1 ||
                             !(ppu->io->bldcnt.target2 & (1 << layers[1])))
                             break;
-                        if (ppu->bg0_3d && layers[0] == 0) {
-
+                        u16 color2 = ppu->layerlines[layers[1]][x];
+                        u8 r2 = color2 & 0x1f;
+                        u8 g2 = (color2 >> 5) & 0x1f;
+                        u8 b2 = (color2 >> 10) & 0x1f;
+                        if (layers[0] == LBG0 && ppu->bg0_3d) {
+                            u8 a = (color1 >> 16) & 0xf;
+                            r1 = (a * r1 + (16 - a) * r2) / 16;
+                            g1 = (a * g1 + (16 - a) * g2) / 16;
+                            b1 = (a * b1 + (16 - a) * b2) / 16;
                         } else {
-                            u16 color2 = ppu->layerlines[layers[1]][x];
-                            u8 r2 = color2 & 0x1f;
-                            u8 g2 = (color2 >> 5) & 0x1f;
-                            u8 b2 = (color2 >> 10) & 0x1f;
                             r1 = (eva * r1 + evb * r2) / 16;
-                            if (r1 > 31) r1 = 31;
                             g1 = (eva * g1 + evb * g2) / 16;
-                            if (g1 > 31) g1 = 31;
                             b1 = (eva * b1 + evb * b2) / 16;
-                            if (b1 > 31) b1 = 31;
                         }
+                        if (g1 > 31) g1 = 31;
+                        if (r1 > 31) r1 = 31;
+                        if (b1 > 31) b1 = 31;
                         break;
                     }
                     case EFF_BINC: {
@@ -908,22 +912,48 @@ void ppu_check_window(PPU* ppu) {
 void lcd_capture_line(NDS* nds) {
     int w = DISPCAPLAYOUT[nds->io9.dispcapcnt.size][0];
 
-    u16* source = nds->ppuA.cur_line;
+    u16 gpu_line[NDS_SCREEN_W];
+    if (nds->io9.dispcapcnt.srcA) {
+        for (int i = 0; i < NDS_SCREEN_W; i++)
+            gpu_line[i] = nds->gpu.screen[nds->io7.vcount][i];
+    }
+    u16 blended[NDS_SCREEN_W];
+
+    u16* srcA = nds->io9.dispcapcnt.srcA ? gpu_line : nds->ppuA.cur_line;
+    u16* srcB = (u16*) &nds->vrambanks[nds->io9.ppuA.dispcnt.vram_block]
+                                      [2 * NDS_SCREEN_W * nds->io7.vcount];
+    if (nds->io9.ppuA.dispcnt.disp_mode != 2)
+        srcB += 0x4000 * nds->io9.dispcapcnt.vram_r_off;
+
+    u16* source;
     switch (nds->io9.dispcapcnt.source) {
         case 0:
-            source = nds->io9.dispcapcnt.srcA ? nds->gpu.screen[nds->io7.vcount]
-                                              : nds->ppuA.cur_line;
+            source = srcA;
             break;
         case 1:
-            source = (u16*) &nds->vrambanks[nds->io9.ppuA.dispcnt.vram_block]
-                                           [2 * NDS_SCREEN_W * nds->io7.vcount];
-            if (nds->io9.ppuA.dispcnt.disp_mode != 2)
-                source += 0x4000 * nds->io9.dispcapcnt.vram_r_off;
+            source = srcB;
             break;
         case 2:
         case 3:
-            source = nds->io9.dispcapcnt.srcA ? nds->gpu.screen[nds->io7.vcount]
-                                              : nds->ppuA.cur_line;
+            for (int i = 0; i < NDS_SCREEN_W; i++) {
+                u8 ra = srcA[i] & 0x1f;
+                u8 ga = srcA[i] >> 5 & 0x1f;
+                u8 ba = srcA[i] >> 10 & 0x1f;
+                u8 rb = srcB[i] & 0x1f;
+                u8 gb = srcB[i] >> 5 & 0x1f;
+                u8 bb = srcB[i] >> 10 & 0x1f;
+                u8 r = (ra * nds->io9.dispcapcnt.eva +
+                        rb * nds->io9.dispcapcnt.evb) /
+                       16;
+                u8 g = (ga * nds->io9.dispcapcnt.eva +
+                        gb * nds->io9.dispcapcnt.evb) /
+                       16;
+                u8 b = (ba * nds->io9.dispcapcnt.eva +
+                        bb * nds->io9.dispcapcnt.evb) /
+                       16;
+                blended[i] = r | g << 5 | b << 10;
+            }
+            source = blended;
             break;
     }
     u32 dest_addr = 0x8000 * nds->io9.dispcapcnt.vram_w_off +

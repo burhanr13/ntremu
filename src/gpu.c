@@ -858,7 +858,7 @@ void gxcmd_execute(GPU* gpu) {
             add_vtx(gpu);
             break;
         case POLYGON_ATTR:
-            FIFO_pop(gpu->param_fifo, gpu->cur_attr.w);
+            FIFO_pop(gpu->param_fifo, gpu->next_attr.w);
             break;
         case TEXIMAGE_PARAM:
             FIFO_pop(gpu->param_fifo, gpu->cur_texparam.w);
@@ -906,6 +906,7 @@ void gxcmd_execute(GPU* gpu) {
             }
             break;
         case BEGIN_VTXS:
+            gpu->cur_attr = gpu->next_attr;
             gpu->cur_vtx_ct = 0;
             gpu->tri_orient = false;
             FIFO_pop(gpu->param_fifo, gpu->poly_mode);
@@ -1067,7 +1068,7 @@ void render_line(GPU* gpu, vertex* v0, vertex* v1) {
         for (int y = y0; y <= y1; y++, x += m) {
             int sx = x;
             if (sx < 0 || sx >= NDS_SCREEN_W) continue;
-            gpu->screen_back[y][sx] = 0x801f;
+            gpu->screen_back[y][sx] = 0x1f801f;
         }
     } else {
         if (x0 > x1) {
@@ -1082,7 +1083,7 @@ void render_line(GPU* gpu, vertex* v0, vertex* v1) {
         for (int x = x0; x <= x1; x++, y += m) {
             int sy = y;
             if (sy < 0 || sy >= NDS_SCREEN_H) continue;
-            gpu->screen_back[sy][x] = 0x801f;
+            gpu->screen_back[sy][x] = 0x1f801f;
         }
     }
 }
@@ -1497,9 +1498,11 @@ void render_polygon(GPU* gpu, poly* p) {
                 u16 sr = gpu->screen_back[y][x] & 0x1f;
                 u16 sg = gpu->screen_back[y][x] >> 5 & 0x1f;
                 u16 sb = gpu->screen_back[y][x] >> 10 & 0x1f;
+                u16 sa = gpu->screen_back[y][x] >> 16 & 0x1f;
                 r = (r * (a + 1) + sr * (31 - a)) / 32;
                 g = (g * (a + 1) + sg * (31 - a)) / 32;
                 b = (b * (a + 1) + sb * (31 - a)) / 32;
+                a = (a > sa) ? a : sa;
                 gpu->attr_buf[y][x].blend = 1;
                 gpu->attr_buf[y][x].fog &= p->attr.fog;
             } else {
@@ -1515,7 +1518,7 @@ void render_polygon(GPU* gpu, poly* p) {
             }
 
             gpu->polyid_buf[y][x] = p->attr.id;
-            gpu->screen_back[y][x] = r | g << 5 | b << 10 | 1 << 15;
+            gpu->screen_back[y][x] = r | g << 5 | b << 10 | 1 << 15 | a << 16;
         }
     }
 }
@@ -1529,7 +1532,8 @@ void gpu_render(GPU* gpu) {
         for (int y = 0; y < NDS_SCREEN_H; y++) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {
                 gpu->screen_back[y][x] =
-                    *(u16*) &gpu->texram[2][(y * NDS_SCREEN_W + x) << 1];
+                    *(u16*) &gpu->texram[2][(y * NDS_SCREEN_W + x) << 1] |
+                    (31 << 16);
                 float depth =
                     (*(u16*) &gpu->texram[3][(y * NDS_SCREEN_W + x) << 1] &
                      0x7fff) /
@@ -1542,8 +1546,9 @@ void gpu_render(GPU* gpu) {
             }
         }
     } else {
-        u16 clear_color = gpu->master->io9.clear_color.color;
-        if (gpu->master->io9.clear_color.alpha) clear_color |= 0x8000;
+        u32 clear_color = gpu->master->io9.clear_color.color;
+        if (gpu->master->io9.clear_color.alpha)
+            clear_color |= 0x8000 | (gpu->master->io9.clear_color.alpha << 16);
         float clear_depth =
             (gpu->master->io9.clear_depth & 0x7fff) / (float) (1 << 12);
         if (gpu->w_buffer) clear_depth *= 0x200;
@@ -1609,11 +1614,11 @@ void gpu_render(GPU* gpu) {
                             r = (r + sr) / 2;
                             g = (g + sg) / 2;
                             b = (b + sb) / 2;
-                            gpu->screen_back[y][x] =
-                                r | g << 5 | b << 10 | 1 << 15;
+                            gpu->screen_back[y][x] &= 0xffff8000;
+                            gpu->screen_back[y][x] |= r | g << 5 | b << 10;
                         } else {
-                            gpu->screen_back[y][x] =
-                                1 << 15 |
+                            gpu->screen_back[y][x] &= 0xffff8000;
+                            gpu->screen_back[y][x] |=
                                 gpu->master->io9
                                     .edge_color[gpu->polyid_buf[y][x] >> 3];
                         }
@@ -1647,7 +1652,8 @@ void gpu_render(GPU* gpu) {
                             (fg * fog_density + sg * (128 - fog_density)) / 128;
                         u16 b =
                             (fb * fog_density + sb * (128 - fog_density)) / 128;
-                        gpu->screen_back[y][x] = r | g << 5 | b << 10 | 1 << 15;
+                        gpu->screen_back[y][x] &= 0xffff8000;
+                        gpu->screen_back[y][x] |= r | g << 5 | b << 10;
                     }
                 }
             }

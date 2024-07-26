@@ -173,9 +173,9 @@ typedef struct _NDS NDS;
 typedef struct {
     NDS* master;
 
-    u16 framebuffers[2][NDS_SCREEN_H][NDS_SCREEN_W];
-    u16 (*screen)[NDS_SCREEN_W];
-    u16 (*screen_back)[NDS_SCREEN_W];
+    u32 framebuffers[2][NDS_SCREEN_H][NDS_SCREEN_W];
+    u32 (*screen)[NDS_SCREEN_W];
+    u32 (*screen_back)[NDS_SCREEN_W];
 
     float depth_buf[NDS_SCREEN_H][NDS_SCREEN_W];
     u8 polyid_buf[NDS_SCREEN_H][NDS_SCREEN_W];
@@ -235,6 +235,7 @@ typedef struct {
 
     int poly_mode;
     PolygonAttr cur_attr;
+    PolygonAttr next_attr;
 
     vertex cur_vtx;
     vec4 cur_texcoord;

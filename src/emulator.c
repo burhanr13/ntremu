@@ -323,7 +323,7 @@ void update_input_freecam() {
     float speed = TRANSLATE_SPEED;
     if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) speed /= 20;
 
-    if (keys[SDL_SCANCODE_W]) {
+    if (keys[SDL_SCANCODE_E]) {
         mat4 m = {0};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
@@ -334,7 +334,7 @@ void update_input_freecam() {
         matmul2(&m, &ntremu.freecam_mtx, &tmp);
         ntremu.freecam_mtx = tmp;
     }
-    if (keys[SDL_SCANCODE_S]) {
+    if (keys[SDL_SCANCODE_Q]) {
         mat4 m = {0};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
@@ -345,7 +345,7 @@ void update_input_freecam() {
         matmul2(&m, &ntremu.freecam_mtx, &tmp);
         ntremu.freecam_mtx = tmp;
     }
-    if (keys[SDL_SCANCODE_Q]) {
+    if (keys[SDL_SCANCODE_DOWN]) {
         mat4 m = {0};
         m.p[3][3] = 1;
         m.p[0][0] = 1;
@@ -357,7 +357,7 @@ void update_input_freecam() {
         matmul2(&m, &ntremu.freecam_mtx, &tmp);
         ntremu.freecam_mtx = tmp;
     }
-    if (keys[SDL_SCANCODE_E]) {
+    if (keys[SDL_SCANCODE_UP]) {
         mat4 m = {0};
         m.p[3][3] = 1;
         m.p[0][0] = 1;
@@ -415,7 +415,7 @@ void update_input_freecam() {
         matmul2(&m, &ntremu.freecam_mtx, &tmp);
         ntremu.freecam_mtx = tmp;
     }
-    if (keys[SDL_SCANCODE_UP]) {
+    if (keys[SDL_SCANCODE_W]) {
         mat4 m = {0};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
@@ -426,7 +426,7 @@ void update_input_freecam() {
         matmul2(&m, &ntremu.freecam_mtx, &tmp);
         ntremu.freecam_mtx = tmp;
     }
-    if (keys[SDL_SCANCODE_DOWN]) {
+    if (keys[SDL_SCANCODE_S]) {
         mat4 m = {0};
         m.p[0][0] = 1;
         m.p[1][1] = 1;

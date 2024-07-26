@@ -85,7 +85,7 @@ typedef struct {
     u16 cur_line[NDS_SCREEN_W];
     u16 ly;
 
-    u16 layerlines[LMAX][NDS_SCREEN_W];
+    u32 layerlines[LMAX][NDS_SCREEN_W];
     struct {
         u8 priority : 2;
         u8 semitrans : 1;
