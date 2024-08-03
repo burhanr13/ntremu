@@ -1,5 +1,5 @@
-#ifndef _ARM_CORE_H
-#define _ARM_CORE_H
+#ifndef ARM_CORE_H
+#define ARM_CORE_H
 
 #include <stdio.h>
 

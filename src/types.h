@@ -1,5 +1,5 @@
-#ifndef _TYPES_H
-#define _TYPES_H
+#ifndef TYPES_H
+#define TYPES_H
 
 #include <limits.h>
 #include <stdbool.h>
@@ -25,16 +25,16 @@ typedef int64_t s64;
         u32 size;                                                              \
     }
 
-#define __FIFO_MAX(f) (sizeof(f).d / sizeof(f).d[0])
+#define FIFO_MAX(f) (sizeof(f).d / sizeof(f).d[0])
 
 #define FIFO_push(f, v)                                                        \
-    ((f).d[(f).tail++] = v, (f).tail &= __FIFO_MAX(f) - 1, (f).size++)
+    ((f).d[(f).tail++] = v, (f).tail &= FIFO_MAX(f) - 1, (f).size++)
 #define FIFO_pop(f, v)                                                         \
-    (v = (f).d[(f).head++], (f).head &= __FIFO_MAX(f) - 1, (f).size--)
+    (v = (f).d[(f).head++], (f).head &= FIFO_MAX(f) - 1, (f).size--)
 #define FIFO_peek(f) ((f).d[(f).head])
 #define FIFO_foreach(i, f)                                                     \
     for (u32 _i = 0, i = (f).head; _i < (f).size;                              \
-         _i++, i = (i + 1) & (__FIFO_MAX(f) - 1))
+         _i++, i = (i + 1) & (FIFO_MAX(f) - 1))
 #define FIFO_clear(f) ((f).d[0] = (f).head = (f).tail = (f).size = 0)
 
 #define Vector(T)                                                              \
@@ -45,7 +45,7 @@ typedef int64_t s64;
     }
 
 #define Vec_init(v) ((v).d = NULL, (v).size = 0, (v).cap = 0)
-#define Vec_copy(v1, v2)                                                       \
+#define Vec_assn(v1, v2)                                                       \
     ((v1).d = (v2).d, (v1).size = (v2).size, (v1).cap = (v2).cap)
 #define Vec_free(v) (free((v).d))
 

@@ -1,5 +1,5 @@
-#ifndef _PPU_H
-#define _PPU_H
+#ifndef PPU_H
+#define PPU_H
 
 #include "io.h"
 #include "types.h"

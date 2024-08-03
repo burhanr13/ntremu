@@ -1,5 +1,5 @@
-#ifndef _BUS7_H
-#define _BUS7_H
+#ifndef BUS7_H
+#define BUS7_H
 
 #include "types.h"
 

@@ -1,5 +1,5 @@
-#ifndef _SCHEDULER_H
-#define _SCHEDULER_H
+#ifndef SCHEDULER_H
+#define SCHEDULER_H
 
 #include "types.h"
 
@@ -41,7 +41,8 @@ void run_to_present(Scheduler* sched);
 int run_next_event(Scheduler* sched);
 
 static inline bool event_pending(Scheduler* sched) {
-    return sched->event_queue.size && sched->now >= FIFO_peek(sched->event_queue).time;
+    return sched->event_queue.size &&
+           sched->now >= FIFO_peek(sched->event_queue).time;
 }
 
 void add_event(Scheduler* sched, EventType t, u64 time);
