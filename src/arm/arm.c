@@ -4,23 +4,25 @@
 
 ArmInstrFormat arm_lookup[1 << 8][1 << 4];
 
-ArmExecFunc exec_funcs[] = {[ARM_DATAPROC] = exec_arm_data_proc,
-                            [ARM_PSRTRANS] = exec_arm_psr_trans,
-                            [ARM_MULTIPLY] = exec_arm_multiply,
-                            [ARM_MULTIPLYLONG] = exec_arm_multiply_long,
-                            [ARM_MULTIPLYSHORT] = exec_arm_multiply_short,
-                            [ARM_SWAP] = exec_arm_swap,
-                            [ARM_BRANCHEX] = exec_arm_branch_ex,
-                            [ARM_LEADINGZEROS] = exec_arm_leading_zeros,
-                            [ARM_SATARITH] = exec_arm_sat_arith,
-                            [ARM_HALFTRANS] = exec_arm_half_trans,
-                            [ARM_SINGLETRANS] = exec_arm_single_trans,
-                            [ARM_UNDEFINED] = exec_arm_undefined,
-                            [ARM_BLOCKTRANS] = exec_arm_block_trans,
-                            [ARM_BRANCH] = exec_arm_branch,
-                            [ARM_CPREGTRANS] = exec_arm_cp_reg_trans,
-                            [ARM_SWINTR] = exec_arm_sw_intr,
-                            [ARM_MOV] = exec_arm_mov};
+ArmExecFunc exec_funcs[] = {
+    [ARM_DATAPROC] = exec_arm_data_proc,
+    [ARM_PSRTRANS] = exec_arm_psr_trans,
+    [ARM_MULTIPLY] = exec_arm_multiply,
+    [ARM_MULTIPLYLONG] = exec_arm_multiply_long,
+    [ARM_MULTIPLYSHORT] = exec_arm_multiply_short,
+    [ARM_SWAP] = exec_arm_swap,
+    [ARM_BRANCHEXCH] = exec_arm_branch_exch,
+    [ARM_LEADINGZEROS] = exec_arm_leading_zeros,
+    [ARM_SATARITH] = exec_arm_sat_arith,
+    [ARM_HALFTRANS] = exec_arm_half_trans,
+    [ARM_SINGLETRANS] = exec_arm_single_trans,
+    [ARM_UNDEFINED] = exec_arm_undefined,
+    [ARM_BLOCKTRANS] = exec_arm_block_trans,
+    [ARM_BRANCH] = exec_arm_branch,
+    [ARM_CPREGTRANS] = exec_arm_cp_reg_trans,
+    [ARM_SWINTR] = exec_arm_sw_intr,
+    [ARM_MOV] = exec_arm_mov,
+};
 
 ArmExecFunc func_lookup[1 << 8][1 << 4];
 
@@ -53,9 +55,9 @@ ArmInstrFormat arm_decode_instr(ArmInstr instr) {
     } else if (instr.sat_arith.c1 == 0b00010 && instr.sat_arith.c2 == 0 &&
                instr.sat_arith.c4 == 0b0101) {
         return ARM_SATARITH;
-    } else if (instr.branch_ex.c1 == 0b00010010 && instr.branch_ex.c3 == 0b00 &&
-               instr.branch_ex.c4 == 1) {
-        return ARM_BRANCHEX;
+    } else if (instr.branch_exch.c1 == 0b00010010 &&
+               instr.branch_exch.c3 == 0b00 && instr.branch_exch.c4 == 1) {
+        return ARM_BRANCHEXCH;
     } else if (instr.swap.c1 == 0b00010 && instr.swap.c2 == 0b00 &&
                instr.swap.c4 == 0b1001) {
         return ARM_SWAP;
@@ -562,9 +564,9 @@ void exec_arm_swap(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_branch_ex(ArmCore* cpu, ArmInstr instr) {
-    u32 dest = cpu->r[instr.branch_ex.rn];
-    if (instr.branch_ex.l && cpu->v5) {
+void exec_arm_branch_exch(ArmCore* cpu, ArmInstr instr) {
+    u32 dest = cpu->r[instr.branch_exch.rn];
+    if (instr.branch_exch.l && cpu->v5) {
         if (cpu->cpsr.t) {
             cpu->lr = (cpu->pc - 2) | 1;
         } else {
@@ -1059,9 +1061,9 @@ void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
             fprintf(out, "clz %s, %s", reg_names[instr.leading_zeros.rd],
                     reg_names[instr.leading_zeros.rm]);
             break;
-        case ARM_BRANCHEX:
-            fprintf(out, "%s%s %s", instr.branch_ex.l ? "blx" : "bx", cond,
-                    reg_names[instr.branch_ex.rn]);
+        case ARM_BRANCHEXCH:
+            fprintf(out, "%s%s %s", instr.branch_exch.l ? "blx" : "bx", cond,
+                    reg_names[instr.branch_exch.rn]);
             break;
         case ARM_SWAP:
             fprintf(out, "swap%s%s %s, %s, [%s]", instr.swap.b ? "b" : "", cond,
@@ -1231,6 +1233,8 @@ void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
                     }
                 }
             }
+            break;
+        default:
             break;
     }
 }

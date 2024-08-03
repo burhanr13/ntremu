@@ -152,7 +152,7 @@ typedef union {
         u32 c2 : 12;
         u32 c1 : 8; // 00010010
         u32 cond : 4;
-    } branch_ex;
+    } branch_exch;
     struct {
         u32 rm : 4;
         u32 c4 : 4; // 0001
@@ -254,7 +254,7 @@ typedef enum {
     ARM_MULTIPLYLONG,
     ARM_MULTIPLYSHORT,
     ARM_SWAP,
-    ARM_BRANCHEX,
+    ARM_BRANCHEXCH,
     ARM_LEADINGZEROS,
     ARM_SATARITH,
     ARM_HALFTRANS,
@@ -264,10 +264,14 @@ typedef enum {
     ARM_BRANCH,
     ARM_CPREGTRANS,
     ARM_SWINTR,
-    ARM_MOV
+    ARM_MOV,
+
+    ARM_MAX
 } ArmInstrFormat;
 
 typedef struct _ArmCore ArmCore;
+
+extern ArmInstrFormat arm_lookup[1 << 8][1 << 4];
 
 void arm_generate_lookup();
 ArmInstrFormat arm_decode_instr(ArmInstr instr);
@@ -283,7 +287,7 @@ void exec_arm_multiply(ArmCore* cpu, ArmInstr instr);
 void exec_arm_multiply_long(ArmCore* cpu, ArmInstr instr);
 void exec_arm_multiply_short(ArmCore* cpu, ArmInstr instr);
 void exec_arm_swap(ArmCore* cpu, ArmInstr instr);
-void exec_arm_branch_ex(ArmCore* cpu, ArmInstr instr);
+void exec_arm_branch_exch(ArmCore* cpu, ArmInstr instr);
 void exec_arm_leading_zeros(ArmCore* cpu, ArmInstr instr);
 void exec_arm_sat_arith(ArmCore* cpu, ArmInstr instr);
 void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr);

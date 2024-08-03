@@ -134,11 +134,11 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
                             dec.data_proc.opcode = A_MOV;
                             break;
                         case 3:
-                            dec.branch_ex.c4 = 1;
-                            dec.branch_ex.l = instr.hi_ops.h1;
-                            dec.branch_ex.c3 = 0b00;
-                            dec.branch_ex.c1 = 0b00010010;
-                            dec.branch_ex.rn =
+                            dec.branch_exch.c4 = 1;
+                            dec.branch_exch.l = instr.hi_ops.h1;
+                            dec.branch_exch.c3 = 0b00;
+                            dec.branch_exch.c1 = 0b00010010;
+                            dec.branch_exch.rn =
                                 instr.hi_ops.rs | (instr.hi_ops.h2 << 3);
                             break;
                     }
