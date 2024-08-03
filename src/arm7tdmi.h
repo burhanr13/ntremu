@@ -1,8 +1,8 @@
 #ifndef _ARM7TDMI_H
 #define _ARM7TDMI_H
 
-#include "arm.h"
-#include "arm_core.h"
+#include "arm/arm.h"
+#include "arm/arm_core.h"
 #include "types.h"
 
 typedef struct _NDS NDS;

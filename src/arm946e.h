@@ -1,8 +1,8 @@
 #ifndef _ARM946E_H
 #define _ARM946E_H
 
-#include "arm.h"
-#include "arm_core.h"
+#include "arm/arm.h"
+#include "arm/arm_core.h"
 #include "types.h"
 
 #define ITCMSIZE (1 << 15)

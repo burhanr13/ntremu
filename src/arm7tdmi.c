@@ -2,11 +2,11 @@
 
 #include <stdio.h>
 
-#include "arm.h"
-#include "arm_core.h"
+#include "arm/arm.h"
+#include "arm/arm_core.h"
 #include "bus7.h"
 #include "nds.h"
-#include "thumb.h"
+#include "arm/thumb.h"
 #include "types.h"
 
 void arm7_init(Arm7TDMI* cpu) {

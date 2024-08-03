@@ -2,7 +2,7 @@
 #define _THUMB_H
 
 #include "arm.h"
-#include "types.h"
+#include "../types.h"
 
 typedef union {
     u16 h;
