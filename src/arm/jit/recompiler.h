@@ -16,8 +16,11 @@ typedef bool (*ArmCompileFunc)(IRBlock*, ArmCore*, u32, ArmInstr);
     bool compile_arm_##f(IRBlock* block, ArmCore* cpu, u32 addr, ArmInstr instr)
 
 DECL_ARM_COMPILE(data_proc);
+DECL_ARM_COMPILE(psr_trans);
+DECL_ARM_COMPILE(branch_exch);
 DECL_ARM_COMPILE(half_trans);
 DECL_ARM_COMPILE(single_trans);
+DECL_ARM_COMPILE(block_trans);
 DECL_ARM_COMPILE(branch);
 
 #endif

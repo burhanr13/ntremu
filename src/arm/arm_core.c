@@ -60,6 +60,7 @@ RegBank get_bank(CpuMode mode) {
 }
 
 void cpu_update_mode(ArmCore* cpu, CpuMode old) {
+    if (cpu->cpsr.m == old) return;
     RegBank old_bank = get_bank(old);
     cpu->banked_sp[old_bank] = cpu->sp;
     cpu->banked_lr[old_bank] = cpu->lr;

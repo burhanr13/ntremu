@@ -4,6 +4,7 @@
 
 #include "arm/arm.h"
 #include "arm/arm_core.h"
+#include "arm/jit/jit_block.h"
 #include "bus9.h"
 #include "nds.h"
 #include "arm/thumb.h"

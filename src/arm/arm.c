@@ -1246,36 +1246,3 @@ void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
             break;
     }
 }
-
-JITBlock* get_jitblock(ArmCore* cpu, u32 addr) {
-    u32 addrhi = addr >> 16;
-    u32 addrlo = (addr & 0xffff) >> 1;
-
-    if (!cpu->jit_cache) cpu->jit_cache = calloc(1 << 16, sizeof(JITBlock**));
-
-    if (!cpu->jit_cache[addrhi])
-        cpu->jit_cache[addrhi] = calloc(1 << 15, sizeof(JITBlock*));
-
-    if (!cpu->jit_cache[addrhi][addrlo])
-        cpu->jit_cache[addrhi][addrlo] = create_jit_block(cpu, addr);
-    else if (cpu->jit_cache[addrhi][addrlo]->t != cpu->cpsr.t ||
-             cpu->jit_cache[addrhi][addrlo]->v5 != cpu->v5) {
-        destroy_jit_block(cpu->jit_cache[addrhi][addrlo]);
-        cpu->jit_cache[addrhi][addrlo] = create_jit_block((ArmCore*) cpu, addr);
-    }
-
-    return cpu->jit_cache[addrhi][addrlo];
-}
-
-void arm_exec_jit(ArmCore* cpu) {
-    JITBlock* block = get_jitblock(cpu, cpu->cur_instr_addr);
-    if (block) {
-        jit_exec(block);
-        cpu->cur_instr_addr = cpu->pc;
-        cpu->pending_flush = true;
-        cpu->cycles =
-            (block->end_addr - block->start_addr) >> (cpu->cpsr.t ? 1 : 2);
-    } else {
-        arm_exec_instr(cpu);
-    }
-}

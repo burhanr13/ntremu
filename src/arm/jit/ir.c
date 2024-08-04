@@ -20,6 +20,12 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
             case IR_STORE_CPSR:
                 cpu->cpsr.w = OP(2);
                 break;
+            case IR_LOAD_SPSR:
+                v[i] = cpu->spsr;
+                break;
+            case IR_STORE_SPSR:
+                cpu->spsr = OP(2);
+                break;
             case IR_LOAD_MEM8:
                 v[i] = cpu->read8(cpu, OP(1), false);
                 break;
@@ -61,18 +67,40 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
             case IR_NOT:
                 v[i] = ~OP(2);
                 break;
-            case IR_LSL:
-                v[i] = OP(1) << OP(2);
+            case IR_LSL: {
+                u32 shamt = OP(2);
+                if (shamt >= 32) {
+                    v[i] = 0;
+                } else {
+                    v[i] = OP(1) << shamt;
+                }
                 break;
-            case IR_LSR:
-                v[i] = OP(1) >> OP(2);
+            }
+            case IR_LSR: {
+                u32 shamt = OP(2);
+                if (shamt >= 32) {
+                    v[i] = 0;
+                } else {
+                    v[i] = OP(1) >> shamt;
+                }
                 break;
-            case IR_ASR:
-                v[i] = (s32) OP(1) >> OP(2);
+            }
+            case IR_ASR: {
+                u32 shamt = OP(2);
+                if (shamt >= 32) {
+                    shamt = 31;
+                }
+                v[i] = (s32) OP(1) >> shamt;
                 break;
-            case IR_ROR:
-                v[i] = OP(1) >> OP(2) | OP(1) << (32 - OP(2));
+            }
+            case IR_ROR: {
+                u32 shamt = OP(2);
+                if (shamt >= 32) {
+                    shamt &= 0x1f;
+                }
+                v[i] = OP(1) >> shamt | OP(1) << (32 - shamt);
                 break;
+            }
             case IR_ADD:
                 v[i] = OP(1) + OP(2);
                 break;
@@ -175,7 +203,7 @@ void disasm_instr(IRInstr inst, int i) {
         case IR_NOP:
             return;
         case IR_MOV:
-            DISASM(, 1, 0, 1);
+            DISASM(mov, 1, 0, 1);
         case IR_AND:
             DISASM(and, 1, 1, 1);
         case IR_OR:
@@ -218,6 +246,7 @@ void disasm_instr(IRInstr inst, int i) {
 }
 
 void ir_disassemble(IRBlock* block) {
+    eprintf("===== IR Block 0x%08x =====\n", block->start_addr);
     for (int i = 1; i < block->code.size; i++) {
         disasm_instr(block->code.d[i], i);
         eprintf("\n");

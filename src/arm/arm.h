@@ -302,6 +302,4 @@ DECL_ARM_EXEC(sw_intr);
 
 void arm_disassemble(ArmInstr instr, u32 addr, FILE* out);
 
-void arm_exec_jit(ArmCore* cpu);
-
 #endif

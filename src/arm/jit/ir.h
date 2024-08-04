@@ -11,6 +11,8 @@ enum {
     IR_STORE_REG,
     IR_LOAD_CPSR,
     IR_STORE_CPSR,
+    IR_LOAD_SPSR,
+    IR_STORE_SPSR,
     IR_LOAD_MEM8,
     IR_LOAD_MEMS8,
     IR_LOAD_MEM16,
@@ -56,11 +58,14 @@ typedef struct {
     Vector(IRInstr) code;
     u32 start_addr;
     u32 end_addr;
+    bool modeswitch;
+    bool thumbswitch;
 } IRBlock;
 
-static inline void irblock_init(IRBlock* block) {
+static inline void irblock_init(IRBlock* block, u32 addr) {
     Vec_init(block->code);
-    Vec_push(block->code, (IRInstr){.opcode = IR_NOP});
+    block->start_addr = block->end_addr = addr;
+    block->modeswitch = block->thumbswitch = false;
 }
 static inline void irblock_free(IRBlock* block) {
     Vec_free(block->code);
