@@ -1,5 +1,5 @@
-#ifndef _DLDI_H
-#define _DLDI_H
+#ifndef DLDI_H
+#define DLDI_H
 
 #include "types.h"
 

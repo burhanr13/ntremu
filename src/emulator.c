@@ -7,10 +7,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "arm.h"
+#include "arm/arm.h"
 #include "emulator_state.h"
 #include "nds.h"
-#include "thumb.h"
+#include "arm/thumb.h"
 
 #define TRANSLATE_SPEED 5.0
 #define ROTATE_SPEED 0.02

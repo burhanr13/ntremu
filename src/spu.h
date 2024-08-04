@@ -1,5 +1,5 @@
-#ifndef _SPU_H
-#define _SPU_H
+#ifndef SPU_H
+#define SPU_H
 
 #include "types.h"
 

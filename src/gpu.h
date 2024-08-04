@@ -1,5 +1,5 @@
-#ifndef _GPU_H
-#define _GPU_H
+#ifndef GPU_H
+#define GPU_H
 
 #include <pthread.h>
 

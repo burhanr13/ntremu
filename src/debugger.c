@@ -6,14 +6,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "arm.h"
-#include "arm_core.h"
+#include "arm/arm.h"
+#include "arm/arm_core.h"
 #include "bus7.h"
 #include "bus9.h"
 #include "emulator.h"
 #include "nds.h"
 #include "scheduler.h"
-#include "thumb.h"
+#include "arm/thumb.h"
 
 const char* help = "Debugger commands:\n"
                    "c -- continue emulation\n"

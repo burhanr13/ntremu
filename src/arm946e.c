@@ -2,11 +2,11 @@
 
 #include <stdio.h>
 
-#include "arm.h"
-#include "arm_core.h"
+#include "arm/arm.h"
+#include "arm/arm_core.h"
 #include "bus9.h"
 #include "nds.h"
-#include "thumb.h"
+#include "arm/thumb.h"
 #include "types.h"
 
 void arm9_init(Arm946E* cpu) {
@@ -92,7 +92,7 @@ u32 arm9_read32(Arm946E* cpu, u32 addr) {
 
 void arm9_write8(Arm946E* cpu, u32 addr, u8 data) {
     cpu->c.cycles++;
-    WRITE(8,addr);
+    WRITE(8, addr);
 }
 
 void arm9_write16(Arm946E* cpu, u32 addr, u16 data) {

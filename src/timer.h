@@ -1,5 +1,5 @@
-#ifndef _TIMER_H
-#define _TIMER_H
+#ifndef TIMER_H
+#define TIMER_H
 
 #include "io.h"
 #include "scheduler.h"

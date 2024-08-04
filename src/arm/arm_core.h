@@ -1,10 +1,10 @@
-#ifndef _ARM_CORE_H
-#define _ARM_CORE_H
+#ifndef ARM_CORE_H
+#define ARM_CORE_H
 
 #include <stdio.h>
 
 #include "arm.h"
-#include "types.h"
+#include "../types.h"
 
 typedef enum { B_USER, B_FIQ, B_SVC, B_ABT, B_IRQ, B_UND, B_CT } RegBank;
 typedef enum {

@@ -1,9 +1,9 @@
-#ifndef _ARM_H
-#define _ARM_H
+#ifndef ARM_H
+#define ARM_H
 
 #include <stdio.h>
 
-#include "types.h"
+#include "../types.h"
 
 enum {
     C_EQ,

@@ -1,5 +1,5 @@
-#ifndef _NDS_H
-#define _NDS_H
+#ifndef NDS_H
+#define NDS_H
 
 #include "arm7tdmi.h"
 #include "arm946e.h"

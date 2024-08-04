@@ -1,5 +1,5 @@
-#ifndef _DMA_H
-#define _DMA_H
+#ifndef DMA_H
+#define DMA_H
 
 #include "types.h"
 

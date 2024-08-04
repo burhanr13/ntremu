@@ -1,8 +1,8 @@
-#ifndef _THUMB_H
-#define _THUMB_H
+#ifndef THUMB_H
+#define THUMB_H
 
 #include "arm.h"
-#include "types.h"
+#include "../types.h"
 
 typedef union {
     u16 h;
