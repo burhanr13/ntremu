@@ -1,5 +1,7 @@
 #include "arm_core.h"
 
+#include <stdlib.h>
+
 #include "thumb.h"
 
 void cpu_fetch_instr(ArmCore* cpu) {

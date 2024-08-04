@@ -1,6 +1,9 @@
 #include "arm.h"
 
+#include <stdlib.h>
+
 #include "arm_core.h"
+#include "jit/jit_block.h"
 
 ArmInstrFormat arm_lookup[1 << 8][1 << 4];
 
@@ -125,6 +128,11 @@ static inline bool eval_cond(ArmCore* cpu, ArmInstr instr) {
 }
 
 void arm_exec_instr(ArmCore* cpu) {
+    if (cpu->pending_flush) {
+        cpu_flush(cpu);
+        cpu->pending_flush = false;
+    }
+
     ArmInstr instr = cpu->cur_instr;
 
 #ifdef CPULOG
@@ -177,7 +185,7 @@ static u32 arm_shifter(ArmCore* cpu, u8 shift, u32 operand, u32* carry) {
     return 0;
 }
 
-void exec_arm_mov(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(mov) {
     u32 op2 = cpu->r[instr.data_proc.op2 & 0xf];
     u32 shift = instr.data_proc.op2 >> 7;
     u32 c = cpu->cpsr.c;
@@ -203,7 +211,7 @@ void exec_arm_mov(ArmCore* cpu, ArmInstr instr) {
     if (instr.data_proc.rd == 15) cpu_flush(cpu);
 }
 
-void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(data_proc) {
     u32 op1, op2;
 
     u32 z, c = cpu->cpsr.c, n, v = cpu->cpsr.v;
@@ -426,7 +434,7 @@ void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_psr_trans(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(psr_trans) {
     if (instr.psr_trans.op) {
         u32 op2;
         if (instr.psr_trans.i) {
@@ -465,7 +473,7 @@ void exec_arm_psr_trans(ArmCore* cpu, ArmInstr instr) {
     cpu_fetch_instr(cpu);
 }
 
-void exec_arm_multiply(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(multiply) {
     cpu_fetch_instr(cpu);
     u32 res = cpu->r[instr.multiply.rm] * cpu->r[instr.multiply.rs];
     if (instr.multiply.a) {
@@ -478,7 +486,7 @@ void exec_arm_multiply(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_multiply_long(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(multiply_long) {
     cpu_fetch_instr(cpu);
     u64 res;
     if (instr.multiply_long.u) {
@@ -502,7 +510,7 @@ void exec_arm_multiply_long(ArmCore* cpu, ArmInstr instr) {
     cpu->r[instr.multiply_long.rdhi] = res >> 32;
 }
 
-void exec_arm_multiply_short(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(multiply_short) {
     if (!cpu->v5) {
         cpu_handle_interrupt(cpu, I_UND);
         return;
@@ -550,7 +558,7 @@ void exec_arm_multiply_short(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_swap(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(swap) {
     u32 addr = cpu->r[instr.swap.rn];
     cpu_fetch_instr(cpu);
     if (instr.swap.b) {
@@ -564,7 +572,7 @@ void exec_arm_swap(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_branch_exch(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(branch_exch) {
     u32 dest = cpu->r[instr.branch_exch.rn];
     if (instr.branch_exch.l && cpu->v5) {
         if (cpu->cpsr.t) {
@@ -579,7 +587,7 @@ void exec_arm_branch_exch(ArmCore* cpu, ArmInstr instr) {
     cpu_flush(cpu);
 }
 
-void exec_arm_leading_zeros(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(leading_zeros) {
     if (!cpu->v5) {
         cpu_handle_interrupt(cpu, I_UND);
         return;
@@ -597,7 +605,7 @@ void exec_arm_leading_zeros(ArmCore* cpu, ArmInstr instr) {
     cpu_fetch_instr(cpu);
 }
 
-void exec_arm_sat_arith(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(sat_arith) {
     if (!cpu->v5) {
         cpu_handle_interrupt(cpu, I_UND);
         return;
@@ -632,7 +640,7 @@ void exec_arm_sat_arith(ArmCore* cpu, ArmInstr instr) {
     cpu_fetch_instr(cpu);
 }
 
-void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(half_trans) {
     if (cpu->v5 && !instr.half_trans.l && instr.half_trans.s &&
         (instr.half_trans.rd & 1)) {
         cpu_handle_interrupt(cpu, I_UND);
@@ -698,7 +706,7 @@ void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_single_trans(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(single_trans) {
     if (instr.cond == 0xf && cpu->v5) {
         cpu_fetch_instr(cpu);
         return;
@@ -755,7 +763,7 @@ void exec_arm_single_trans(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_undefined(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(undefined) {
     cpu_handle_interrupt(cpu, I_UND);
 }
 
@@ -770,7 +778,7 @@ static u32* get_user_reg(ArmCore* cpu, int reg) {
     return NULL;
 }
 
-void exec_arm_block_trans(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(block_trans) {
     int rcount = 0;
     int rlist[16];
     u32 addr = cpu->r[instr.block_trans.rn];
@@ -865,7 +873,7 @@ void exec_arm_block_trans(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_branch(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(branch) {
     u32 offset = instr.branch.offset;
     offset = (s32) (offset << 8) >> 8;
     if (cpu->cpsr.t) offset <<= 1;
@@ -901,7 +909,7 @@ void exec_arm_branch(ArmCore* cpu, ArmInstr instr) {
     cpu_flush(cpu);
 }
 
-void exec_arm_cp_reg_trans(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(cp_reg_trans) {
     if (!cpu->cp15_read || !cpu->cp15_write) {
         cpu_handle_interrupt(cpu, I_UND);
         return;
@@ -922,7 +930,7 @@ void exec_arm_cp_reg_trans(ArmCore* cpu, ArmInstr instr) {
     }
 }
 
-void exec_arm_sw_intr(ArmCore* cpu, ArmInstr instr) {
+DECL_ARM_EXEC(sw_intr) {
     cpu_handle_interrupt(cpu, I_SWI);
 }
 
@@ -1236,5 +1244,38 @@ void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
             break;
         default:
             break;
+    }
+}
+
+JITBlock* get_jitblock(ArmCore* cpu, u32 addr) {
+    u32 addrhi = addr >> 16;
+    u32 addrlo = (addr & 0xffff) >> 1;
+
+    if (!cpu->jit_cache) cpu->jit_cache = calloc(1 << 16, sizeof(JITBlock**));
+
+    if (!cpu->jit_cache[addrhi])
+        cpu->jit_cache[addrhi] = calloc(1 << 15, sizeof(JITBlock*));
+
+    if (!cpu->jit_cache[addrhi][addrlo])
+        cpu->jit_cache[addrhi][addrlo] = create_jit_block(cpu, addr);
+    else if (cpu->jit_cache[addrhi][addrlo]->t != cpu->cpsr.t ||
+             cpu->jit_cache[addrhi][addrlo]->v5 != cpu->v5) {
+        destroy_jit_block(cpu->jit_cache[addrhi][addrlo]);
+        cpu->jit_cache[addrhi][addrlo] = create_jit_block((ArmCore*) cpu, addr);
+    }
+
+    return cpu->jit_cache[addrhi][addrlo];
+}
+
+void arm_exec_jit(ArmCore* cpu) {
+    JITBlock* block = get_jitblock(cpu, cpu->cur_instr_addr);
+    if (block) {
+        jit_exec(block);
+        cpu->cur_instr_addr = cpu->pc;
+        cpu->pending_flush = true;
+        cpu->cycles =
+            (block->end_addr - block->start_addr) >> (cpu->cpsr.t ? 1 : 2);
+    } else {
+        arm_exec_instr(cpu);
     }
 }

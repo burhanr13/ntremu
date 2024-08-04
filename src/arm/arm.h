@@ -280,24 +280,28 @@ void arm_exec_instr(ArmCore* cpu);
 
 typedef void (*ArmExecFunc)(ArmCore*, ArmInstr);
 
-void exec_arm_mov(ArmCore* cpu, ArmInstr instr);
-void exec_arm_data_proc(ArmCore* cpu, ArmInstr instr);
-void exec_arm_psr_trans(ArmCore* cpu, ArmInstr instr);
-void exec_arm_multiply(ArmCore* cpu, ArmInstr instr);
-void exec_arm_multiply_long(ArmCore* cpu, ArmInstr instr);
-void exec_arm_multiply_short(ArmCore* cpu, ArmInstr instr);
-void exec_arm_swap(ArmCore* cpu, ArmInstr instr);
-void exec_arm_branch_exch(ArmCore* cpu, ArmInstr instr);
-void exec_arm_leading_zeros(ArmCore* cpu, ArmInstr instr);
-void exec_arm_sat_arith(ArmCore* cpu, ArmInstr instr);
-void exec_arm_half_trans(ArmCore* cpu, ArmInstr instr);
-void exec_arm_single_trans(ArmCore* cpu, ArmInstr instr);
-void exec_arm_undefined(ArmCore* cpu, ArmInstr instr);
-void exec_arm_block_trans(ArmCore* cpu, ArmInstr instr);
-void exec_arm_branch(ArmCore* cpu, ArmInstr instr);
-void exec_arm_cp_reg_trans(ArmCore* cpu, ArmInstr instr);
-void exec_arm_sw_intr(ArmCore* cpu, ArmInstr instr);
+#define DECL_ARM_EXEC(f) void exec_arm_##f(ArmCore* cpu, ArmInstr instr)
+
+DECL_ARM_EXEC(mov);
+DECL_ARM_EXEC(data_proc);
+DECL_ARM_EXEC(psr_trans);
+DECL_ARM_EXEC(multiply);
+DECL_ARM_EXEC(multiply_long);
+DECL_ARM_EXEC(multiply_short);
+DECL_ARM_EXEC(swap);
+DECL_ARM_EXEC(branch_exch);
+DECL_ARM_EXEC(leading_zeros);
+DECL_ARM_EXEC(sat_arith);
+DECL_ARM_EXEC(half_trans);
+DECL_ARM_EXEC(single_trans);
+DECL_ARM_EXEC(undefined);
+DECL_ARM_EXEC(block_trans);
+DECL_ARM_EXEC(branch);
+DECL_ARM_EXEC(cp_reg_trans);
+DECL_ARM_EXEC(sw_intr);
 
 void arm_disassemble(ArmInstr instr, u32 addr, FILE* out);
+
+void arm_exec_jit(ArmCore* cpu);
 
 #endif

@@ -6,14 +6,18 @@
 #include "../../types.h"
 #include "ir.h"
 
-IRBlock* compile_block(ArmCore* cpu, u32 start_addr);
+void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr);
 
 bool arm_compile_instr(IRBlock* block, ArmCore* cpu, u32 addr, ArmInstr instr);
 
 typedef bool (*ArmCompileFunc)(IRBlock*, ArmCore*, u32, ArmInstr);
 
-bool compile_arm_data_proc(IRBlock* block, ArmCore* cpu, u32 addr,
-                           ArmInstr instr);
-bool compile_arm_branch(IRBlock* block, ArmCore* cpu, u32 addr, ArmInstr instr);
+#define DECL_ARM_COMPILE(f)                                                    \
+    bool compile_arm_##f(IRBlock* block, ArmCore* cpu, u32 addr, ArmInstr instr)
+
+DECL_ARM_COMPILE(data_proc);
+DECL_ARM_COMPILE(half_trans);
+DECL_ARM_COMPILE(single_trans);
+DECL_ARM_COMPILE(branch);
 
 #endif

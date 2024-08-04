@@ -3,13 +3,22 @@
 
 #include <stdlib.h>
 
+#include "../arm_core.h"
 #include "../../types.h"
 
 enum {
-    IR_LOAD_R0,
-    IR_LOAD_CPSR = IR_LOAD_R0 + 16,
-    IR_STORE_R0,
-    IR_STORE_CPSR = IR_STORE_R0 + 16,
+    IR_LOAD_REG,
+    IR_STORE_REG,
+    IR_LOAD_CPSR,
+    IR_STORE_CPSR,
+    IR_LOAD_MEM8,
+    IR_LOAD_MEMS8,
+    IR_LOAD_MEM16,
+    IR_LOAD_MEMS16,
+    IR_LOAD_MEM32,
+    IR_STORE_MEM8,
+    IR_STORE_MEM16,
+    IR_STORE_MEM32,
     IR_NOP,
     IR_MOV,
     IR_AND,
@@ -43,22 +52,26 @@ typedef struct {
     u32 op2;
 } IRInstr;
 
-#define IR_LOAD_R(n) (IR_LOAD_R0 + n)
-#define IR_STORE_R(n) (IR_STORE_R0 + n)
-
 typedef struct {
     Vector(IRInstr) code;
+    u32 start_addr;
+    u32 end_addr;
 } IRBlock;
 
 static inline void irblock_init(IRBlock* block) {
     Vec_init(block->code);
+    Vec_push(block->code, (IRInstr){.opcode = IR_NOP});
 }
-static inline void irblock_destroy(IRBlock* block) {
+static inline void irblock_free(IRBlock* block) {
     Vec_free(block->code);
 }
 static inline u32 irblock_write(IRBlock* block, IRInstr instr) {
     Vec_push(block->code, instr);
-    return block->code.size;
+    return block->code.size - 1;
 }
+
+void ir_interpret(IRBlock* block, ArmCore* cpu);
+
+void ir_disassemble(IRBlock* block);
 
 #endif

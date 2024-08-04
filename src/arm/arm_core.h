@@ -29,6 +29,7 @@ typedef enum {
 } CpuInterrupt;
 
 typedef struct _ArmCore ArmCore;
+typedef struct _JITBlock JITBlock;
 
 typedef struct _ArmCore {
     union {
@@ -81,6 +82,9 @@ typedef struct _ArmCore {
 
     u32 (*cp15_read)(ArmCore* cpu, u32 cn, u32 cm, u32 cp);
     void (*cp15_write)(ArmCore* cpu, u32 cn, u32 cm, u32 cp, u32 data);
+
+    JITBlock*** jit_cache;
+    bool pending_flush;
 
     bool v5;
     u32 vector_base;

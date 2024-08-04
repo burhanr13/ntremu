@@ -40,7 +40,8 @@ bool arm9_step(Arm946E* cpu) {
     if (!cpu->c.cpsr.i && cpu->c.irq) {
         cpu_handle_interrupt((ArmCore*) cpu, I_IRQ);
     } else {
-        arm_exec_instr((ArmCore*) cpu);
+        // arm_exec_instr((ArmCore*) cpu);
+        arm_exec_jit((ArmCore*) cpu);
     }
     if (cpu->c.cycles == 0) cpu->c.cycles = 1;
     return true;
