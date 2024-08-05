@@ -17,7 +17,9 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     block->modeswitch = block->ir.modeswitch;
     block->thumbswitch = block->ir.thumbswitch;
 
-    //ir_disassemble(&block->ir);
+#ifdef IR_DISASM
+    ir_disassemble(&block->ir);
+#endif
 
     return block;
 }

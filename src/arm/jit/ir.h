@@ -31,14 +31,17 @@ enum {
     IR_LSR,
     IR_ASR,
     IR_ROR,
+    IR_RRC,
     IR_ADD,
     IR_SUB,
     IR_ADC,
     IR_SBC,
-    IR_SETN,
-    IR_SETZ,
+    IR_GETN,
+    IR_GETZ,
+    IR_GETC,
+    IR_GETV,
     IR_SETC,
-    IR_SETV,
+    IR_GETCIFZ,
     IR_JZ,
     IR_JNZ,
     IR_END,
@@ -77,6 +80,7 @@ static inline u32 irblock_write(IRBlock* block, IRInstr instr) {
 
 void ir_interpret(IRBlock* block, ArmCore* cpu);
 
+void ir_disasm_instr(IRInstr inst, int i);
 void ir_disassemble(IRBlock* block);
 
 #endif

@@ -2,9 +2,19 @@
 
 #define OP(n) (inst.imm##n ? inst.op##n : v[inst.op##n])
 
+#define ADDCV(op1, op2, c)                                                     \
+    {                                                                          \
+        v[i] = op1 + op2;                                                      \
+        u32 tmpc = v[i] < op1;                                                 \
+        v[i] += c;                                                             \
+        cf = tmpc || v[i] < op1 + op2;                                         \
+        vf = ((op1 ^ v[i]) & ~(op1 ^ op2)) >> 31;                              \
+    }
+
 void ir_interpret(IRBlock* block, ArmCore* cpu) {
     u32 i = 0;
     u32* v = malloc(sizeof(u32) * block->code.size);
+    bool cf, vf;
     while (true) {
         IRInstr inst = block->code.d[i];
         switch (inst.opcode) {
@@ -101,25 +111,38 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 v[i] = OP(1) >> shamt | OP(1) << (32 - shamt);
                 break;
             }
+            case IR_RRC:
+                v[i] = OP(1) >> 1 | cf << 31;
+                break;
             case IR_ADD:
-                v[i] = OP(1) + OP(2);
+                ADDCV(OP(1), OP(2), 0);
                 break;
             case IR_SUB:
-                v[i] = OP(1) - OP(2);
+                ADDCV(OP(1), ~OP(2), 1);
                 break;
             case IR_ADC:
+                ADDCV(OP(1), OP(2), cf);
                 break;
             case IR_SBC:
+                ADDCV(OP(1), ~OP(2), cf);
                 break;
-            case IR_SETN:
+            case IR_GETN:
                 v[i] = OP(2) >> 31;
                 break;
-            case IR_SETZ:
+            case IR_GETZ:
                 v[i] = OP(2) == 0;
                 break;
-            case IR_SETC:
+            case IR_GETC:
+                v[i] = cf;
                 break;
-            case IR_SETV:
+            case IR_GETV:
+                v[i] = vf;
+                break;
+            case IR_SETC:
+                cf = OP(2) != 0;
+                break;
+            case IR_GETCIFZ:
+                v[i] = OP(1) ? OP(2) : cf;
                 break;
             case IR_JZ:
                 if (OP(1) == 0) i += OP(2) - 1;
@@ -132,6 +155,12 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 return;
                 break;
         }
+#ifdef IR_TRACE
+        if (block->start_addr == IR_TRACE_ADDR) {
+            ir_disasm_instr(inst, i);
+            eprintf(" [ = 0x%x, cf=%d]\n", v[i], cf);
+        }
+#endif
         i++;
     }
 }
@@ -174,7 +203,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
     eprintf(" %d", inst.op2 + i);                                              \
     return
 
-void disasm_instr(IRInstr inst, int i) {
+void ir_disasm_instr(IRInstr inst, int i) {
     switch (inst.opcode) {
         case IR_LOAD_REG:
             DISASM_REG(load_reg, 1, 0);
@@ -220,6 +249,8 @@ void disasm_instr(IRInstr inst, int i) {
             DISASM(asr, 1, 1, 1);
         case IR_ROR:
             DISASM(ror, 1, 1, 1);
+        case IR_RRC:
+            DISASM(rrc, 1, 1, 0);
         case IR_ADD:
             DISASM(add, 1, 1, 1);
         case IR_SUB:
@@ -228,14 +259,18 @@ void disasm_instr(IRInstr inst, int i) {
             DISASM(adc, 1, 1, 1);
         case IR_SBC:
             DISASM(sbc, 1, 1, 1);
-        case IR_SETN:
-            DISASM(setn, 1, 0, 1);
-        case IR_SETZ:
-            DISASM(setz, 1, 0, 1);
+        case IR_GETN:
+            DISASM(getn, 1, 0, 1);
+        case IR_GETZ:
+            DISASM(getz, 1, 0, 1);
+        case IR_GETC:
+            DISASM(getc, 1, 0, 0);
+        case IR_GETV:
+            DISASM(getv, 1, 0, 0);
         case IR_SETC:
-            DISASM(setc, 1, 0, 0);
-        case IR_SETV:
-            DISASM(setv, 1, 0, 0);
+            DISASM(setc, 0, 0, 1);
+        case IR_GETCIFZ:
+            DISASM(getcifz, 1, 1, 1);
         case IR_JZ:
             DISASM_JMP(jz, i);
         case IR_JNZ:
@@ -248,7 +283,7 @@ void disasm_instr(IRInstr inst, int i) {
 void ir_disassemble(IRBlock* block) {
     eprintf("===== IR Block 0x%08x =====\n", block->start_addr);
     for (int i = 1; i < block->code.size; i++) {
-        disasm_instr(block->code.d[i], i);
+        ir_disasm_instr(block->code.d[i], i);
         eprintf("\n");
     }
 }
