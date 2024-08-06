@@ -78,6 +78,12 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
             case IR_STORE_SPSR:
                 cpu->spsr = OP(2);
                 break;
+            case IR_LOAD_THUMB:
+                v[i] = cpu->cpsr.t;
+                break;
+            case IR_STORE_THUMB:
+                cpu->cpsr.t = OP(2);
+                break;
             case IR_READ_CP: {
                 ArmInstr cpinst = {OP(1)};
                 if (cpinst.cp_reg_trans.cpnum == 15) {
@@ -241,7 +247,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 v[i] = vf;
                 break;
             case IR_SETC:
-                cf = OP(2) != 0;
+                cf = OP(2);
                 break;
             case IR_GETCIFZ:
                 v[i] = OP(1) ? OP(2) : cf;
@@ -351,6 +357,10 @@ void ir_disasm_instr(IRInstr inst, int i) {
             DISASM(load_spsr, 1, 0, 0);
         case IR_STORE_SPSR:
             DISASM(store_spsr, 0, 0, 1);
+        case IR_LOAD_THUMB:
+            DISASM(load_thumb, 1, 0, 0);
+        case IR_STORE_THUMB:
+            DISASM(store_thumb, 0, 0, 1);
         case IR_READ_CP:
             DISASM(read_cp, 1, 1, 0);
             break;

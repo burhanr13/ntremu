@@ -19,6 +19,8 @@ typedef enum {
     IR_STORE_CPSR,
     IR_LOAD_SPSR,
     IR_STORE_SPSR,
+    IR_LOAD_THUMB,
+    IR_STORE_THUMB,
     IR_READ_CP,
     IR_WRITE_CP,
     IR_LOAD_MEM8,
@@ -43,19 +45,23 @@ typedef enum {
 
     IR_NOP,
     IR_MOV,
+
     IR_AND,
     IR_OR,
     IR_XOR,
     IR_NOT,
+
     IR_LSL,
     IR_LSR,
     IR_ASR,
     IR_ROR,
     IR_RRC,
+
     IR_ADD,
     IR_SUB,
     IR_ADC,
     IR_SBC,
+    
     IR_MUL,
     IR_SMULH,
     IR_UMULH,

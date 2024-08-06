@@ -6,7 +6,7 @@
 #define NOP                                                                    \
     ((IRInstr){.opcode = IR_NOP, .imm1 = 1, .imm2 = 1, .op1 = 0, .op2 = 0})
 
-void optimize_loadstore_reg(IRBlock* block) {
+void optimize_loadstore(IRBlock* block) {
     u32 vreg[16] = {0};
     bool immreg[16] = {0};
     u32 laststorereg[16] = {0};
@@ -214,6 +214,17 @@ void optimize_constprop(IRBlock* block) {
                 case IR_GETZ:
                     OPTI(inst->op2 == 0);
                     break;
+                case IR_GETCIFZ:
+                    if (inst->op1) {
+                        OPTI(inst->op2);
+                    } else {
+                        *inst = (IRInstr){.opcode = IR_GETC,
+                                          .imm1 = 1,
+                                          .imm2 = 1,
+                                          .op1 = 0,
+                                          .op2 = 0};
+                    }
+                    break;
                 case IR_PCMASK:
                     OPTI(inst->op1 ? ~1 : ~3);
                     break;
@@ -331,9 +342,7 @@ void optimize_constprop(IRBlock* block) {
         } else if (inst->imm1) {
             switch (inst->opcode) {
                 case IR_MOV:
-                    vops[i] = inst->op2;
-                    vimm[i] = false;
-                    *inst = NOP;
+                    OPTV(inst->op2);
                     break;
                 case IR_AND:
                     if (inst->op1 == 0) {
@@ -425,6 +434,7 @@ void optimize_deadcode(IRBlock* block) {
                     case IR_LOAD_REG_USR:
                     case IR_LOAD_CPSR:
                     case IR_LOAD_SPSR:
+                    case IR_LOAD_THUMB:
                         *inst = NOP;
                     default:
                         break;

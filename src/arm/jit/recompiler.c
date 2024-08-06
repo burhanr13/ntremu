@@ -79,8 +79,6 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
     block->end_addr = addr;
 }
 
-#define THUMB 0x00000020
-
 u32 compile_cond(IRBlock* block, ArmInstr instr) {
     switch (instr.cond & ~1) {
         case C_EQ:
@@ -373,9 +371,8 @@ DECL_ARM_COMPILE(data_proc) {
         if (instr.data_proc.rd == 15) {
             if (instr.data_proc.s) {
                 u32 vpc = EMITI0(LOAD_REG, 15);
-                EMIT00(LOAD_CPSR);
-                u32 vt = EMITVI(AND, LASTV, THUMB);
-                EMITV0(PCMASK, vt);
+                EMIT00(LOAD_THUMB);
+                EMITV0(PCMASK, LASTV);
                 EMITVV(AND, vpc, LASTV);
                 EMITV_STORE_REG(15, LASTV);
             } else {
@@ -509,13 +506,9 @@ DECL_ARM_COMPILE(branch_exch) {
             EMITI_STORE_REG(14, addr + 4);
         }
     }
-    EMIT00(LOAD_CPSR);
-    u32 tmp = EMITVI(AND, LASTV, ~THUMB);
-    u32 vt = EMITVI(AND, vdest, 1);
-    EMITVI(LSL, LASTV, 5);
-    EMITVV(OR, tmp, LASTV);
-    EMIT0V(STORE_CPSR, LASTV);
 
+    u32 vt = EMITVI(AND, vdest, 1);
+    EMIT0V(STORE_THUMB, vt);
     EMITV0(PCMASK, vt);
     EMITVV(AND, vdest, LASTV);
     EMITV_STORE_REG(15, LASTV);
@@ -683,12 +676,8 @@ DECL_ARM_COMPILE(single_trans) {
             if (instr.single_trans.rd == 15) {
                 if (cpu->v5) {
                     u32 vpc = EMITI0(LOAD_REG, 15);
-                    EMIT00(LOAD_CPSR);
-                    u32 tmp = EMITVI(AND, LASTV, ~THUMB);
                     u32 vt = EMITVI(AND, vpc, 1);
-                    EMITVI(LSL, LASTV, 5);
-                    EMITVV(OR, tmp, LASTV);
-                    EMIT0V(STORE_CPSR, LASTV);
+                    EMIT0V(STORE_THUMB, vt);
                     EMITV0(PCMASK, vt);
                     EMITVV(AND, vpc, LASTV);
                     EMITV_STORE_REG(15, LASTV);
@@ -809,20 +798,15 @@ DECL_ARM_COMPILE(block_trans) {
                 }
                 if (cpu->v5) {
                     u32 vpc = EMITI0(LOAD_REG, 15);
-                    EMIT00(LOAD_CPSR);
-                    u32 tmp = EMITVI(AND, LASTV, ~THUMB);
                     u32 vt = EMITVI(AND, vpc, 1);
-                    EMITVI(LSL, LASTV, 5);
-                    EMITVV(OR, tmp, LASTV);
-                    EMIT0V(STORE_CPSR, LASTV);
+                    EMIT0V(STORE_THUMB, vt);
                     EMITV0(PCMASK, vt);
                     EMITVV(AND, vpc, LASTV);
                     EMITV_STORE_REG(15, LASTV);
                 } else {
                     if (instr.block_trans.s) {
                         u32 vpc = EMITI0(LOAD_REG, 15);
-                        EMIT00(LOAD_CPSR);
-                        u32 vt = EMITVI(AND, LASTV, THUMB);
+                        u32 vt = EMIT00(LOAD_THUMB);
                         EMITV0(PCMASK, vt);
                         EMITVV(AND, vpc, LASTV);
                         EMITV_STORE_REG(15, LASTV);
@@ -871,9 +855,7 @@ DECL_ARM_COMPILE(branch) {
                 u32 vdest = EMITVI(ADD, LASTV, offset);
                 EMITI_STORE_REG(14, addr + 3);
                 if (instr.cond == 0xf && cpu->v5) {
-                    EMIT00(LOAD_CPSR);
-                    EMITVI(AND, LASTV, ~THUMB);
-                    EMIT0V(STORE_CPSR, LASTV);
+                    EMIT0I(STORE_THUMB, 0);
                     vdest = EMITVI(AND, vdest, ~3);
                 }
                 EMITV_STORE_REG(15, vdest);
@@ -888,9 +870,7 @@ DECL_ARM_COMPILE(branch) {
             EMITI_STORE_REG(14, addr + 4);
             if (instr.cond == 0xf && cpu->v5) {
                 dest += instr.branch.l << 1;
-                EMIT00(LOAD_CPSR);
-                EMITVI(OR, LASTV, THUMB);
-                EMIT0V(STORE_CPSR, LASTV);
+                EMIT0I(STORE_THUMB, 1);
             }
         }
     }
