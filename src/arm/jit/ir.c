@@ -1,18 +1,18 @@
 #include "ir.h"
 
 // #define IR_TRACE
-#define IR_TRACE_ADDR 0x2007be4
+#define IR_TRACE_ADDR 0x38021a8
 
 #define OP(n) (inst.imm##n ? inst.op##n : v[inst.op##n])
 
 #define ADDCV(op1, op2, c)                                                     \
-    {                                                                          \
+    do {                                                                       \
         v[i] = op1 + op2;                                                      \
         u32 tmpc = v[i] < op1;                                                 \
         v[i] += c;                                                             \
         cf = tmpc || v[i] < op1 + op2;                                         \
         vf = ((op1 ^ v[i]) & ~(op1 ^ op2)) >> 31;                              \
-    }
+    } while (false)
 
 void ir_interpret(IRBlock* block, ArmCore* cpu) {
     u32 i = 0;
@@ -24,7 +24,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
         v = malloc(sizeof(u32) * block->code.size);
     }
 #ifdef IR_TRACE
-    if (cpu->v5) eprintf("executing block at 0x%08x\n", block->start_addr);
+    // if (cpu->v5) eprintf("executing block at 0x%08x\n", block->start_addr);
 #endif
 
     bool cf, vf;
@@ -175,16 +175,37 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 v[i] = OP(1) >> 1 | cf << 31;
                 break;
             case IR_ADD:
-                ADDCV(OP(1), OP(2), 0);
+                if (block->code.d[i + 1].opcode == IR_GETC ||
+                    block->code.d[i + 3].opcode == IR_GETV ||
+                    block->code.d[i + 1].opcode == IR_ADC) {
+                    ADDCV(OP(1), OP(2), 0);
+                } else {
+                    v[i] = OP(1) + OP(2);
+                }
                 break;
             case IR_SUB:
-                ADDCV(OP(1), ~OP(2), 1);
+                if (block->code.d[i + 1].opcode == IR_GETC ||
+                    block->code.d[i + 3].opcode == IR_GETV) {
+                    ADDCV(OP(1), ~OP(2), 1);
+                } else {
+                    v[i] = OP(1) - OP(2);
+                }
                 break;
             case IR_ADC:
-                ADDCV(OP(1), OP(2), cf);
+                if (block->code.d[i + 1].opcode == IR_GETC ||
+                    block->code.d[i + 3].opcode == IR_GETV) {
+                    ADDCV(OP(1), OP(2), cf);
+                } else {
+                    v[i] = OP(1) + OP(2) + cf;
+                }
                 break;
             case IR_SBC:
-                ADDCV(OP(1), ~OP(2), cf);
+                if (block->code.d[i + 1].opcode == IR_GETC ||
+                    block->code.d[i + 3].opcode == IR_GETV) {
+                    ADDCV(OP(1), ~OP(2), cf);
+                } else {
+                    v[i] = OP(1) + ~OP(2) + cf;
+                }
                 break;
             case IR_MUL:
                 v[i] = OP(1) * OP(2);
@@ -395,9 +416,9 @@ void ir_disasm_instr(IRInstr inst, int i) {
         case IR_GETZ:
             DISASM(getz, 1, 0, 1);
         case IR_GETC:
-            DISASM(getc, 1, 0, 0);
+            DISASM(getc, 1, 0, 1);
         case IR_GETV:
-            DISASM(getv, 1, 0, 0);
+            DISASM(getv, 1, 0, 1);
         case IR_SETC:
             DISASM(setc, 0, 0, 1);
         case IR_GETCIFZ:
@@ -423,8 +444,13 @@ void ir_disasm_instr(IRInstr inst, int i) {
 
 void ir_disassemble(IRBlock* block) {
     eprintf("===== IR Block 0x%08x =====\n", block->start_addr);
+    u32 jmptarget = -1;
     for (int i = 0; i < block->code.size; i++) {
+        if (i == jmptarget) eprintf("%d:\n", i);
         if (block->code.d[i].opcode == IR_NOP) continue;
+        if (block->code.d[i].opcode == IR_JZ ||
+            block->code.d[i].opcode == IR_JNZ)
+            jmptarget = i + block->code.d[i].op2;
         ir_disasm_instr(block->code.d[i], i);
         eprintf("\n");
     }

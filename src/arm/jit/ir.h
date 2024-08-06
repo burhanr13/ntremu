@@ -29,6 +29,18 @@ typedef enum {
     IR_STORE_MEM8,
     IR_STORE_MEM16,
     IR_STORE_MEM32,
+
+    IR_SETC,
+
+    IR_JZ,
+    IR_JNZ,
+
+    IR_MODESWITCH,
+    IR_EXCEPTION,
+    
+    IR_BEGIN,
+    IR_END,
+
     IR_NOP,
     IR_MOV,
     IR_AND,
@@ -48,19 +60,14 @@ typedef enum {
     IR_SMULH,
     IR_UMULH,
     IR_CLZ,
+
     IR_GETN,
     IR_GETZ,
     IR_GETC,
     IR_GETV,
-    IR_SETC,
     IR_GETCIFZ,
+
     IR_PCMASK,
-    IR_JZ,
-    IR_JNZ,
-    IR_MODESWITCH,
-    IR_EXCEPTION,
-    IR_BEGIN,
-    IR_END,
 } IROpcode;
 
 typedef struct {

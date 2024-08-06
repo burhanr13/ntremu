@@ -30,7 +30,7 @@ void arm7_step(Arm7TDMI* cpu) {
         cpu_handle_exception((ArmCore*) cpu, E_IRQ);
         return;
     }
-    //arm_exec_instr((ArmCore*) cpu);
+    // arm_exec_instr((ArmCore*) cpu);
     arm_exec_jit((ArmCore*) cpu);
 }
 

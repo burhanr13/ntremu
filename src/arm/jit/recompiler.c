@@ -355,9 +355,9 @@ DECL_ARM_COMPILE(data_proc) {
             }
         } else {
             if (arith) {
-                EMIT00(GETC);
+                EMIT0V(GETC, vres);
                 EMITIV(STORE_FLAG, CF, LASTV);
-                EMIT00(GETV);
+                EMIT0V(GETV, vres);
                 EMITIV(STORE_FLAG, VF, LASTV);
             } else if (shiftc) {
                 EMITIV(STORE_FLAG, CF, shiftc);

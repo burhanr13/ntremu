@@ -15,15 +15,14 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     block->end_addr = block->ir.end_addr;
 
-// #ifdef IR_DISASM
-//     ir_disassemble(&block->ir);
-// #endif
-
     optimize_loadstore_reg(&block->ir);
     optimize_constprop(&block->ir);
+    optimize_chainjumps(&block->ir);
+    optimize_loadstore_reg(&block->ir);
+    optimize_constprop(&block->ir);
+    optimize_deadcode(&block->ir);
 
 #ifdef IR_DISASM
-    //eprintf("optimized :");
     ir_disassemble(&block->ir);
 #endif
 

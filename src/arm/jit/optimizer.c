@@ -2,6 +2,7 @@
 
 #define MOVX(_op2, imm)                                                        \
     ((IRInstr){.opcode = IR_MOV, .imm1 = 1, .imm2 = imm, .op1 = 0, .op2 = _op2})
+#define MOVI(op2) MOVX(op2, 1)
 #define NOP                                                                    \
     ((IRInstr){.opcode = IR_NOP, .imm1 = 1, .imm2 = 1, .op1 = 0, .op2 = 0})
 
@@ -19,14 +20,14 @@ void optimize_loadstore_reg(IRBlock* block) {
         IRInstr inst = block->code.d[i];
         if (i == jmptarget) {
             for (int r = 0; r < 16; r++) {
-                if (laststorereg[r] > jmpsource) {
+                if (laststorereg[r] > jmpsource || vreg[r] > jmpsource) {
                     laststorereg[r] = 0;
                     vreg[r] = 0;
                     immreg[r] = false;
                 }
             }
             for (int f = 0; f < 5; f++) {
-                if (laststoreflag[f] > jmpsource) {
+                if (laststoreflag[f] > jmpsource || vflag[f] > jmpsource) {
                     laststoreflag[f] = 0;
                     vflag[f] = 0;
                     immflag[f] = false;
@@ -124,8 +125,10 @@ void optimize_loadstore_reg(IRBlock* block) {
         u32 res = op1 + op2;                                                   \
         u32 tmpc = res < op1;                                                  \
         res += c;                                                              \
-        inst[1] = MOVX(tmpc || res < op1 + op2, 1);                            \
-        inst[3] = MOVX(((op1 ^ res) & ~(op1 ^ op2)) >> 31, 1);                 \
+        if (inst[1].opcode == IR_GETC)                                         \
+            inst[1] = MOVI(tmpc || res < op1 + op2);                           \
+        if (inst[3].opcode == IR_GETV)                                         \
+            inst[3] = MOVI(((op1 ^ res) & ~(op1 ^ op2)) >> 31);                \
         vops[i] = res;                                                         \
         vimm[i] = true;                                                        \
         *inst = NOP;                                                           \
@@ -191,7 +194,8 @@ void optimize_constprop(IRBlock* block) {
                          (inst->op1 << (32 - inst->op2)));
                     break;
                 case IR_ADD:
-                    if (inst[1].opcode == IR_GETC) {
+                    if (inst[1].opcode == IR_GETC ||
+                        inst[3].opcode == IR_GETV) {
                         ADDCV(inst->op1, inst->op2, 0);
                     } else {
                         OPTI(inst->op1 + inst->op2);
@@ -212,6 +216,28 @@ void optimize_constprop(IRBlock* block) {
                     break;
                 case IR_PCMASK:
                     OPTI(inst->op1 ? ~1 : ~3);
+                    break;
+                case IR_JZ:
+                    if (inst->op1) {
+                        *inst = NOP;
+                    } else {
+                        u32 off = inst->op2;
+                        for (int j = 0; j < off; j++) {
+                            inst[j] = NOP;
+                        }
+                        i += off - 1;
+                    }
+                    break;
+                case IR_JNZ:
+                    if (!inst->op1) {
+                        *inst = NOP;
+                    } else {
+                        u32 off = inst->op2;
+                        for (int j = 0; j < off; j++) {
+                            inst[j] = NOP;
+                        }
+                        i += off - 1;
+                    }
                     break;
                 default:
                     NOOPT();
@@ -247,6 +273,8 @@ void optimize_constprop(IRBlock* block) {
                 case IR_LSL:
                     if (inst->op2 >= 32) {
                         OPTI(0);
+                    } else if (inst->op2 == 0) {
+                        OPTV(inst->op1);
                     } else {
                         NOOPT();
                     }
@@ -254,27 +282,35 @@ void optimize_constprop(IRBlock* block) {
                 case IR_LSR:
                     if (inst->op2 >= 32) {
                         OPTI(0);
+                    } else if (inst->op2 == 0) {
+                        OPTV(inst->op1);
                     } else {
                         NOOPT();
                     }
                     break;
                 case IR_ASR:
-                    if (inst->op2 >= 32) {
-                        inst->op2 = 31;
+                    if (inst->op2 == 0) {
+                        OPTV(inst->op1);
+                    } else {
+                        if (inst->op2 >= 32) {
+                            inst->op2 = 31;
+                        }
+                        NOOPT();
                     }
-                    NOOPT();
                     break;
                 case IR_ROR:
-                    inst->op2 &= 31;
-                    NOOPT();
+                    if (inst->op2 == 0) {
+                        OPTV(inst->op1);
+                    } else {
+                        inst->op2 &= 31;
+                        NOOPT();
+                    }
                     break;
                 case IR_ADD:
                     if (inst->op2 == 0) {
                         OPTV(inst->op1);
-                        if (inst[1].opcode == IR_GETC) {
-                            inst[1] = MOVX(0, 1);
-                            inst[3] = MOVX(0, 1);
-                        }
+                        if (inst[1].opcode == IR_GETC) inst[1] = MOVI(0);
+                        if (inst[3].opcode == IR_GETV) inst[3] = MOVI(0);
                     } else {
                         NOOPT();
                     }
@@ -282,10 +318,8 @@ void optimize_constprop(IRBlock* block) {
                 case IR_SUB:
                     if (inst->op2 == 0) {
                         OPTV(inst->op1);
-                        if (inst[1].opcode == IR_GETC) {
-                            inst[1] = MOVX(1, 1);
-                            inst[3] = MOVX(0, 1);
-                        }
+                        if (inst[1].opcode == IR_GETC) inst[1] = MOVI(1);
+                        if (inst[3].opcode == IR_GETV) inst[3] = MOVI(0);
                     } else {
                         NOOPT();
                     }
@@ -329,10 +363,8 @@ void optimize_constprop(IRBlock* block) {
                 case IR_ADD:
                     if (inst->op1 == 0) {
                         OPTV(inst->op2);
-                        if (inst[1].opcode == IR_GETC) {
-                            inst[1] = MOVX(0, 1);
-                            inst[3] = MOVX(0, 1);
-                        }
+                        if (inst[1].opcode == IR_GETC) inst[1] = MOVI(0);
+                        if (inst[3].opcode == IR_GETV) inst[3] = MOVI(0);
                     } else {
                         NOOPT();
                     }
@@ -345,4 +377,62 @@ void optimize_constprop(IRBlock* block) {
             NOOPT();
         }
     }
+    free(vops);
+    free(vimm);
+}
+
+u32 chainjmp_helper(IRInstr* jmp) {
+    IRInstr* next = jmp + jmp->op2;
+    while (next->opcode == IR_NOP) next++;
+    if (next->opcode == jmp->opcode && next->op1 == jmp->op1) {
+        chainjmp_helper(next);
+        jmp->op2 = next - jmp + next->op2;
+        *next = NOP;
+    }
+    return jmp->op2;
+}
+
+void optimize_chainjumps(IRBlock* block) {
+    for (int i = 0; i < block->code.size; i++) {
+        IRInstr inst = block->code.d[i];
+        switch (inst.opcode) {
+            case IR_JZ:
+            case IR_JNZ:
+                i += chainjmp_helper(&block->code.d[i]) - 1;
+                break;
+            case IR_END:
+                for (int j = i + 1; j < block->code.size; j++) {
+                    block->code.d[j] = NOP;
+                }
+                return;
+            default:
+                break;
+        }
+    }
+}
+
+void optimize_deadcode(IRBlock* block) {
+    bool* vused = calloc(block->code.size, sizeof(bool));
+    for (int i = block->code.size - 1; i >= 0; i--) {
+        IRInstr* inst = &block->code.d[i];
+        if (!vused[i]) {
+            if (inst->opcode > IR_NOP) {
+                *inst = NOP;
+            } else {
+                switch (inst->opcode) {
+                    case IR_LOAD_REG:
+                    case IR_LOAD_FLAG:
+                    case IR_LOAD_REG_USR:
+                    case IR_LOAD_CPSR:
+                    case IR_LOAD_SPSR:
+                        *inst = NOP;
+                    default:
+                        break;
+                }
+            }
+        }
+        if (!inst->imm1) vused[inst->op1] = true;
+        if (!inst->imm2) vused[inst->op2] = true;
+    }
+    free(vused);
 }

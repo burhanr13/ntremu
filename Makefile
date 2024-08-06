@@ -2,7 +2,7 @@ TARGET_EXEC := ntremu
 
 CC := gcc
 
-CFLAGS := -Wall -Wimplicit-fallthrough -Werror
+CFLAGS := -Wall -Wimplicit-fallthrough
 CFLAGS_RELEASE := -O3 -flto
 CFLAGS_DEBUG := -g -DCPULOG
 
