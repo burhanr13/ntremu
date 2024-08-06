@@ -6,9 +6,13 @@
 #include "../arm_core.h"
 #include "../../types.h"
 
+enum { NF, ZF, CF, VF, QF };
+
 typedef enum {
     IR_LOAD_REG,
     IR_STORE_REG,
+    IR_LOAD_FLAG,
+    IR_STORE_FLAG,
     IR_LOAD_REG_USR,
     IR_STORE_REG_USR,
     IR_LOAD_CPSR,
@@ -55,6 +59,7 @@ typedef enum {
     IR_JNZ,
     IR_MODESWITCH,
     IR_EXCEPTION,
+    IR_BEGIN,
     IR_END,
 } IROpcode;
 

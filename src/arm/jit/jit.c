@@ -1,8 +1,9 @@
 #include "jit.h"
 
+#include "optimizer.h"
 #include "recompiler.h"
 
-// #define IR_DISASM
+#define IR_DISASM
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
@@ -14,7 +15,15 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     block->end_addr = block->ir.end_addr;
 
+// #ifdef IR_DISASM
+//     ir_disassemble(&block->ir);
+// #endif
+
+    optimize_loadstore_reg(&block->ir);
+    optimize_constprop(&block->ir);
+
 #ifdef IR_DISASM
+    //eprintf("optimized :");
     ir_disassemble(&block->ir);
 #endif
 

@@ -1,7 +1,7 @@
 #include "ir.h"
 
-//#define IR_TRACE
-#define IR_TRACE_ADDR 0
+// #define IR_TRACE
+#define IR_TRACE_ADDR 0x2007be4
 
 #define OP(n) (inst.imm##n ? inst.op##n : v[inst.op##n])
 
@@ -36,6 +36,13 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 break;
             case IR_STORE_REG:
                 cpu->r[OP(1)] = OP(2);
+                break;
+            case IR_LOAD_FLAG:
+                v[i] = (cpu->cpsr.w & (1 << (31 - OP(1)))) ? 1 : 0;
+                break;
+            case IR_STORE_FLAG:
+                cpu->cpsr.w &= ~(1 << (31 - OP(1)));
+                if (OP(2)) cpu->cpsr.w |= (1 << (31 - OP(1)));
                 break;
             case IR_LOAD_REG_USR: {
                 int rd = OP(1);
@@ -235,6 +242,8 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 cpu_handle_exception(cpu, OP(1));
                 cpu->pc -= 8;
                 break;
+            case IR_BEGIN:
+                break;
             case IR_END:
                 cpu->cur_instr_addr = cpu->pc;
                 cpu->pending_flush = true;
@@ -273,6 +282,17 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
     if (op2) DISASM_OP(2);                                                     \
     return
 
+#define DISASM_FLAG(name, r, op2)                                              \
+    if (r) eprintf("v%d = ", i);                                               \
+    eprintf(#name);                                                            \
+    eprintf(" %s ", inst.op1 == NF   ? "n"                                     \
+                    : inst.op1 == ZF ? "z"                                     \
+                    : inst.op1 == CF ? "c"                                     \
+                    : inst.op1 == VF ? "v"                                     \
+                                     : "q");                                   \
+    if (op2) DISASM_OP(2);                                                     \
+    return
+
 #define DISASM_MEM(name, r, op2)                                               \
     if (r) eprintf("v%d = ", i);                                               \
     eprintf(#name " ");                                                        \
@@ -294,6 +314,10 @@ void ir_disasm_instr(IRInstr inst, int i) {
             DISASM_REG(load_reg, 1, 0);
         case IR_STORE_REG:
             DISASM_REG(store_reg, 0, 1);
+        case IR_LOAD_FLAG:
+            DISASM_FLAG(load_flag, 1, 0);
+        case IR_STORE_FLAG:
+            DISASM_FLAG(store_flag, 0, 1);
         case IR_LOAD_REG_USR:
             DISASM_REG(load_reg_usr, 1, 0);
         case IR_STORE_REG_USR:
@@ -390,6 +414,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
         case IR_EXCEPTION:
             DISASM(exception, 0, 1, 0);
             break;
+        case IR_BEGIN:
+            DISASM(begin, 0, 0, 0);
         case IR_END:
             DISASM(end, 0, 0, 0);
     }
@@ -398,6 +424,7 @@ void ir_disasm_instr(IRInstr inst, int i) {
 void ir_disassemble(IRBlock* block) {
     eprintf("===== IR Block 0x%08x =====\n", block->start_addr);
     for (int i = 0; i < block->code.size; i++) {
+        if (block->code.d[i].opcode == IR_NOP) continue;
         ir_disasm_instr(block->code.d[i], i);
         eprintf("\n");
     }
