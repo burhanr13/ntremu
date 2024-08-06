@@ -17,10 +17,17 @@ typedef bool (*ArmCompileFunc)(IRBlock*, ArmCore*, u32, ArmInstr);
 
 DECL_ARM_COMPILE(data_proc);
 DECL_ARM_COMPILE(psr_trans);
+DECL_ARM_COMPILE(multiply);
+DECL_ARM_COMPILE(multiply_long);
+DECL_ARM_COMPILE(swap);
 DECL_ARM_COMPILE(branch_exch);
+DECL_ARM_COMPILE(leading_zeros);
 DECL_ARM_COMPILE(half_trans);
 DECL_ARM_COMPILE(single_trans);
+DECL_ARM_COMPILE(undefined);
 DECL_ARM_COMPILE(block_trans);
 DECL_ARM_COMPILE(branch);
+DECL_ARM_COMPILE(cp_reg_trans);
+DECL_ARM_COMPILE(sw_intr);
 
 #endif

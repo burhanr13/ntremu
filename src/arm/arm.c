@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "arm_core.h"
-#include "jit/jit_block.h"
+#include "jit/jit.h"
 
 ArmInstrFormat arm_lookup[1 << 8][1 << 4];
 
@@ -512,7 +512,7 @@ DECL_ARM_EXEC(multiply_long) {
 
 DECL_ARM_EXEC(multiply_short) {
     if (!cpu->v5) {
-        cpu_handle_interrupt(cpu, I_UND);
+        cpu_handle_exception(cpu, E_UND);
         return;
     }
 
@@ -589,7 +589,7 @@ DECL_ARM_EXEC(branch_exch) {
 
 DECL_ARM_EXEC(leading_zeros) {
     if (!cpu->v5) {
-        cpu_handle_interrupt(cpu, I_UND);
+        cpu_handle_exception(cpu, E_UND);
         return;
     }
 
@@ -607,7 +607,7 @@ DECL_ARM_EXEC(leading_zeros) {
 
 DECL_ARM_EXEC(sat_arith) {
     if (!cpu->v5) {
-        cpu_handle_interrupt(cpu, I_UND);
+        cpu_handle_exception(cpu, E_UND);
         return;
     }
 
@@ -643,7 +643,7 @@ DECL_ARM_EXEC(sat_arith) {
 DECL_ARM_EXEC(half_trans) {
     if (cpu->v5 && !instr.half_trans.l && instr.half_trans.s &&
         (instr.half_trans.rd & 1)) {
-        cpu_handle_interrupt(cpu, I_UND);
+        cpu_handle_exception(cpu, E_UND);
         return;
     }
 
@@ -764,7 +764,7 @@ DECL_ARM_EXEC(single_trans) {
 }
 
 DECL_ARM_EXEC(undefined) {
-    cpu_handle_interrupt(cpu, I_UND);
+    cpu_handle_exception(cpu, E_UND);
 }
 
 static u32* get_user_reg(ArmCore* cpu, int reg) {
@@ -911,7 +911,7 @@ DECL_ARM_EXEC(branch) {
 
 DECL_ARM_EXEC(cp_reg_trans) {
     if (!cpu->cp15_read || !cpu->cp15_write) {
-        cpu_handle_interrupt(cpu, I_UND);
+        cpu_handle_exception(cpu, E_UND);
         return;
     }
 
@@ -931,7 +931,7 @@ DECL_ARM_EXEC(cp_reg_trans) {
 }
 
 DECL_ARM_EXEC(sw_intr) {
-    cpu_handle_interrupt(cpu, I_SWI);
+    cpu_handle_exception(cpu, E_SWI);
 }
 
 void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {

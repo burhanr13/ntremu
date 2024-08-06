@@ -18,15 +18,15 @@ typedef enum {
 } CpuMode;
 
 typedef enum {
-    I_RESET,
-    I_UND,
-    I_SWI,
-    I_PABT,
-    I_DABT,
-    I_ADDR,
-    I_IRQ,
-    I_FIQ
-} CpuInterrupt;
+    E_RESET,
+    E_UND,
+    E_SWI,
+    E_PABT,
+    E_DABT,
+    E_ADDR,
+    E_IRQ,
+    E_FIQ
+} CpuException;
 
 typedef struct _ArmCore ArmCore;
 typedef struct _JITBlock JITBlock;
@@ -83,7 +83,7 @@ typedef struct _ArmCore {
     u32 (*cp15_read)(ArmCore* cpu, u32 cn, u32 cm, u32 cp);
     void (*cp15_write)(ArmCore* cpu, u32 cn, u32 cm, u32 cp, u32 data);
 
-    JITBlock*** jit_cache;
+    JITBlock*** jit_cache[64];
     bool pending_flush;
 
     bool v5;
@@ -108,7 +108,7 @@ void cpu_fetch_instr(ArmCore* cpu);
 void cpu_flush(ArmCore* cpu);
 
 void cpu_update_mode(ArmCore* cpu, CpuMode old);
-void cpu_handle_interrupt(ArmCore* cpu, CpuInterrupt intr);
+void cpu_handle_exception(ArmCore* cpu, CpuException intr);
 
 void cpu_print_state(ArmCore* cpu);
 void cpu_print_cur_instr(ArmCore* cpu);

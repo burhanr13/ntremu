@@ -95,26 +95,31 @@ void cpu_update_mode(ArmCore* cpu, CpuMode old) {
     }
 }
 
-void cpu_handle_interrupt(ArmCore* cpu, CpuInterrupt intr) {
+void cpu_handle_exception(ArmCore* cpu, CpuException intr) {
+    if (cpu->pending_flush) {
+        cpu_flush(cpu);
+        cpu->pending_flush = false;
+    }
+
     CpuMode old = cpu->cpsr.m;
     u32 spsr = cpu->cpsr.w;
     switch (intr) {
-        case I_RESET:
-        case I_SWI:
-        case I_ADDR:
+        case E_RESET:
+        case E_SWI:
+        case E_ADDR:
             cpu->cpsr.m = M_SVC;
             break;
-        case I_PABT:
-        case I_DABT:
+        case E_PABT:
+        case E_DABT:
             cpu->cpsr.m = M_ABT;
             break;
-        case I_UND:
+        case E_UND:
             cpu->cpsr.m = M_UND;
             break;
-        case I_IRQ:
+        case E_IRQ:
             cpu->cpsr.m = M_IRQ;
             break;
-        case I_FIQ:
+        case E_FIQ:
             cpu->cpsr.m = M_FIQ;
             break;
     }
@@ -122,7 +127,7 @@ void cpu_handle_interrupt(ArmCore* cpu, CpuInterrupt intr) {
     cpu->spsr = spsr;
     cpu->lr = cpu->pc;
     if (cpu->cpsr.t) {
-        if (intr == I_SWI || intr == I_UND) cpu->lr -= 2;
+        if (intr == E_SWI || intr == E_UND) cpu->lr -= 2;
     } else cpu->lr -= 4;
     cpu->cpsr.t = 0;
     cpu->cpsr.i = 1;

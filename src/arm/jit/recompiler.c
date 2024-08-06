@@ -9,11 +9,18 @@ ArmCompileFunc compile_funcs[ARM_MAX] = {
     [ARM_DATAPROC] = compile_arm_data_proc,
     [ARM_MOV] = compile_arm_data_proc,
     [ARM_PSRTRANS] = compile_arm_psr_trans,
+    [ARM_MULTIPLY] = compile_arm_multiply,
+    [ARM_MULTIPLYLONG] = compile_arm_multiply_long,
+    [ARM_SWAP] = compile_arm_swap,
     [ARM_BRANCHEXCH] = compile_arm_branch_exch,
+    [ARM_LEADINGZEROS] = compile_arm_leading_zeros,
     [ARM_HALFTRANS] = compile_arm_half_trans,
     [ARM_SINGLETRANS] = compile_arm_single_trans,
+    [ARM_UNDEFINED] = compile_arm_undefined,
     [ARM_BLOCKTRANS] = compile_arm_block_trans,
     [ARM_BRANCH] = compile_arm_branch,
+    [ARM_CPREGTRANS] = compile_arm_cp_reg_trans,
+    [ARM_SWINTR] = compile_arm_sw_intr,
 };
 
 #define INSTRLEN (cpu->cpsr.t ? 2 : 4)
@@ -25,23 +32,36 @@ ArmCompileFunc compile_funcs[ARM_MAX] = {
                                     .op1 = _op1,                               \
                                     .op2 = _op2}))
 
-#define EMITV(opc, op1, op2) EMITXX(opc, op1, op2, 0, 0)
-#define EMITI(opc, op1, op2) EMITXX(opc, op1, op2, 0, 1)
-#define EMITX(opc, op1, op2, imm) EMITXX(opc, op1, op2, 0, imm)
+#define EMITVX(opc, op1, op2, imm) EMITXX(opc, op1, op2, 0, imm)
+#define EMITVV(opc, op1, op2) EMITVX(opc, op1, op2, 0)
+#define EMITVI(opc, op1, op2) EMITVX(opc, op1, op2, 1)
+#define EMITIX(opc, op1, op2, imm) EMITXX(opc, op1, op2, 1, imm)
+#define EMITIV(opc, op1, op2) EMITIX(opc, op1, op2, 0)
 #define EMITXV(opc, op1, op2, imm) EMITXX(opc, op1, op2, imm, 0)
+#define EMIT0X(opc, op2, imm) EMITXX(opc, 0, op2, 1, imm)
+#define EMIT0V(opc, op2) EMIT0X(opc, op2, 0)
+#define EMIT0I(opc, op2) EMIT0X(opc, op2, 1)
+#define EMITX0(opc, op1, imm) EMITXX(opc, op1, 0, imm, 1)
+#define EMITV0(opc, op1) EMITX0(opc, op1, 0)
+#define EMITI0(opc, op1) EMITX0(opc, op1, 1)
+#define EMIT00(opc) EMITXX(opc, 0, 0, 1, 1)
 
 #define EMIT_LOAD_REG(rn, fetched)                                             \
-    (rn == 15 ? EMITI(MOV, 0, addr + (fetched ? 3 * INSTRLEN : 2 * INSTRLEN))  \
-              : EMITXX(LOAD_REG, rn, 0, 1, 0))
-#define EMITX_STORE_REG(rn, op, imm) EMITXX(STORE_REG, rn, op, 1, imm)
+    (rn == 15 ? EMIT0I(MOV, addr + (fetched ? 3 * INSTRLEN : 2 * INSTRLEN))    \
+              : EMITI0(LOAD_REG, rn))
+#define EMITX_STORE_REG(rn, op, imm) EMITIX(STORE_REG, rn, op, imm)
 #define EMITV_STORE_REG(rn, op) EMITX_STORE_REG(rn, op, 0)
 #define EMITI_STORE_REG(rn, op) EMITX_STORE_REG(rn, op, 1)
 
 #define LASTV (block->code.size - 1)
 
+#define EMIT_ALIGN_PC()                                                        \
+    (EMITI0(LOAD_REG, 15), EMITVI(AND, LASTV, cpu->cpsr.t ? ~1 : ~3),          \
+     EMITIV(STORE_REG, 15, LASTV))
+#define EMIT_UPDATE_PC() EMITI_STORE_REG(15, addr + 2 * INSTRLEN)
+
 void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
     u32 addr = start_addr;
-    EMITV(NOP, 0, 0);
 
     for (int i = 0; i < MAX_BLOCK_INSTRS; i++) {
         ArmInstr instr = cpu->cpsr.t ? thumb_lookup[cpu->fetch16(cpu, addr)]
@@ -53,7 +73,7 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
         addr += INSTRLEN;
     }
     EMITI_STORE_REG(15, addr);
-    EMITV(END, 0, 0);
+    EMIT00(END);
     block->end_addr = addr;
 }
 
@@ -61,54 +81,56 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
 #define ZF 0x40000000
 #define CF 0x20000000
 #define VF 0x10000000
+#define QF 0x08000000
+#define TF 0x00000020
 
 u32 compile_cond(IRBlock* block, ArmInstr instr) {
-    u32 vcpsr = EMITV(LOAD_CPSR, 0, 0);
+    u32 vcpsr = EMIT00(LOAD_CPSR);
     switch (instr.cond & ~1) {
         case C_EQ:
-            EMITI(AND, LASTV, ZF);
+            EMITVI(AND, LASTV, ZF);
             break;
         case C_CS:
-            EMITI(AND, LASTV, CF);
+            EMITVI(AND, LASTV, CF);
             break;
         case C_MI:
-            EMITI(AND, LASTV, NF);
+            EMITVI(AND, LASTV, NF);
             break;
         case C_VS:
-            EMITI(AND, LASTV, VF);
+            EMITVI(AND, LASTV, VF);
             break;
         case C_HI: {
-            u32 tmp = EMITI(AND, LASTV, CF);
-            EMITI(AND, vcpsr, ZF);
-            EMITV(NOT, 0, LASTV);
-            EMITI(LSR, LASTV, 1);
-            EMITV(AND, tmp, LASTV);
+            u32 tmp = EMITVI(AND, LASTV, CF);
+            EMITVI(AND, vcpsr, ZF);
+            EMIT0V(NOT, LASTV);
+            EMITVI(LSR, LASTV, 1);
+            EMITVV(AND, tmp, LASTV);
             break;
         }
         case C_GE: {
-            u32 tmp = EMITI(AND, LASTV, NF);
-            EMITI(AND, vcpsr, VF);
-            EMITI(LSL, LASTV, 3);
-            EMITV(XOR, tmp, LASTV);
+            u32 tmp = EMITVI(AND, LASTV, NF);
+            EMITVI(AND, vcpsr, VF);
+            EMITVI(LSL, LASTV, 3);
+            EMITVV(XOR, tmp, LASTV);
             instr.cond ^= 1;
             break;
         }
         case C_GT: {
-            u32 tmp = EMITI(AND, LASTV, NF);
-            EMITI(AND, vcpsr, VF);
-            EMITI(LSL, LASTV, 3);
-            tmp = EMITV(XOR, tmp, LASTV);
-            EMITI(AND, vcpsr, ZF);
-            EMITI(LSL, LASTV, 1);
-            EMITV(OR, tmp, LASTV);
+            u32 tmp = EMITVI(AND, LASTV, NF);
+            EMITVI(AND, vcpsr, VF);
+            EMITVI(LSL, LASTV, 3);
+            tmp = EMITVV(XOR, tmp, LASTV);
+            EMITVI(AND, vcpsr, ZF);
+            EMITVI(LSL, LASTV, 1);
+            EMITVV(OR, tmp, LASTV);
             instr.cond ^= 1;
             break;
         }
     }
     if (instr.cond & 1) {
-        EMITI(JNZ, LASTV, 0);
+        EMITVI(JNZ, LASTV, 0);
     } else {
-        EMITI(JZ, LASTV, 0);
+        EMITVI(JZ, LASTV, 0);
     }
     return LASTV;
 }
@@ -137,64 +159,64 @@ u32 compile_shifter(IRBlock* block, ArmCore* cpu, u8 op, u32 operand, u32 shamt,
             case S_LSL:
                 if (carry) {
                     if (imm) {
-                        EMITI(LSR, operand, 32 - shamt);
+                        EMITVI(LSR, operand, 32 - shamt);
                     } else {
                         EMITXV(SUB, 32, shamt, 1);
-                        EMITV(LSR, operand, LASTV);
+                        EMITVV(LSR, operand, LASTV);
                     }
-                    *carry = EMITI(AND, LASTV, 1);
+                    *carry = EMITVI(AND, LASTV, 1);
                 }
-                return EMITX(LSL, operand, shamt, imm);
+                return EMITVX(LSL, operand, shamt, imm);
             case S_LSR:
                 if (carry) {
                     if (imm) {
-                        EMITI(LSR, operand, shamt - 1);
+                        EMITVI(LSR, operand, shamt - 1);
                     } else {
-                        EMITI(SUB, shamt, 1);
-                        EMITV(LSR, operand, LASTV);
+                        EMITVI(SUB, shamt, 1);
+                        EMITVV(LSR, operand, LASTV);
                     }
-                    *carry = EMITI(AND, LASTV, 1);
+                    *carry = EMITVI(AND, LASTV, 1);
                 }
-                return EMITX(LSR, operand, shamt, imm);
+                return EMITVX(LSR, operand, shamt, imm);
             case S_ASR:
                 if (carry) {
                     if (imm) {
-                        EMITI(LSR, operand, shamt - 1);
+                        EMITVI(LSR, operand, shamt - 1);
                     } else {
-                        EMITI(SUB, shamt, 1);
-                        EMITV(ASR, operand, LASTV);
+                        EMITVI(SUB, shamt, 1);
+                        EMITVV(ASR, operand, LASTV);
                     }
-                    *carry = EMITI(AND, LASTV, 1);
+                    *carry = EMITVI(AND, LASTV, 1);
                 }
-                return EMITX(ASR, operand, shamt, imm);
+                return EMITVX(ASR, operand, shamt, imm);
             case S_ROR:
                 if (carry) {
                     if (imm) {
-                        EMITI(LSR, operand, shamt - 1);
+                        EMITVI(LSR, operand, shamt - 1);
                     } else {
-                        EMITI(SUB, shamt, 1);
-                        EMITV(LSR, operand, LASTV);
+                        EMITVI(SUB, shamt, 1);
+                        EMITVV(LSR, operand, LASTV);
                     }
-                    *carry = EMITI(AND, LASTV, 1);
+                    *carry = EMITVI(AND, LASTV, 1);
                 }
-                return EMITX(ROR, operand, shamt, imm);
+                return EMITVX(ROR, operand, shamt, imm);
         }
     } else {
         switch (op) {
             case S_LSL:
                 return operand;
             case S_LSR:
-                if (carry) *carry = EMITI(LSR, operand, 31);
-                return EMITI(MOV, 0, 0);
+                if (carry) *carry = EMITVI(LSR, operand, 31);
+                return EMIT0I(MOV, 0);
             case S_ASR:
-                if (carry) *carry = EMITI(LSR, operand, 31);
-                return EMITI(ASR, operand, 31);
+                if (carry) *carry = EMITVI(LSR, operand, 31);
+                return EMITVI(ASR, operand, 31);
             case S_ROR:
-                if (carry) *carry = EMITI(AND, operand, 1);
-                EMITV(LOAD_CPSR, 0, 0);
-                EMITI(AND, LASTV, CF);
-                EMITV(SETC, 0, LASTV);
-                return EMITV(RRC, operand, 0);
+                if (carry) *carry = EMITVI(AND, operand, 1);
+                EMIT00(LOAD_CPSR);
+                EMITVI(AND, LASTV, CF);
+                EMIT0V(SETC, LASTV);
+                return EMITV0(RRC, operand);
         }
     }
     return operand;
@@ -217,7 +239,7 @@ DECL_ARM_COMPILE(data_proc) {
             if (shift_amt) {
                 shift_amt *= 2;
                 if (instr.data_proc.s)
-                    shiftc = EMITI(MOV, 0, (op2 >> (shift_amt - 1)) & 1);
+                    shiftc = EMIT0I(MOV, (op2 >> (shift_amt - 1)) & 1);
                 op2 = (op2 >> shift_amt) | (op2 << (32 - shift_amt));
             }
         }
@@ -235,14 +257,14 @@ DECL_ARM_COMPILE(data_proc) {
 
             u32 rs = shift >> 4;
             EMIT_LOAD_REG(rs, true);
-            shamt = EMITI(AND, LASTV, 0xff);
+            shamt = EMITVI(AND, LASTV, 0xff);
             if (instr.data_proc.s) {
                 op2 = compile_shifter(block, cpu, shift_type, op2, shamt,
                                       immshift, &shiftc);
-                EMITV(LOAD_CPSR, 0, 0);
-                EMITI(AND, LASTV, CF);
-                EMITV(SETC, 0, LASTV);
-                shiftc = EMITV(GETCIFZ, shamt, shiftc);
+                EMIT00(LOAD_CPSR);
+                EMITVI(AND, LASTV, CF);
+                EMIT0V(SETC, LASTV);
+                shiftc = EMITVV(GETCIFZ, shamt, shiftc);
             } else {
                 op2 = compile_shifter(block, cpu, shift_type, op2, shamt,
                                       immshift, NULL);
@@ -257,20 +279,20 @@ DECL_ARM_COMPILE(data_proc) {
         }
     }
     if (instr.data_proc.rn == 15 && instr.data_proc.rd != 15 && cpu->cpsr.t) {
-        op1 = EMITI(AND, op1, ~3);
+        op1 = EMITVI(AND, op1, ~3);
     }
 
     bool save = true;
     bool arith = false;
     switch (instr.data_proc.opcode) {
         case A_AND:
-            EMITX(AND, op1, op2, imm);
+            EMITVX(AND, op1, op2, imm);
             break;
         case A_EOR:
-            EMITX(XOR, op1, op2, imm);
+            EMITVX(XOR, op1, op2, imm);
             break;
         case A_SUB:
-            EMITX(SUB, op1, op2, imm);
+            EMITVX(SUB, op1, op2, imm);
             arith = true;
             break;
         case A_RSB:
@@ -278,60 +300,60 @@ DECL_ARM_COMPILE(data_proc) {
             arith = true;
             break;
         case A_ADD:
-            EMITX(ADD, op1, op2, imm);
+            EMITVX(ADD, op1, op2, imm);
             arith = true;
             break;
         case A_ADC:
-            EMITV(LOAD_CPSR, 0, 0);
-            EMITI(AND, LASTV, CF);
-            EMITV(SETC, 0, LASTV);
-            EMITX(ADC, op1, op2, imm);
+            EMIT00(LOAD_CPSR);
+            EMITVI(AND, LASTV, CF);
+            EMIT0V(SETC, LASTV);
+            EMITVX(ADC, op1, op2, imm);
             arith = true;
             break;
         case A_SBC:
-            EMITV(LOAD_CPSR, 0, 0);
-            EMITI(AND, LASTV, CF);
-            EMITV(SETC, 0, LASTV);
-            EMITX(SBC, op1, op2, imm);
+            EMIT00(LOAD_CPSR);
+            EMITVI(AND, LASTV, CF);
+            EMIT0V(SETC, LASTV);
+            EMITVX(SBC, op1, op2, imm);
             arith = true;
             break;
         case A_RSC:
-            EMITV(LOAD_CPSR, 0, 0);
-            EMITI(AND, LASTV, CF);
-            EMITV(SETC, 0, LASTV);
+            EMIT00(LOAD_CPSR);
+            EMITVI(AND, LASTV, CF);
+            EMIT0V(SETC, LASTV);
             EMITXV(SBC, op2, op1, imm);
             arith = true;
             break;
         case A_TST:
-            EMITX(AND, op1, op2, imm);
+            EMITVX(AND, op1, op2, imm);
             save = false;
             break;
         case A_TEQ:
-            EMITX(XOR, op1, op2, imm);
+            EMITVX(XOR, op1, op2, imm);
             save = false;
             break;
         case A_CMP:
-            EMITX(SUB, op1, op2, imm);
+            EMITVX(SUB, op1, op2, imm);
             arith = true;
             save = false;
             break;
         case A_CMN:
-            EMITX(ADD, op1, op2, imm);
+            EMITVX(ADD, op1, op2, imm);
             arith = true;
             save = false;
             break;
         case A_ORR:
-            EMITX(OR, op1, op2, imm);
+            EMITVX(OR, op1, op2, imm);
             break;
         case A_MOV:
-            EMITX(MOV, 0, op2, imm);
+            EMIT0X(MOV, op2, imm);
             break;
         case A_BIC:
-            EMITX(NOT, 0, op2, imm);
-            EMITV(AND, op1, LASTV);
+            EMIT0X(NOT, op2, imm);
+            EMITVV(AND, op1, LASTV);
             break;
         case A_MVN:
-            EMITX(NOT, 0, op2, imm);
+            EMIT0X(NOT, op2, imm);
             break;
     }
     u32 vres = LASTV;
@@ -339,44 +361,55 @@ DECL_ARM_COMPILE(data_proc) {
     if (instr.data_proc.s) {
         if (instr.data_proc.rd == 15) {
             if (!(cpu->cpsr.m == M_USER || cpu->cpsr.m == M_SYSTEM)) {
-                EMITV(LOAD_SPSR, 0, 0);
-                EMITV(STORE_CPSR, 0, LASTV);
-                block->modeswitch = true;
+                EMIT00(LOAD_SPSR);
+                EMIT0V(STORE_CPSR, LASTV);
+                EMITI0(MODESWITCH, cpu->cpsr.m);
+                if (!save) return false;
             }
         } else {
             u32 cpsrmask = 0x3fffffff;
             u32 vc, vv;
             if (arith) {
                 cpsrmask = 0x0fffffff;
-                vc = EMITV(GETC, 0, 0);
-                vv = EMITV(GETV, 0, 0);
+                vc = EMIT00(GETC);
+                vv = EMIT00(GETV);
             } else if (shiftc) {
                 cpsrmask = 0x1fffffff;
             }
-            u32 vn = EMITV(GETN, 0, vres);
-            u32 vz = EMITV(GETZ, 0, vres);
-            EMITV(LOAD_CPSR, 0, 0);
-            u32 vcpsr = EMITI(AND, LASTV, cpsrmask);
-            EMITI(LSL, vn, 31);
-            vcpsr = EMITV(OR, vcpsr, LASTV);
-            EMITI(LSL, vz, 30);
-            vcpsr = EMITV(OR, vcpsr, LASTV);
+            u32 vn = EMIT0V(GETN, vres);
+            u32 vz = EMIT0V(GETZ, vres);
+            EMIT00(LOAD_CPSR);
+            u32 vcpsr = EMITVI(AND, LASTV, cpsrmask);
+            EMITVI(LSL, vn, 31);
+            vcpsr = EMITVV(OR, vcpsr, LASTV);
+            EMITVI(LSL, vz, 30);
+            vcpsr = EMITVV(OR, vcpsr, LASTV);
             if (arith) {
-                EMITI(LSL, vc, 29);
-                vcpsr = EMITV(OR, vcpsr, LASTV);
-                EMITI(LSL, vv, 28);
-                vcpsr = EMITV(OR, vcpsr, LASTV);
+                EMITVI(LSL, vc, 29);
+                vcpsr = EMITVV(OR, vcpsr, LASTV);
+                EMITVI(LSL, vv, 28);
+                vcpsr = EMITVV(OR, vcpsr, LASTV);
             } else if (shiftc) {
-                EMITI(LSL, shiftc, 29);
-                vcpsr = EMITV(OR, vcpsr, LASTV);
+                EMITVI(LSL, shiftc, 29);
+                vcpsr = EMITVV(OR, vcpsr, LASTV);
             }
-            EMITV(STORE_CPSR, 0, vcpsr);
+            EMIT0V(STORE_CPSR, vcpsr);
         }
     }
     if (save) {
         EMITV_STORE_REG(instr.data_proc.rd, vres);
         if (instr.data_proc.rd == 15) {
-            EMITV(END, 0, 0);
+            if (instr.data_proc.s) {
+                u32 vpc = EMITI0(LOAD_REG, 15);
+                EMIT00(LOAD_CPSR);
+                u32 vt = EMITVI(AND, LASTV, TF);
+                EMITV0(PCMASK, vt);
+                EMITVV(AND, vpc, LASTV);
+                EMITV_STORE_REG(15, LASTV);
+            } else {
+                EMIT_ALIGN_PC();
+            }
+            EMIT00(END);
             return false;
         }
     }
@@ -403,32 +436,106 @@ DECL_ARM_COMPILE(psr_trans) {
         if (cpu->cpsr.m == M_USER) mask &= 0xf0000000;
 
         if (imm) op2 &= mask;
-        else op2 = EMITI(AND, op2, mask);
+        else op2 = EMITVI(AND, op2, mask);
 
         if (instr.psr_trans.p) {
-            EMITV(LOAD_SPSR, 0, 0);
+            EMIT00(LOAD_SPSR);
         } else {
-            EMITV(LOAD_CPSR, 0, 0);
+            EMIT00(LOAD_CPSR);
         }
-        EMITI(AND, LASTV, ~mask);
-        EMITX(OR, LASTV, op2, imm);
+        EMITVI(AND, LASTV, ~mask);
+        EMITVX(OR, LASTV, op2, imm);
         if (instr.psr_trans.p) {
-            EMITV(STORE_SPSR, 0, LASTV);
+            EMIT0V(STORE_SPSR, LASTV);
             return true;
         } else {
-            EMITV(STORE_CPSR, 0, LASTV);
-            block->modeswitch = true;
+            EMIT0V(STORE_CPSR, LASTV);
+            EMITI0(MODESWITCH, cpu->cpsr.m);
             return false;
         }
     } else {
         if (instr.psr_trans.p) {
-            EMITV(LOAD_SPSR, 0, 0);
+            EMIT00(LOAD_SPSR);
         } else {
-            EMITV(LOAD_CPSR, 0, 0);
+            EMIT00(LOAD_CPSR);
         }
         EMITV_STORE_REG(instr.psr_trans.rd, LASTV);
         return true;
     }
+}
+
+DECL_ARM_COMPILE(multiply) {
+    u32 op1 = EMIT_LOAD_REG(instr.multiply.rm, true);
+    u32 op2 = EMIT_LOAD_REG(instr.multiply.rs, true);
+    u32 vres = EMITVV(MUL, op1, op2);
+    if (instr.multiply.a) {
+        EMIT_LOAD_REG(instr.multiply.rn, true);
+        vres = EMITVV(ADD, vres, LASTV);
+    }
+    if (instr.multiply.s) {
+        u32 vn = EMIT0V(GETN, vres);
+        u32 vz = EMIT0V(GETZ, vres);
+        EMIT00(LOAD_CPSR);
+        u32 vcpsr = EMITVI(AND, LASTV, 0x3fffffff);
+        EMITVI(LSL, vn, 31);
+        vcpsr = EMITVV(OR, vcpsr, LASTV);
+        EMITVI(LSL, vz, 30);
+        vcpsr = EMITVV(OR, vcpsr, LASTV);
+        EMIT0V(STORE_CPSR, vcpsr);
+    }
+    EMITV_STORE_REG(instr.multiply.rd, vres);
+    return true;
+}
+
+DECL_ARM_COMPILE(multiply_long) {
+    u32 op1 = EMIT_LOAD_REG(instr.multiply_long.rm, true);
+    u32 op2 = EMIT_LOAD_REG(instr.multiply_long.rs, true);
+    u32 vreslo = EMITVV(MUL, op1, op2);
+    u32 vreshi;
+    if (instr.multiply_long.u) {
+        vreshi = EMITVV(SMULH, op1, op2);
+    } else {
+        vreshi = EMITVV(UMULH, op1, op2);
+    }
+    if (instr.multiply_long.a) {
+        u32 aclo = EMIT_LOAD_REG(instr.multiply_long.rdlo, true);
+        u32 achi = EMIT_LOAD_REG(instr.multiply_long.rdhi, true);
+
+        vreslo = EMITVV(ADD, vreslo, aclo);
+        vreshi = EMITVV(ADC, vreshi, achi);
+    }
+    if (instr.multiply_long.s) {
+        u32 vn = EMIT0V(GETN, vreshi);
+        u32 vz = EMIT0V(GETZ, vreslo);
+        EMIT0V(GETZ, vreshi);
+        vz = EMITVV(AND, vz, LASTV);
+        EMIT00(LOAD_CPSR);
+        u32 vcpsr = EMITVI(AND, LASTV, 0x3fffffff);
+        EMITVI(LSL, vn, 31);
+        vcpsr = EMITVV(OR, vcpsr, LASTV);
+        EMITVI(LSL, vz, 30);
+        vcpsr = EMITVV(OR, vcpsr, LASTV);
+        EMIT0V(STORE_CPSR, vcpsr);
+    }
+    EMITV_STORE_REG(instr.multiply_long.rdlo, vreslo);
+    EMITV_STORE_REG(instr.multiply_long.rdhi, vreshi);
+    return true;
+}
+
+DECL_ARM_COMPILE(swap) {
+    u32 vaddr = EMIT_LOAD_REG(instr.swap.rn, false);
+    if (instr.swap.b) {
+        u32 vdata = EMITV0(LOAD_MEM8, vaddr);
+        EMIT_LOAD_REG(instr.swap.rm, true);
+        EMITVV(STORE_MEM8, vaddr, LASTV);
+        EMITV_STORE_REG(instr.swap.rd, vdata);
+    } else {
+        u32 vdata = EMITV0(LOAD_MEM32, vaddr);
+        EMIT_LOAD_REG(instr.swap.rm, true);
+        EMITVV(STORE_MEM32, vaddr, LASTV);
+        EMITV_STORE_REG(instr.swap.rd, vdata);
+    }
+    return true;
 }
 
 DECL_ARM_COMPILE(branch_exch) {
@@ -440,19 +547,35 @@ DECL_ARM_COMPILE(branch_exch) {
             EMITI_STORE_REG(14, addr + 4);
         }
     }
-    block->thumbswitch = true;
-    EMITV_STORE_REG(15, vdest);
-    EMITV(END, 0, 0);
+    EMIT00(LOAD_CPSR);
+    u32 tmp = EMITVI(AND, LASTV, ~TF);
+    u32 vt = EMITVI(AND, vdest, 1);
+    EMITVI(LSL, LASTV, 5);
+    EMITVV(OR, tmp, LASTV);
+    EMIT0V(STORE_CPSR, LASTV);
+
+    EMITV0(PCMASK, vt);
+    EMITVV(AND, vdest, LASTV);
+    EMITV_STORE_REG(15, LASTV);
+    EMIT00(END);
     return false;
 }
 
-DECL_ARM_COMPILE(half_trans) {
-    // if (cpu->v5 && !instr.half_trans.l && instr.half_trans.s &&
-    //     (instr.half_trans.rd & 1)) {
-    //     cpu_handle_interrupt(cpu, I_UND);
-    //     return;
-    // }
+DECL_ARM_COMPILE(leading_zeros) {
+    if (!cpu->v5) {
+        EMIT_UPDATE_PC();
+        EMITI0(EXCEPTION, E_UND);
+        EMIT00(END);
+        return false;
+    }
 
+    EMIT_LOAD_REG(instr.leading_zeros.rm, false);
+    EMIT0V(CLZ, LASTV);
+    EMITV_STORE_REG(instr.leading_zeros.rd, LASTV);
+    return true;
+}
+
+DECL_ARM_COMPILE(half_trans) {
     u32 vaddr = EMIT_LOAD_REG(instr.half_trans.rn, false);
     u32 voffset;
     u32 immoffset = instr.half_trans.i;
@@ -461,60 +584,71 @@ DECL_ARM_COMPILE(half_trans) {
     } else {
         voffset = EMIT_LOAD_REG(instr.half_trans.offlo, false);
     }
-    // cpu_fetch_instr(cpu);
 
     if (instr.half_trans.u) {
-        EMITX(ADD, vaddr, voffset, immoffset);
+        EMITVX(ADD, vaddr, voffset, immoffset);
     } else {
-        EMITX(SUB, vaddr, voffset, immoffset);
+        EMITVX(SUB, vaddr, voffset, immoffset);
     }
     u32 vwback = LASTV;
     if (instr.half_trans.p) vaddr = vwback;
 
     if (instr.half_trans.s) {
-        // if (instr.half_trans.l) {
-        //     if (instr.half_trans.w || !instr.half_trans.p) {
-        //         cpu->r[instr.half_trans.rn] = wback;
-        //     }
-        //     if (instr.half_trans.h) {
-        //         cpu->r[instr.half_trans.rd] = cpu->read16(cpu, addr, true);
-        //     } else {
-        //         cpu->r[instr.half_trans.rd] = cpu->read8(cpu, addr, true);
-        //     }
-        //     if (instr.half_trans.rd == 15) cpu_flush(cpu);
-        // } else if (cpu->v5) {
-        //     if (instr.half_trans.h) {
-        //         cpu->write32(cpu, addr & ~3, cpu->r[instr.half_trans.rd]);
-        //         cpu->write32(cpu, (addr & ~3) + 4,
-        //                      cpu->r[instr.half_trans.rd + 1]);
-        //         if (instr.half_trans.w || !instr.half_trans.p) {
-        //             cpu->r[instr.half_trans.rn] = wback;
-        //         }
-        //     } else {
-        //         if (instr.half_trans.w || !instr.half_trans.p) {
-        //             cpu->r[instr.half_trans.rn] = wback;
-        //         }
-        //         cpu->r[instr.half_trans.rd] = cpu->read32(cpu, addr & ~3);
-        //         cpu->r[instr.half_trans.rd + 1] =
-        //             cpu->read32(cpu, (addr & ~3) + 4);
-        //     }
-        // }
-        return false;
+        if (instr.half_trans.l) {
+            if (instr.half_trans.w || !instr.half_trans.p) {
+                EMITV_STORE_REG(instr.half_trans.rn, vwback);
+            }
+            if (instr.half_trans.h) {
+                EMITV0(LOAD_MEMS16, vaddr);
+            } else {
+                EMITV0(LOAD_MEMS8, vaddr);
+            }
+            EMITV_STORE_REG(instr.half_trans.rd, LASTV);
+            if (instr.half_trans.rd == 15) {
+                EMIT_ALIGN_PC();
+                EMIT00(END);
+                return false;
+            }
+            return true;
+        } else if (cpu->v5) {
+            vaddr = EMITVI(AND, vaddr, ~3);
+            if (instr.half_trans.h) {
+                EMIT_LOAD_REG(instr.half_trans.rd, true);
+                EMITVV(STORE_MEM32, vaddr, LASTV);
+                vaddr = EMITVI(ADD, vaddr, 4);
+                EMIT_LOAD_REG(instr.half_trans.rd + 1, true);
+                EMITVV(STORE_MEM32, vaddr, LASTV);
+                if (instr.half_trans.w || !instr.half_trans.p) {
+                    EMITV_STORE_REG(instr.half_trans.rn, vwback);
+                }
+            } else {
+                if (instr.half_trans.w || !instr.half_trans.p) {
+                    EMITV_STORE_REG(instr.half_trans.rn, vwback);
+                }
+                EMITV0(LOAD_MEM32, vaddr);
+                EMITV_STORE_REG(instr.half_trans.rd, LASTV);
+                vaddr = EMITVI(ADD, vaddr, 4);
+                EMITV0(LOAD_MEM32, vaddr);
+                EMITV_STORE_REG(instr.half_trans.rd + 1, LASTV);
+            }
+            return true;
+        } else return false;
     } else if (instr.half_trans.h) {
         if (instr.half_trans.l) {
             if (instr.half_trans.w || !instr.half_trans.p) {
                 EMITV_STORE_REG(instr.half_trans.rn, vwback);
             }
-            u32 vdata = EMITV(LOAD_MEM16, vaddr, 0);
-            EMITV_STORE_REG(instr.half_trans.rd, vdata);
+            EMITV0(LOAD_MEM16, vaddr);
+            EMITV_STORE_REG(instr.half_trans.rd, LASTV);
             if (instr.half_trans.rd == 15) {
-                EMITV(END, 0, 0);
+                EMIT_ALIGN_PC();
+                EMIT00(END);
                 return false;
             }
             return true;
         } else {
-            u32 vdata = EMIT_LOAD_REG(instr.half_trans.rd, true);
-            EMITV(STORE_MEM16, vaddr, vdata);
+            EMIT_LOAD_REG(instr.half_trans.rd, true);
+            EMITVV(STORE_MEM16, vaddr, LASTV);
             if (instr.half_trans.w || !instr.half_trans.p) {
                 EMITV_STORE_REG(instr.half_trans.rn, vwback);
             }
@@ -530,7 +664,7 @@ DECL_ARM_COMPILE(single_trans) {
 
     u32 vaddr = EMIT_LOAD_REG(instr.single_trans.rn, false);
     if (instr.single_trans.rn == 15 && cpu->cpsr.t) {
-        vaddr = EMITI(AND, vaddr, ~3);
+        vaddr = EMITVI(AND, vaddr, ~3);
     }
     u32 voffset;
     u32 immoffset = !instr.single_trans.i;
@@ -546,9 +680,9 @@ DECL_ARM_COMPILE(single_trans) {
     }
 
     if (instr.single_trans.u) {
-        EMITX(ADD, vaddr, voffset, immoffset);
+        EMITVX(ADD, vaddr, voffset, immoffset);
     } else {
-        EMITX(SUB, vaddr, voffset, immoffset);
+        EMITVX(SUB, vaddr, voffset, immoffset);
     }
     u32 vwback = LASTV;
     if (instr.single_trans.p) vaddr = vwback;
@@ -558,18 +692,22 @@ DECL_ARM_COMPILE(single_trans) {
             if (instr.single_trans.w || !instr.single_trans.p) {
                 EMITV_STORE_REG(instr.single_trans.rn, vwback);
             }
-            u32 vdata = EMITV(LOAD_MEM8, vaddr, 0);
-            EMITV_STORE_REG(instr.single_trans.rd, vdata);
+            EMITV0(LOAD_MEM8, vaddr);
+            EMITV_STORE_REG(instr.single_trans.rd, LASTV);
             if (instr.single_trans.rd == 15) {
-                EMITV(END, 0, 0);
+                EMIT_ALIGN_PC();
+                EMIT00(END);
                 return false;
             }
             return true;
         } else {
-            u32 vdata = EMIT_LOAD_REG(instr.single_trans.rd, true);
-            EMITV(STORE_MEM8, vaddr, vdata);
+            EMIT_LOAD_REG(instr.single_trans.rd, true);
+            EMITVV(STORE_MEM8, vaddr, LASTV);
             if (instr.single_trans.w || !instr.single_trans.p) {
                 EMITV_STORE_REG(instr.single_trans.rn, vwback);
+            }
+            if (!cpu->v5 && immoffset && voffset == 0x301) {
+                return false;
             }
             return true;
         }
@@ -578,23 +716,45 @@ DECL_ARM_COMPILE(single_trans) {
             if (instr.single_trans.w || !instr.single_trans.p) {
                 EMITV_STORE_REG(instr.single_trans.rn, vwback);
             }
-            u32 vdata = EMITV(LOAD_MEM32, vaddr, 0);
-            EMITV_STORE_REG(instr.single_trans.rd, vdata);
+            EMITV0(LOAD_MEM32, vaddr);
+            EMITV_STORE_REG(instr.single_trans.rd, LASTV);
             if (instr.single_trans.rd == 15) {
-                if (cpu->v5) block->thumbswitch = true;
-                EMITV(END, 0, 0);
+                if (cpu->v5) {
+                    u32 vpc = EMITI0(LOAD_REG, 15);
+                    EMIT00(LOAD_CPSR);
+                    u32 tmp = EMITVI(AND, LASTV, ~TF);
+                    u32 vt = EMITVI(AND, vpc, 1);
+                    EMITVI(LSL, LASTV, 5);
+                    EMITVV(OR, tmp, LASTV);
+                    EMIT0V(STORE_CPSR, LASTV);
+                    EMITV0(PCMASK, vt);
+                    EMITVV(AND, vpc, LASTV);
+                    EMITV_STORE_REG(15, LASTV);
+                } else {
+                    EMIT_ALIGN_PC();
+                }
+                EMIT00(END);
                 return false;
             }
             return true;
         } else {
-            u32 vdata = EMIT_LOAD_REG(instr.single_trans.rd, true);
-            EMITV(STORE_MEM32, vaddr, vdata);
+            EMIT_LOAD_REG(instr.single_trans.rd, true);
+            EMITVV(STORE_MEM32, vaddr, LASTV);
             if (instr.single_trans.w || !instr.single_trans.p) {
                 EMITV_STORE_REG(instr.single_trans.rn, vwback);
             }
             return true;
         }
     }
+}
+
+bool needs_user_reg_op(u32 mode, int reg) {
+    if (mode == M_USER || mode == M_SYSTEM || reg < 8 || reg == 15)
+        return false;
+    if (reg < 13) {
+        return mode == M_FIQ;
+    }
+    return true;
 }
 
 DECL_ARM_COMPILE(block_trans) {
@@ -619,69 +779,96 @@ DECL_ARM_COMPILE(block_trans) {
 
     u32 vwback;
     if (instr.block_trans.u) {
-        vwback = EMITI(ADD, vaddr, wboff);
+        vwback = EMITVI(ADD, vaddr, wboff);
     } else {
-        vwback = EMITI(SUB, vaddr, wboff);
+        vwback = EMITVI(SUB, vaddr, wboff);
         vaddr = vwback;
     }
     if (instr.block_trans.p == instr.block_trans.u) {
-        vaddr = EMITI(ADD, vaddr, 4);
+        vaddr = EMITVI(ADD, vaddr, 4);
     }
 
-    // cpu_fetch_instr(cpu);
-
-    vaddr = EMITI(AND, vaddr, ~3);
+    vaddr = EMITVI(AND, vaddr, ~3);
 
     if (instr.block_trans.s &&
         !((instr.block_trans.rlist & (1 << 15)) && instr.block_trans.l)) {
-        // if (instr.block_trans.l) {
-        //     for (int i = 0; i < rcount; i++) {
-        //         if (i == rcount - 1 && instr.block_trans.w)
-        //             cpu->r[instr.block_trans.rn] = wback;
-        //         *get_user_reg(cpu, rlist[i]) =
-        //             cpu->read32(cpu, (addr & ~3) + (i << 2));
-        //     }
-        //     if (rcount < 2 && instr.block_trans.w)
-        //         cpu->r[instr.block_trans.rn] = wback;
-        // } else {
-        //     for (int i = 0; i < rcount; i++) {
-        //         cpu->write32(cpu, (addr & ~3) + (i << 2),
-        //                      *get_user_reg(cpu, rlist[i]));
-        //     }
-        //     if (instr.block_trans.w) cpu->r[instr.block_trans.rn] = wback;
-        // }
-        return false;
+        if (instr.block_trans.l) {
+            for (int i = 0; i < rcount; i++) {
+                if (i == rcount - 1 && instr.block_trans.w)
+                    EMITV_STORE_REG(instr.block_trans.rn, vwback);
+                EMITV0(LOAD_MEM32, vaddr);
+                if (needs_user_reg_op(cpu->cpsr.m, rlist[i]))
+                    EMITIV(STORE_REG_USR, rlist[i], LASTV);
+                else EMITV_STORE_REG(rlist[i], LASTV);
+                vaddr = EMITVI(ADD, vaddr, 4);
+            }
+            if (rcount < 2 && instr.block_trans.w)
+                EMITV_STORE_REG(instr.block_trans.rn, vwback);
+        } else {
+            for (int i = 0; i < rcount; i++) {
+                if (needs_user_reg_op(cpu->cpsr.m, rlist[i]))
+                    EMITI0(LOAD_REG_USR, rlist[i]);
+                else EMIT_LOAD_REG(rlist[i], true);
+                EMITVV(STORE_MEM32, vaddr, LASTV);
+                vaddr = EMITVI(ADD, vaddr, 4);
+            }
+            if (instr.block_trans.w)
+                EMITV_STORE_REG(instr.block_trans.rn, vwback);
+        }
+        return true;
     } else {
         if (instr.block_trans.l) {
             if (cpu->cpsr.t || !cpu->v5) {
                 if (instr.block_trans.w)
                     EMITV_STORE_REG(instr.block_trans.rn, vwback);
                 for (int i = 0; i < rcount; i++) {
-                    EMITV(LOAD_MEM32, vaddr, 0);
+                    EMITV0(LOAD_MEM32, vaddr);
                     EMITV_STORE_REG(rlist[i], LASTV);
-                    vaddr = EMITI(ADD, vaddr, 4);
+                    vaddr = EMITVI(ADD, vaddr, 4);
                 }
             } else {
                 for (int i = 0; i < rcount; i++) {
                     if (i == rcount - 1 && instr.block_trans.w)
                         EMITV_STORE_REG(instr.block_trans.rn, vwback);
-                    EMITV(LOAD_MEM32, vaddr, 0);
+                    EMITV0(LOAD_MEM32, vaddr);
                     EMITV_STORE_REG(rlist[i], LASTV);
-                    vaddr = EMITI(ADD, vaddr, 4);
+                    vaddr = EMITVI(ADD, vaddr, 4);
                 }
                 if (rcount < 2 && instr.block_trans.w)
                     EMITV_STORE_REG(instr.block_trans.rn, vwback);
             }
             if (instr.block_trans.rlist & (1 << 15)) {
-                if (cpu->v5) block->thumbswitch = true;
                 if (instr.block_trans.s) {
                     if (!(cpu->cpsr.m == M_USER || cpu->cpsr.m == M_SYSTEM)) {
-                        EMITV(LOAD_SPSR, 0, 0);
-                        EMITV(STORE_CPSR, 0, LASTV);
-                        block->modeswitch = true;
+                        EMIT00(LOAD_SPSR);
+                        EMIT0V(STORE_CPSR, LASTV);
+                        EMITI0(MODESWITCH, cpu->cpsr.m);
                     }
                 }
-                EMITV(END, 0, 0);
+                if (cpu->v5) {
+                    u32 vpc = EMITI0(LOAD_REG, 15);
+                    EMIT00(LOAD_CPSR);
+                    u32 tmp = EMITVI(AND, LASTV, ~TF);
+                    u32 vt = EMITVI(AND, vpc, 1);
+                    EMITVI(LSL, LASTV, 5);
+                    EMITVV(OR, tmp, LASTV);
+                    EMIT0V(STORE_CPSR, LASTV);
+                    EMITV0(PCMASK, vt);
+                    EMITVV(AND, vpc, LASTV);
+                    EMITV_STORE_REG(15, LASTV);
+                } else {
+                    if (instr.block_trans.s) {
+                        u32 vpc = EMITI0(LOAD_REG, 15);
+                        EMIT00(LOAD_CPSR);
+                        u32 vt = EMITVI(AND, LASTV, TF);
+                        EMITV0(PCMASK, vt);
+                        EMITVV(AND, vpc, LASTV);
+                        EMITV_STORE_REG(15, LASTV);
+                    } else {
+                        EMIT_ALIGN_PC();
+                    }
+                }
+                EMIT00(END);
                 return false;
             }
             return true;
@@ -689,16 +876,16 @@ DECL_ARM_COMPILE(block_trans) {
             if (cpu->v5) {
                 for (int i = 0; i < rcount; i++) {
                     EMIT_LOAD_REG(rlist[i], true);
-                    EMITV(STORE_MEM32, vaddr, LASTV);
-                    vaddr = EMITI(ADD, vaddr, 4);
+                    EMITVV(STORE_MEM32, vaddr, LASTV);
+                    vaddr = EMITVI(ADD, vaddr, 4);
                 }
                 if (instr.block_trans.w)
                     EMITV_STORE_REG(instr.block_trans.rn, vwback);
             } else {
                 for (int i = 0; i < rcount; i++) {
                     EMIT_LOAD_REG(rlist[i], true);
-                    EMITV(STORE_MEM32, vaddr, LASTV);
-                    vaddr = EMITI(ADD, vaddr, 4);
+                    EMITVV(STORE_MEM32, vaddr, LASTV);
+                    vaddr = EMITVI(ADD, vaddr, 4);
                     if (i == 0 && instr.block_trans.w)
                         EMITV_STORE_REG(instr.block_trans.rn, vwback);
                 }
@@ -719,14 +906,16 @@ DECL_ARM_COMPILE(branch) {
             if (offset & (1 << 23)) {
                 offset %= 1 << 23;
                 EMIT_LOAD_REG(14, false);
-                u32 vdest = EMITI(ADD, LASTV, offset);
-                dest = cpu->lr;
+                u32 vdest = EMITVI(ADD, LASTV, offset);
                 EMITI_STORE_REG(14, addr + 3);
                 if (instr.cond == 0xf && cpu->v5) {
-                    block->modeswitch = 1;
+                    EMIT00(LOAD_CPSR);
+                    EMITVI(AND, LASTV, ~TF);
+                    EMIT0V(STORE_CPSR, LASTV);
                 }
-                EMITV_STORE_REG(15, vdest);
-                EMITV(END, 0, 0);
+                EMITVI(AND, vdest, ~3);
+                EMITV_STORE_REG(15, LASTV);
+                EMIT00(END);
                 return false;
             } else {
                 if (offset & (1 << 22)) dest += 0xff800000;
@@ -737,13 +926,49 @@ DECL_ARM_COMPILE(branch) {
             EMITI_STORE_REG(14, addr + 4);
             if (instr.cond == 0xf && cpu->v5) {
                 dest += instr.branch.l << 1;
-                dest |= 1;
-                block->thumbswitch = true;
+                EMIT00(LOAD_CPSR);
+                EMITVI(OR, LASTV, TF);
+                EMIT0V(STORE_CPSR, LASTV);
             }
         }
     }
 
     EMITI_STORE_REG(15, dest);
-    EMITV(END, 0, 0);
+    EMIT00(END);
+    return false;
+}
+
+DECL_ARM_COMPILE(cp_reg_trans) {
+    if (!cpu->cp15_read || !cpu->cp15_write) {
+        EMIT_UPDATE_PC();
+        EMITI0(EXCEPTION, E_UND);
+        EMIT00(END);
+        return false;
+    }
+
+    if (instr.cp_reg_trans.cpnum == 15 && instr.cp_reg_trans.cpopc == 0) {
+        if (instr.cp_reg_trans.l) {
+            EMITI0(READ_CP, instr.w);
+            EMITV_STORE_REG(instr.cp_reg_trans.rd, LASTV);
+        } else {
+            EMIT_LOAD_REG(instr.cp_reg_trans.rd, true);
+            EMITIV(WRITE_CP, instr.w, LASTV);
+            return false;
+        }
+    }
+    return true;
+}
+
+DECL_ARM_COMPILE(undefined) {
+    EMIT_UPDATE_PC();
+    EMITI0(EXCEPTION, E_UND);
+    EMIT00(END);
+    return false;
+}
+
+DECL_ARM_COMPILE(sw_intr) {
+    EMIT_UPDATE_PC();
+    EMITI0(EXCEPTION, E_SWI);
+    EMIT00(END);
     return false;
 }

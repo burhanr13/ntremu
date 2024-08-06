@@ -6,13 +6,17 @@
 #include "../arm_core.h"
 #include "../../types.h"
 
-enum {
+typedef enum {
     IR_LOAD_REG,
     IR_STORE_REG,
+    IR_LOAD_REG_USR,
+    IR_STORE_REG_USR,
     IR_LOAD_CPSR,
     IR_STORE_CPSR,
     IR_LOAD_SPSR,
     IR_STORE_SPSR,
+    IR_READ_CP,
+    IR_WRITE_CP,
     IR_LOAD_MEM8,
     IR_LOAD_MEMS8,
     IR_LOAD_MEM16,
@@ -36,20 +40,27 @@ enum {
     IR_SUB,
     IR_ADC,
     IR_SBC,
+    IR_MUL,
+    IR_SMULH,
+    IR_UMULH,
+    IR_CLZ,
     IR_GETN,
     IR_GETZ,
     IR_GETC,
     IR_GETV,
     IR_SETC,
     IR_GETCIFZ,
+    IR_PCMASK,
     IR_JZ,
     IR_JNZ,
+    IR_MODESWITCH,
+    IR_EXCEPTION,
     IR_END,
-};
+} IROpcode;
 
 typedef struct {
     struct {
-        u32 opcode : 30;
+        IROpcode opcode : 30;
         u32 imm1 : 1;
         u32 imm2 : 1;
     };
@@ -61,14 +72,11 @@ typedef struct {
     Vector(IRInstr) code;
     u32 start_addr;
     u32 end_addr;
-    bool modeswitch;
-    bool thumbswitch;
 } IRBlock;
 
 static inline void irblock_init(IRBlock* block, u32 addr) {
     Vec_init(block->code);
     block->start_addr = block->end_addr = addr;
-    block->modeswitch = block->thumbswitch = false;
 }
 static inline void irblock_free(IRBlock* block) {
     Vec_free(block->code);

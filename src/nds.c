@@ -117,8 +117,8 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
     if (bootbios) {
         encrypt_securearea(card, (u32*) &bios7[0x30]);
 
-        cpu_handle_interrupt((ArmCore*) &nds->cpu7, I_RESET);
-        cpu_handle_interrupt((ArmCore*) &nds->cpu9, I_RESET);
+        cpu_handle_exception((ArmCore*) &nds->cpu7, E_RESET);
+        cpu_handle_exception((ArmCore*) &nds->cpu9, E_RESET);
     } else {
 
         nds->io7.wramstat = 3;

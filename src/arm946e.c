@@ -4,7 +4,7 @@
 
 #include "arm/arm.h"
 #include "arm/arm_core.h"
-#include "arm/jit/jit_block.h"
+#include "arm/jit/jit.h"
 #include "bus9.h"
 #include "nds.h"
 #include "arm/thumb.h"
@@ -39,7 +39,7 @@ bool arm9_step(Arm946E* cpu) {
         }
     }
     if (!cpu->c.cpsr.i && cpu->c.irq) {
-        cpu_handle_interrupt((ArmCore*) cpu, I_IRQ);
+        cpu_handle_exception((ArmCore*) cpu, E_IRQ);
     } else {
         // arm_exec_instr((ArmCore*) cpu);
         arm_exec_jit((ArmCore*) cpu);
