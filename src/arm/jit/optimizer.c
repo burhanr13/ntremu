@@ -399,6 +399,43 @@ void optimize_constprop(IRBlock* block) {
     free(vimm);
 }
 
+void optimize_constmem(IRBlock* block, ArmCore* cpu) {
+    for (int i = 0; i < block->code.size; i++) {
+        IRInstr* inst = &block->code.d[i];
+        switch (inst->opcode) {
+            case IR_LOAD_MEM8:
+            case IR_LOAD_MEMS8:
+            case IR_LOAD_MEM16:
+            case IR_LOAD_MEMS16:
+            case IR_LOAD_MEM32:
+                if ((inst->op1 >> 12) == (block->start_addr >> 12)) {
+                    switch (inst->opcode) {
+                        case IR_LOAD_MEM8:
+                            *inst = MOVI(cpu->read8(cpu, inst->op1, false));
+                            break;
+                        case IR_LOAD_MEMS8:
+                            *inst = MOVI(cpu->read8(cpu, inst->op1, true));
+                            break;
+                        case IR_LOAD_MEM16:
+                            *inst = MOVI(cpu->read16(cpu, inst->op1, false));
+                            break;
+                        case IR_LOAD_MEMS16:
+                            *inst = MOVI(cpu->read16(cpu, inst->op1, true));
+                            break;
+                        case IR_LOAD_MEM32:
+                            *inst = MOVI(cpu->read32(cpu, inst->op1));
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+    }
+}
+
 u32 chainjmp_helper(IRBlock* block, IRInstr* jmp) {
     IRInstr* next = &block->code.d[jmp->op2];
     while (next->opcode == IR_NOP) next++;
@@ -426,6 +463,9 @@ void optimize_chainjumps(IRBlock* block) {
             case IR_JZ:
             case IR_JNZ:
                 i = chainjmp_helper(block, &block->code.d[i]) - 1;
+                break;
+            case IR_JELSE:
+                i = inst.op2 - 1;
                 break;
             case IR_END:
                 for (int j = i + 1; j < block->code.size; j++) {
@@ -488,7 +528,6 @@ void optimize_waitloop(IRBlock* block) {
                     inst.op2 == block->start_addr &&
                     block->code.d[i + 1].opcode == IR_NOP && !modified) {
                     block->code.d[i + 1].opcode = IR_WFE;
-                    ir_disassemble(block);
                     return;
                 } else {
                     STORE(R(inst.op1));

@@ -41,7 +41,7 @@ typedef enum {
     IR_MODESWITCH,
     IR_EXCEPTION,
     IR_WFE,
-    
+
     IR_BEGIN,
     IR_END,
 
@@ -63,7 +63,7 @@ typedef enum {
     IR_SUB,
     IR_ADC,
     IR_SBC,
-    
+
     IR_MUL,
     IR_SMULH,
     IR_UMULH,
@@ -76,6 +76,7 @@ typedef enum {
     IR_GETCIFZ,
 
     IR_PCMASK,
+
 } IROpcode;
 
 typedef struct {

@@ -20,6 +20,7 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     optimize_loadstore(&block->ir);
     optimize_constprop(&block->ir);
+    optimize_constmem(&block->ir, cpu);
     optimize_chainjumps(&block->ir);
     optimize_loadstore(&block->ir);
     optimize_constprop(&block->ir);
