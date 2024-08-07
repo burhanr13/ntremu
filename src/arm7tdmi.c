@@ -24,14 +24,16 @@ void arm7_init(Arm7TDMI* cpu) {
     cpu->c.cp15_write = NULL;
 }
 
-void arm7_step(Arm7TDMI* cpu) {
+bool arm7_step(Arm7TDMI* cpu) {
+    if (cpu->c.wfe) return false;
     cpu->c.cycles = 0;
     if (!cpu->c.cpsr.i && cpu->c.irq) {
         cpu_handle_exception((ArmCore*) cpu, E_IRQ);
-        return;
+    } else {
+        //arm_exec_instr((ArmCore*) cpu);
+        arm_exec_jit((ArmCore*) cpu);
     }
-    // arm_exec_instr((ArmCore*) cpu);
-    arm_exec_jit((ArmCore*) cpu);
+    return true;
 }
 
 u32 arm7_read8(Arm7TDMI* cpu, u32 addr, bool sx) {

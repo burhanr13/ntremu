@@ -211,13 +211,19 @@ void nds_run(NDS* nds) {
                 break;
             }
         } else {
-            arm7_step(&nds->cpu7);
-            nds->sched.now += nds->cpu7.c.cycles;
+            if (arm7_step(&nds->cpu7)) {
+                nds->sched.now += nds->cpu7.c.cycles;
+            } else {
+                nds->sched.now = FIFO_peek(nds->sched.event_queue).time;
+                break;
+            }
         }
     }
     run_to_present(&nds->sched);
     nds->cpu7.c.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
     nds->cpu9.c.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
+    nds->cpu7.c.wfe = false;
+    nds->cpu9.c.wfe = false;
 
     nds->cur_cpu = (ArmCore*) &nds->cpu9;
     nds->cur_cpu_type = CPU9;
@@ -235,8 +241,11 @@ bool nds_step(NDS* nds) {
                 nds->sched.now = FIFO_peek(nds->sched.event_queue).time;
             }
         } else {
-            arm7_step(&nds->cpu7);
-            nds->sched.now += nds->cpu7.c.cycles;
+            if (arm7_step(&nds->cpu7)) {
+                nds->sched.now += nds->cpu7.c.cycles;
+            } else {
+                nds->sched.now = FIFO_peek(nds->sched.event_queue).time;
+            }
         }
     } else {
         if (arm9_step(&nds->cpu9)) {
@@ -255,6 +264,8 @@ bool nds_step(NDS* nds) {
             run_to_present(&nds->sched);
             nds->cpu7.c.irq = nds->io7.ime && (nds->io7.ie.w & nds->io7.ifl.w);
             nds->cpu9.c.irq = nds->io9.ime && (nds->io9.ie.w & nds->io9.ifl.w);
+            nds->cpu7.c.wfe = false;
+            nds->cpu9.c.wfe = false;
 
             nds->cur_cpu = (ArmCore*) &nds->cpu9;
             nds->cur_cpu_type = CPU9;

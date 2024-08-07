@@ -92,9 +92,10 @@ void optimize_loadstore(IRBlock* block) {
                 }
                 break;
             case IR_JZ:
-            case IR_JNZ: {
+            case IR_JNZ:
+            case IR_JELSE: {
                 jmpsource = i;
-                jmptarget = i + inst.op2;
+                jmptarget = inst.op2;
                 break;
             }
             case IR_END: {
@@ -229,25 +230,33 @@ void optimize_constprop(IRBlock* block) {
                     OPTI(inst->op1 ? ~1 : ~3);
                     break;
                 case IR_JZ:
+                    if (block->code.d[inst->op2].opcode == IR_JELSE) {
+                        NOOPT();
+                        break;
+                    }
                     if (inst->op1) {
                         *inst = NOP;
                     } else {
-                        u32 off = inst->op2;
-                        for (int j = 0; j < off; j++) {
+                        u32 dest = inst->op2;
+                        for (int j = 0; j < dest - i; j++) {
                             inst[j] = NOP;
                         }
-                        i += off - 1;
+                        i = dest - 1;
                     }
                     break;
                 case IR_JNZ:
+                    if (block->code.d[inst->op2].opcode == IR_JELSE) {
+                        NOOPT();
+                        break;
+                    }
                     if (!inst->op1) {
                         *inst = NOP;
                     } else {
-                        u32 off = inst->op2;
-                        for (int j = 0; j < off; j++) {
+                        u32 dest = inst->op2;
+                        for (int j = 0; j < dest - i; j++) {
                             inst[j] = NOP;
                         }
-                        i += off - 1;
+                        i = dest - 1;
                     }
                     break;
                 default:
@@ -390,13 +399,22 @@ void optimize_constprop(IRBlock* block) {
     free(vimm);
 }
 
-u32 chainjmp_helper(IRInstr* jmp) {
-    IRInstr* next = jmp + jmp->op2;
+u32 chainjmp_helper(IRBlock* block, IRInstr* jmp) {
+    IRInstr* next = &block->code.d[jmp->op2];
     while (next->opcode == IR_NOP) next++;
-    if (next->opcode == jmp->opcode && next->op1 == jmp->op1) {
-        chainjmp_helper(next);
-        jmp->op2 = next - jmp + next->op2;
-        *next = NOP;
+    if (next->op1 == jmp->op1 &&
+        (next->opcode == IR_JZ || next->opcode == IR_JNZ)) {
+        chainjmp_helper(block, next);
+        if (next->opcode == jmp->opcode) {
+            jmp->op2 = next->op2;
+            *next = NOP;
+        } else {
+            *next = (IRInstr){.opcode = IR_JELSE,
+                              .imm1 = 1,
+                              .imm2 = 1,
+                              .op1 = 0,
+                              .op2 = next->op2};
+        }
     }
     return jmp->op2;
 }
@@ -407,7 +425,7 @@ void optimize_chainjumps(IRBlock* block) {
         switch (inst.opcode) {
             case IR_JZ:
             case IR_JNZ:
-                i += chainjmp_helper(&block->code.d[i]) - 1;
+                i = chainjmp_helper(block, &block->code.d[i]) - 1;
                 break;
             case IR_END:
                 for (int j = i + 1; j < block->code.size; j++) {
@@ -436,6 +454,7 @@ void optimize_deadcode(IRBlock* block) {
                     case IR_LOAD_SPSR:
                     case IR_LOAD_THUMB:
                         *inst = NOP;
+                        break;
                     default:
                         break;
                 }
@@ -445,4 +464,87 @@ void optimize_deadcode(IRBlock* block) {
         if (!inst->imm2) vused[inst->op2] = true;
     }
     free(vused);
+}
+
+void optimize_waitloop(IRBlock* block) {
+#define R(n) (1 << n)
+#define CPSR (1 << 16)
+#define SPSR (1 << 17)
+#define MEM (1 << 18)
+#define LOAD(v) (loaded |= v);
+#define STORE(v) (loaded & (v) ? modified |= v : 0)
+
+    u32 loaded = 0;
+    u32 modified = 0;
+
+    for (int i = 0; i < block->code.size; i++) {
+        IRInstr inst = block->code.d[i];
+        switch (inst.opcode) {
+            case IR_LOAD_REG:
+                LOAD(R(inst.op1));
+                break;
+            case IR_STORE_REG:
+                if (inst.op1 == 15 && inst.imm2 &&
+                    inst.op2 == block->start_addr &&
+                    block->code.d[i + 1].opcode == IR_NOP && !modified) {
+                    block->code.d[i + 1].opcode = IR_WFE;
+                    ir_disassemble(block);
+                    return;
+                } else {
+                    STORE(R(inst.op1));
+                }
+                break;
+            case IR_LOAD_FLAG:
+                LOAD(CPSR);
+                break;
+            case IR_STORE_FLAG:
+                STORE(CPSR);
+                break;
+            case IR_LOAD_CPSR:
+                LOAD(CPSR);
+                break;
+            case IR_STORE_CPSR:
+                STORE(CPSR);
+                break;
+            case IR_LOAD_SPSR:
+                LOAD(SPSR);
+                break;
+            case IR_STORE_SPSR:
+                STORE(SPSR);
+                break;
+            case IR_LOAD_MEM8:
+                LOAD(MEM);
+                break;
+            case IR_LOAD_MEMS8:
+                LOAD(MEM);
+                break;
+            case IR_LOAD_MEM16:
+                LOAD(MEM);
+                break;
+            case IR_LOAD_MEMS16:
+                LOAD(MEM);
+                break;
+            case IR_LOAD_MEM32:
+                LOAD(MEM);
+                break;
+            case IR_STORE_MEM8:
+                STORE(MEM);
+                break;
+            case IR_STORE_MEM16:
+                STORE(MEM);
+                break;
+            case IR_STORE_MEM32:
+                STORE(MEM);
+                break;
+            default:
+                break;
+        }
+    }
+
+#undef R
+#undef CPSR
+#undef SPSR
+#undef MEM
+#undef LOAD
+#undef STORE
 }

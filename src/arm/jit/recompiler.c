@@ -2,8 +2,7 @@
 
 #include "../arm.h"
 #include "../thumb.h"
-
-#define MAX_BLOCK_INSTRS 128
+#include "jit.h"
 
 ArmCompileFunc compile_funcs[ARM_MAX] = {
     [ARM_DATAPROC] = compile_arm_data_proc,
@@ -77,6 +76,8 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
     EMITI_STORE_REG(15, addr);
     EMIT00(END);
     block->end_addr = addr;
+    block->numinstr =
+        (block->end_addr - block->start_addr) >> (cpu->cpsr.t ? 1 : 2);
 }
 
 u32 compile_cond(IRBlock* block, ArmInstr instr) {
@@ -135,7 +136,7 @@ bool arm_compile_instr(IRBlock* block, ArmCore* cpu, u32 addr, ArmInstr instr) {
     if (instr.cond < C_AL) {
         u32 jmpaddr = compile_cond(block, instr);
         bool retval = func(block, cpu, addr, instr);
-        block->code.d[jmpaddr].op2 = LASTV + 1 - jmpaddr;
+        block->code.d[jmpaddr].op2 = LASTV + 1;
         return retval;
     } else {
         return func(block, cpu, addr, instr);
@@ -876,6 +877,7 @@ DECL_ARM_COMPILE(branch) {
     }
 
     EMITI_STORE_REG(15, dest);
+    if (dest == block->start_addr) EMIT00(NOP);
     EMIT00(END);
     return false;
 }

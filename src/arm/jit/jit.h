@@ -4,10 +4,13 @@
 #include "../arm_core.h"
 #include "ir.h"
 
+#define MAX_BLOCK_INSTRS 512
+
 typedef struct _JITBlock {
     ArmCore* cpu;
     u32 start_addr;
     u32 end_addr;
+    u32 numinstr;
     IRBlock ir;
 } JITBlock;
 

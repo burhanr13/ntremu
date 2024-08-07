@@ -3,7 +3,8 @@
 #include "optimizer.h"
 #include "recompiler.h"
 
-// #define IR_DISASM
+//#define IR_DISASM
+//#define JIT_LOG
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
@@ -15,12 +16,15 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     block->end_addr = block->ir.end_addr;
 
+    block->numinstr = block->ir.numinstr;
+
     optimize_loadstore(&block->ir);
     optimize_constprop(&block->ir);
     optimize_chainjumps(&block->ir);
     optimize_loadstore(&block->ir);
     optimize_constprop(&block->ir);
     optimize_deadcode(&block->ir);
+    optimize_waitloop(&block->ir);
 
 #ifdef IR_DISASM
     ir_disassemble(&block->ir);
@@ -35,6 +39,9 @@ void destroy_jit_block(JITBlock* block) {
 }
 
 void jit_exec(JITBlock* block) {
+#ifdef JIT_LOG
+    eprintf("executing block at 0x%08x\n", block->start_addr);
+#endif
     ir_interpret(&block->ir, block->cpu);
 }
 
@@ -98,8 +105,6 @@ void arm_exec_jit(ArmCore* cpu) {
     JITBlock* block = get_jitblock(cpu, cpu->cur_instr_addr);
     if (block) {
         jit_exec(block);
-        cpu->cycles +=
-            (block->end_addr - block->start_addr) >> (cpu->cpsr.t ? 1 : 2);
     } else {
         arm_exec_instr(cpu);
     }

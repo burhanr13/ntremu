@@ -90,6 +90,8 @@ typedef struct _ArmCore {
     u32 vector_base;
 
     int cycles;
+    
+    bool wfe;
 
     bool irq;
 

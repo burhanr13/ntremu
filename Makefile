@@ -48,14 +48,14 @@ $(RELEASE_DIR)/%.o: $(SRC_DIR)/%.c
 
 $(DEBUG_DIR)/$(TARGET_EXEC): $(OBJS_DEBUG)
 	$(CC) -o $@ $(CFLAGS) $(CPPFLAGS) $^ $(LDFLAGS)
-	cp $@ $(TARGET_EXEC)
+	cp $@ $(TARGET_EXEC)d
 
 $(DEBUG_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET_EXEC)
+	rm -rf $(BUILD_DIR) $(TARGET_EXEC) $(TARGET_EXEC)d
 
 -include $(DEPS_DEBUG)
 -include $(DEPS_RELEASE)

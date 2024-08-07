@@ -30,6 +30,7 @@ void arm9_init(Arm946E* cpu) {
 }
 
 bool arm9_step(Arm946E* cpu) {
+    if (cpu->c.wfe) return false;
     cpu->c.cycles = 0;
     if (cpu->halt) {
         if (cpu->c.irq) {
@@ -41,7 +42,7 @@ bool arm9_step(Arm946E* cpu) {
     if (!cpu->c.cpsr.i && cpu->c.irq) {
         cpu_handle_exception((ArmCore*) cpu, E_IRQ);
     } else {
-        // arm_exec_instr((ArmCore*) cpu);
+        //arm_exec_instr((ArmCore*) cpu);
         arm_exec_jit((ArmCore*) cpu);
     }
     if (cpu->c.cycles == 0) cpu->c.cycles = 1;

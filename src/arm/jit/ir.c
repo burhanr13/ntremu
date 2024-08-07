@@ -1,7 +1,7 @@
 #include "ir.h"
 
 // #define IR_TRACE
-#define IR_TRACE_ADDR 0x38021a8
+#define IR_TRACE_ADDR 0x2004348
 
 #define OP(n) (inst.imm##n ? inst.op##n : v[inst.op##n])
 
@@ -24,11 +24,16 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
         v = malloc(sizeof(u32) * block->code.size);
     }
 #ifdef IR_TRACE
-    // if (cpu->v5) eprintf("executing block at 0x%08x\n", block->start_addr);
+    if (block->start_addr == IR_TRACE_ADDR) {
+        eprintf("======== tracing IR block 0x%08x =========\n",
+                block->start_addr);
+    }
 #endif
 
     bool cf, vf;
+    bool jmptaken;
     while (true) {
+        while (block->code.d[i].opcode == IR_NOP) i++;
         IRInstr inst = block->code.d[i];
         switch (inst.opcode) {
             case IR_LOAD_REG:
@@ -256,10 +261,22 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 v[i] = OP(1) ? ~1 : ~3;
                 break;
             case IR_JZ:
-                if (OP(1) == 0) i += OP(2) - 1;
+                if (OP(1) == 0) {
+                    i = OP(2) - 1;
+                    jmptaken = true;
+                } else jmptaken = false;
                 break;
             case IR_JNZ:
-                if (OP(1) != 0) i += OP(2) - 1;
+                if (OP(1) != 0) {
+                    i = OP(2) - 1;
+                    jmptaken = true;
+                } else jmptaken = false;
+                break;
+            case IR_JELSE:
+                if (!jmptaken) {
+                    i = OP(2) - 1;
+                    jmptaken = true;
+                } else jmptaken = false;
                 break;
             case IR_MODESWITCH:
                 cpu_update_mode(cpu, OP(1));
@@ -269,11 +286,15 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 cpu_handle_exception(cpu, OP(1));
                 cpu->pc -= 8;
                 break;
+            case IR_WFE:
+                cpu->wfe = true;
+                break;
             case IR_BEGIN:
                 break;
             case IR_END:
                 cpu->cur_instr_addr = cpu->pc;
                 cpu->pending_flush = true;
+                cpu->cycles += block->numinstr;
                 return;
         }
 #ifdef IR_TRACE
@@ -291,7 +312,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
 
 #define DISASM(name, r, op1, op2)                                              \
     if (r) eprintf("v%d = ", i);                                               \
-    eprintf("%s", #name);                                                      \
+    eprintf(#name);                                                            \
     if (op1) {                                                                 \
         eprintf(" ");                                                          \
         DISASM_OP(1);                                                          \
@@ -329,10 +350,13 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
     if (op2) DISASM_OP(2);                                                     \
     return
 
-#define DISASM_JMP(name, i)                                                    \
-    eprintf(#name " ");                                                        \
-    DISASM_OP(1);                                                              \
-    eprintf(" %d", inst.op2 + i);                                              \
+#define DISASM_JMP(name, op1)                                                  \
+    eprintf(#name);                                                            \
+    if (op1) {                                                                 \
+        eprintf(" ");                                                          \
+        DISASM_OP(1);                                                          \
+    }                                                                          \
+    eprintf(" %d", inst.op2);                                                  \
     return
 
 void ir_disasm_instr(IRInstr inst, int i) {
@@ -436,14 +460,19 @@ void ir_disasm_instr(IRInstr inst, int i) {
         case IR_PCMASK:
             DISASM(pcmask, 1, 1, 0);
         case IR_JZ:
-            DISASM_JMP(jz, i);
+            DISASM_JMP(jz, 1);
         case IR_JNZ:
-            DISASM_JMP(jnz, i);
+            DISASM_JMP(jnz, 1);
+        case IR_JELSE:
+            DISASM_JMP(jelse, 0);
         case IR_MODESWITCH:
             DISASM(modeswitch, 0, 1, 0);
             break;
         case IR_EXCEPTION:
             DISASM(exception, 0, 1, 0);
+            break;
+        case IR_WFE:
+            DISASM(wfe, 0, 0, 0);
             break;
         case IR_BEGIN:
             DISASM(begin, 0, 0, 0);
@@ -459,8 +488,9 @@ void ir_disassemble(IRBlock* block) {
         if (i == jmptarget) eprintf("%d:\n", i);
         if (block->code.d[i].opcode == IR_NOP) continue;
         if (block->code.d[i].opcode == IR_JZ ||
-            block->code.d[i].opcode == IR_JNZ)
-            jmptarget = i + block->code.d[i].op2;
+            block->code.d[i].opcode == IR_JNZ ||
+            block->code.d[i].opcode == IR_JELSE)
+            jmptarget = block->code.d[i].op2;
         ir_disasm_instr(block->code.d[i], i);
         eprintf("\n");
     }

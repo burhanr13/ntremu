@@ -16,7 +16,7 @@ typedef struct _Arm7TDMI {
 
 void arm7_init(Arm7TDMI* cpu);
 
-void arm7_step(Arm7TDMI* cpu);
+bool arm7_step(Arm7TDMI* cpu);
 
 u32 arm7_read8(Arm7TDMI* cpu, u32 addr, bool sx);
 u32 arm7_read16(Arm7TDMI* cpu, u32 addr, bool sx);
