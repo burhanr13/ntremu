@@ -1421,8 +1421,6 @@ void render_polygon(GPU* gpu, poly* p) {
                 }
             }
 
-            if (alpha == 0) continue;
-
             u16 tr = color & 0x1f;
             u16 tg = color >> 5 & 0x1f;
             u16 tb = color >> 10 & 0x1f;
@@ -1485,6 +1483,11 @@ void render_polygon(GPU* gpu, poly* p) {
                         break;
                 }
             }
+
+            if (a <= gpu->master->io9.disp3dcnt.alpha_test
+                    ? (gpu->master->io9.alpha_test_ref & 0x1f)
+                    : 0)
+                continue;
 
             if (a == 31 || p->attr.depth_transparent) {
                 if (gpu->w_buffer) gpu->depth_buf[y][x] = 1 / i.w;
