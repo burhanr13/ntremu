@@ -1421,6 +1421,11 @@ void render_polygon(GPU* gpu, poly* p) {
                 }
             }
 
+            if (alpha <= (gpu->master->io9.disp3dcnt.alpha_test
+                              ? (gpu->master->io9.alpha_test_ref & 0x1f)
+                              : 0))
+                continue;
+
             u16 tr = color & 0x1f;
             u16 tg = color >> 5 & 0x1f;
             u16 tb = color >> 10 & 0x1f;
@@ -1434,9 +1439,9 @@ void render_polygon(GPU* gpu, poly* p) {
                     a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
                     break;
                 case POLYMODE_DECAL:
-                    r = (tr * alpha) + (i.r / i.w * (31 - alpha)) / 32;
-                    g = (tg * alpha) + (i.g / i.w * (31 - alpha)) / 32;
-                    b = (tb * alpha) + (i.b / i.w * (31 - alpha)) / 32;
+                    r = ((tr * alpha) + (i.r / i.w * (31 - alpha))) / 32;
+                    g = ((tg * alpha) + (i.g / i.w * (31 - alpha))) / 32;
+                    b = ((tb * alpha) + (i.b / i.w * (31 - alpha))) / 32;
                     a = p->attr.alpha;
                     break;
                 case POLYMODE_TOON: {
@@ -1458,36 +1463,29 @@ void render_polygon(GPU* gpu, poly* p) {
                         if (b > 31) b = 31;
                     }
                     break;
-                    case POLYMODE_SHADOW:
-                        if (p->attr.id) {
-                            if (!gpu->attr_buf[y][x].stencil) continue;
-                            gpu->attr_buf[y][x].stencil = 0;
-                            if (gpu->polyid_buf[y][x] == p->attr.id) continue;
-                            if (gpu->master->io9.disp3dcnt.texture &&
-                                p->texparam.format) {
-                                r = (tr * alpha) +
-                                    (i.r / i.w * (31 - alpha)) / 32;
-                                g = (tg * alpha) +
-                                    (i.g / i.w * (31 - alpha)) / 32;
-                                b = (tb * alpha) +
-                                    (i.b / i.w * (31 - alpha)) / 32;
-                            } else {
-                                r = i.r / i.w;
-                                g = i.g / i.w;
-                                b = i.b / i.w;
-                            }
-                            a = p->attr.alpha;
+                }
+                case POLYMODE_SHADOW: {
+                    if (p->attr.id) {
+                        if (!gpu->attr_buf[y][x].stencil) continue;
+                        gpu->attr_buf[y][x].stencil = 0;
+                        if (gpu->polyid_buf[y][x] == p->attr.id) continue;
+                        if (gpu->master->io9.disp3dcnt.texture &&
+                            p->texparam.format) {
+                            r = (tr * alpha) + (i.r / i.w * (31 - alpha)) / 32;
+                            g = (tg * alpha) + (i.g / i.w * (31 - alpha)) / 32;
+                            b = (tb * alpha) + (i.b / i.w * (31 - alpha)) / 32;
                         } else {
-                            continue;
+                            r = i.r / i.w;
+                            g = i.g / i.w;
+                            b = i.b / i.w;
                         }
-                        break;
+                        a = p->attr.alpha;
+                    } else {
+                        continue;
+                    }
+                    break;
                 }
             }
-
-            if (a <= gpu->master->io9.disp3dcnt.alpha_test
-                    ? (gpu->master->io9.alpha_test_ref & 0x1f)
-                    : 0)
-                continue;
 
             if (a == 31 || p->attr.depth_transparent) {
                 if (gpu->w_buffer) gpu->depth_buf[y][x] = 1 / i.w;
