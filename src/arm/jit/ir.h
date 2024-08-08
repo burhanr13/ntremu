@@ -98,9 +98,9 @@ typedef struct {
     bool loop;
 } IRBlock;
 
-static inline void irblock_init(IRBlock* block, u32 addr) {
+static inline void irblock_init(IRBlock* block) {
     Vec_init(block->code);
-    block->start_addr = block->end_addr = addr;
+    block->start_addr = block->end_addr = 0;
     block->numinstr = 0;
     block->loop = false;
 }
@@ -108,8 +108,7 @@ static inline void irblock_free(IRBlock* block) {
     Vec_free(block->code);
 }
 static inline u32 irblock_write(IRBlock* block, IRInstr instr) {
-    Vec_push(block->code, instr);
-    return block->code.size - 1;
+    return Vec_push(block->code, instr);
 }
 
 void ir_interpret(IRBlock* block, ArmCore* cpu);

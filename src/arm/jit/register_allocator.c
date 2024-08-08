@@ -16,6 +16,7 @@ RegisterAllocation allocate_registers(IRBlock* block) {
     RegisterAllocation ret;
     Vec_init(ret.reg_info);
     ret.reg_assn = malloc(block->code.size * sizeof(u32));
+    ret.nassns = block->code.size;
     Vector(bool) reg_active = {};
 
     for (int i = 0; i < block->code.size; i++) {
@@ -24,11 +25,21 @@ RegisterAllocation allocate_registers(IRBlock* block) {
         if (!inst.imm1) {
             if (!--vuses[inst.op1]) {
                 reg_active.d[ret.reg_assn[inst.op1]] = false;
+                if (inst.op1 < i - 1) {
+                    if (ret.reg_info.d[ret.reg_assn[inst.op1]].type ==
+                        REG_SCRATCH)
+                        ret.reg_info.d[ret.reg_assn[inst.op1]].type = REG_TEMP;
+                }
             }
         }
         if (!inst.imm2) {
             if (!--vuses[inst.op2]) {
                 reg_active.d[ret.reg_assn[inst.op2]] = false;
+                if (inst.op2 < i - 1) {
+                    if (ret.reg_info.d[ret.reg_assn[inst.op2]].type ==
+                        REG_SCRATCH)
+                        ret.reg_info.d[ret.reg_assn[inst.op2]].type = REG_TEMP;
+                }
             }
         }
 
@@ -46,7 +57,7 @@ RegisterAllocation allocate_registers(IRBlock* block) {
             case IR_MODESWITCH:
             case IR_EXCEPTION:
                 for (int r = 0; r < ret.reg_info.size; r++) {
-                    if (reg_active.d[r]) ret.reg_info.d[r].calleesaved = true;
+                    if (reg_active.d[r]) ret.reg_info.d[r].type = REG_SAVED;
                 }
             default:
                 break;
@@ -62,7 +73,7 @@ RegisterAllocation allocate_registers(IRBlock* block) {
             }
             if (assignment == -1) {
                 assignment = reg_active.size;
-                Vec_push(ret.reg_info, ((RegInfo){0, false}));
+                Vec_push(ret.reg_info, ((RegInfo){0, REG_SCRATCH}));
                 Vec_push(reg_active, true);
             }
             ret.reg_info.d[assignment].uses += 1 + vuses[i];
@@ -83,18 +94,20 @@ void regalloc_free(RegisterAllocation* regalloc) {
     free(regalloc->reg_assn);
 }
 
-void regalloc_print(IRBlock* block, RegisterAllocation* regalloc) {
+void regalloc_print(RegisterAllocation* regalloc) {
+    static const char typenames[3][2] = {"k", "t", "s"};
+
     eprintf("Registers:");
     for (int i = 0; i < regalloc->reg_info.size; i++) {
-        eprintf(" %s%d(%d)", regalloc->reg_info.d[i].calleesaved ? "s" : "t", i,
+        eprintf(" %s%d(%d)", typenames[regalloc->reg_info.d[i].type], i,
                 regalloc->reg_info.d[i].uses);
     }
-    eprintf("\nAssignments: ");
-    for (int i = 0; i < block->code.size; i++) {
+    eprintf("\nAssignments:");
+    for (int i = 0; i < regalloc->nassns; i++) {
         u32 assn = regalloc->reg_assn[i];
         if (assn == -1) continue;
-        eprintf(" v%d:%s%d", i,
-                regalloc->reg_info.d[assn].calleesaved ? "s" : "t", assn);
+        eprintf(" v%d:%s%d", i, typenames[regalloc->reg_info.d[assn].type],
+                assn);
     }
     eprintf("\n");
 }

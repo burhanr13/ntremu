@@ -9,31 +9,35 @@
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
-    block->cpu = cpu;
     block->start_addr = addr;
-    irblock_init(&block->ir, addr);
 
-    compile_block(cpu, &block->ir, addr);
+    IRBlock* ir = malloc(sizeof(*block->ir));
+    irblock_init(ir);
 
-    block->end_addr = block->ir.end_addr;
+    block->cpu = cpu;
+    block->ir = ir;
 
-    block->numinstr = block->ir.numinstr;
+    compile_block(cpu, ir, addr);
 
-    optimize_loadstore(&block->ir);
-    optimize_constprop(&block->ir);
-    optimize_constmem(&block->ir, cpu);
-    optimize_chainjumps(&block->ir);
-    optimize_loadstore(&block->ir);
-    optimize_constprop(&block->ir);
-    optimize_deadcode(&block->ir);
-    if (block->ir.loop) optimize_waitloop(&block->ir);
-    optimize_blocklinking(&block->ir, cpu);
+    block->numinstr = ir->numinstr;
 
-    RegisterAllocation regalloc = allocate_registers(&block->ir);
+    optimize_loadstore(ir);
+    optimize_constprop(ir);
+    optimize_literals(ir, cpu);
+    optimize_chainjumps(ir);
+    optimize_loadstore(ir);
+    optimize_constprop(ir);
+    optimize_deadcode(ir);
+    if (ir->loop) optimize_waitloop(ir);
+    optimize_blocklinking(ir, cpu);
+
+    block->end_addr = ir->end_addr;
+
+    RegisterAllocation regalloc = allocate_registers(ir);
 
 #ifdef IR_DISASM
-    ir_disassemble(&block->ir);
-    regalloc_print(&block->ir, &regalloc);
+    ir_disassemble(ir);
+    regalloc_print(&regalloc);
 #endif
 
     regalloc_free(&regalloc);
@@ -42,7 +46,8 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 }
 
 void destroy_jit_block(JITBlock* block) {
-    irblock_free(&block->ir);
+    irblock_free(block->ir);
+    free(block->ir);
     free(block);
 }
 
@@ -50,7 +55,7 @@ void jit_exec(JITBlock* block) {
 #ifdef JIT_LOG
     eprintf("executing block at 0x%08x\n", block->start_addr);
 #endif
-    ir_interpret(&block->ir, block->cpu);
+    ir_interpret(block->ir, block->cpu);
 }
 
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
@@ -77,7 +82,7 @@ void invalidate_l2(ArmCore* cpu, u32 attr, u32 addrhi, u32 startlo, u32 endlo) {
             cpu->jit_cache[attr][addrhi][i] = NULL;
         }
     }
-    if (startlo == 0 && endlo == (1 << 15)) {
+    if (startlo == 0 && endlo == BIT(15)) {
         free(cpu->jit_cache[attr][addrhi]);
         cpu->jit_cache[attr][addrhi] = NULL;
     }
@@ -103,6 +108,24 @@ void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
         if (start_addr == 0 && end_addr == -1) {
             free(cpu->jit_cache[i]);
             cpu->jit_cache[i] = NULL;
+        }
+    }
+}
+
+void jit_free_all(ArmCore* cpu) {
+    for (int i = 0; i < 64; i++) {
+        if (cpu->jit_cache[i]) {
+            for (int j = 0; j < 1 << 16; j++) {
+                if (cpu->jit_cache[i][j]) {
+                    for (int k = 0; k < 1 << 15; k++) {
+                        if (cpu->jit_cache[i][j][k]) {
+                            destroy_jit_block(cpu->jit_cache[i][j][k]);
+                        }
+                    }
+                    free(cpu->jit_cache[i][j]);
+                }
+            }
+            free(cpu->jit_cache[i]);
         }
     }
 }

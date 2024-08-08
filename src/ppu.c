@@ -20,7 +20,7 @@ const int OBJLAYOUT[4][3] = {
     {8, 8, 16}, {16, 8, 32}, {32, 16, 32}, {64, 32, 64}};
 
 void render_bg_line_text(PPU* ppu, int bg) {
-    if (!(ppu->io->dispcnt.bg_enable & (1 << bg))) return;
+    if (!(ppu->io->dispcnt.bg_enable & BIT(bg))) return;
     ppu->draw_bg[bg] = true;
 
     u16* bpp8Pal = ppu->pal;
@@ -74,7 +74,7 @@ void render_bg_line_text(PPU* ppu, int bg) {
             u16 col_ind = row & 0xff;
             if (col_ind) {
                 if (extPal) col_ind |= tile.palette << 8;
-                ppu->layerlines[bg][x] = bpp8Pal[col_ind] | (1 << 15);
+                ppu->layerlines[bg][x] = bpp8Pal[col_ind] | BIT(15);
             }
 
             row >>= 8;
@@ -123,7 +123,7 @@ void render_bg_line_text(PPU* ppu, int bg) {
             u8 col_ind = row & 0xf;
             if (col_ind) {
                 col_ind |= tile.palette << 4;
-                ppu->layerlines[bg][x] = ppu->pal[col_ind] | (1 << 15);
+                ppu->layerlines[bg][x] = ppu->pal[col_ind] | BIT(15);
             }
 
             row >>= 4;
@@ -155,7 +155,7 @@ void render_bg_line_text(PPU* ppu, int bg) {
 }
 
 void render_bg_line_aff(PPU* ppu, int bg) {
-    if (!(ppu->io->dispcnt.bg_enable & (1 << bg))) return;
+    if (!(ppu->io->dispcnt.bg_enable & BIT(bg))) return;
     ppu->draw_bg[bg] = true;
 
     u32 map_start = ppu->io->dispcnt.tilemap_base * 0x10000 +
@@ -194,12 +194,12 @@ void render_bg_line_aff(PPU* ppu, int bg) {
         col_ind = vram_read8(ppu->master, ppu->bgReg,
                              tile_start + 64 * tile + finey * 8 + finex);
 
-        if (col_ind) ppu->layerlines[bg][x] = ppu->pal[col_ind] | (1 << 15);
+        if (col_ind) ppu->layerlines[bg][x] = ppu->pal[col_ind] | BIT(15);
     }
 }
 
 void render_bg_line_aff_ext(PPU* ppu, int bg) {
-    if (!(ppu->io->dispcnt.bg_enable & (1 << bg))) return;
+    if (!(ppu->io->dispcnt.bg_enable & BIT(bg))) return;
     ppu->draw_bg[bg] = true;
 
     u16* bpp8Pal = ppu->pal;
@@ -253,7 +253,7 @@ void render_bg_line_aff_ext(PPU* ppu, int bg) {
                 u8 col_ind =
                     vram_read8(ppu->master, ppu->bgReg, bm_start + offset);
                 if (col_ind) {
-                    ppu->layerlines[bg][x] = ppu->pal[col_ind] | (1 << 15);
+                    ppu->layerlines[bg][x] = ppu->pal[col_ind] | BIT(15);
                 }
             }
         } else {
@@ -272,7 +272,7 @@ void render_bg_line_aff_ext(PPU* ppu, int bg) {
 
             if (col_ind) {
                 if (extPal) col_ind |= tile.palette << 8;
-                ppu->layerlines[bg][x] = bpp8Pal[col_ind] | (1 << 15);
+                ppu->layerlines[bg][x] = bpp8Pal[col_ind] | BIT(15);
             }
         }
     }
@@ -393,8 +393,8 @@ void render_obj_line(PPU* ppu, int i) {
 
             u16 col = vram_read16(ppu->master, ppu->objReg, bm_start);
             if (o.priority < ppu->objdotattrs[sx].priority ||
-                !(ppu->layerlines[LOBJ][sx] & (1 << 15))) {
-                if (col & (1 << 15)) {
+                !(ppu->layerlines[LOBJ][sx] & BIT(15))) {
+                if (col & BIT(15)) {
                     ppu->draw_obj = true;
                     ppu->layerlines[LOBJ][sx] = col;
                     ppu->objdotattrs[sx].mosaic = o.mosaic;
@@ -441,7 +441,7 @@ void render_obj_line(PPU* ppu, int i) {
                         vram_read8(ppu->master, ppu->objReg, tile_addr);
                     if (col_ind) {
                         if (extPal) col_ind |= o.palette << 8;
-                        col = bpp8Pal[col_ind] | (1 << 15);
+                        col = bpp8Pal[col_ind] | BIT(15);
                     } else col = 0;
                 } else {
                     u32 tile_addr =
@@ -454,17 +454,17 @@ void render_obj_line(PPU* ppu, int i) {
                     else col_ind &= 0b1111;
                     if (col_ind) {
                         col_ind |= o.palette << 4;
-                        col = ppu->pal[0x100 + col_ind] | (1 << 15);
+                        col = ppu->pal[0x100 + col_ind] | BIT(15);
                     } else col = 0;
                 }
             }
             if (o.mode == OBJ_MODE_OBJWIN) {
-                if (ppu->io->dispcnt.winobj_enable && (col & (1 << 15))) {
+                if (ppu->io->dispcnt.winobj_enable && (col & BIT(15))) {
                     ppu->window[sx] = WOBJ;
                 }
             } else if (o.priority < ppu->objdotattrs[sx].priority ||
-                       !(ppu->layerlines[LOBJ][sx] & (1 << 15))) {
-                if (col & (1 << 15)) {
+                       !(ppu->layerlines[LOBJ][sx] & BIT(15))) {
+                if (col & BIT(15)) {
                     ppu->draw_obj = true;
                     ppu->layerlines[LOBJ][sx] = col;
                     ppu->objdotattrs[sx].semitrans =
@@ -512,12 +512,12 @@ void render_obj_line(PPU* ppu, int i) {
                             ppu->window[sx] = WOBJ;
                         }
                     } else if (o.priority < ppu->objdotattrs[sx].priority ||
-                               !(ppu->layerlines[LOBJ][sx] & (1 << 15))) {
+                               !(ppu->layerlines[LOBJ][sx] & BIT(15))) {
                         if (col_ind) {
                             if (extPal) col_ind |= o.palette << 8;
                             u16 col = bpp8Pal[col_ind];
                             ppu->draw_obj = true;
-                            ppu->layerlines[LOBJ][sx] = col | (1 << 15);
+                            ppu->layerlines[LOBJ][sx] = col | BIT(15);
                             ppu->objdotattrs[sx].semitrans =
                                 o.mode == OBJ_MODE_SEMITRANS;
                             ppu->objdotattrs[sx].mosaic = o.mosaic;
@@ -575,12 +575,12 @@ void render_obj_line(PPU* ppu, int i) {
                             ppu->window[sx] = WOBJ;
                         }
                     } else if (o.priority < ppu->objdotattrs[sx].priority ||
-                               !(ppu->layerlines[LOBJ][sx] & (1 << 15))) {
+                               !(ppu->layerlines[LOBJ][sx] & BIT(15))) {
                         if (col_ind) {
                             col_ind |= o.palette << 4;
                             u16 col = ppu->pal[0x100 + col_ind];
                             ppu->draw_obj = true;
-                            ppu->layerlines[LOBJ][sx] = col | (1 << 15);
+                            ppu->layerlines[LOBJ][sx] = col | BIT(15);
                             ppu->objdotattrs[sx].semitrans =
                                 o.mode == OBJ_MODE_SEMITRANS;
                             ppu->objdotattrs[sx].mosaic = o.mosaic;
@@ -623,7 +623,7 @@ void render_windows(PPU* ppu) {
     if (!ppu->io->dispcnt.win_enable) return;
 
     for (int i = 1; i >= 0; i--) {
-        if (!(ppu->io->dispcnt.win_enable & (1 << i)) || !ppu->in_win[i])
+        if (!(ppu->io->dispcnt.win_enable & BIT(i)) || !ppu->in_win[i])
             continue;
 
         u8 x1 = ppu->io->winh[i].x1;
@@ -698,16 +698,16 @@ void compose_lines(PPU* ppu) {
             u8 win = ppu->window[x];
             int l = 0;
             bool put_obj = ppu->draw_obj &&
-                           (ppu->layerlines[LOBJ][x] & (1 << 15)) &&
+                           (ppu->layerlines[LOBJ][x] & BIT(15)) &&
                            (!win_ena || (ppu->io->wincnt[win].obj_enable));
             for (int i = 0; i < bgs && l < 2; i++) {
                 if (put_obj && ppu->objdotattrs[x].priority <= bg_prios[i]) {
                     put_obj = false;
                     layers[l++] = LOBJ;
                 }
-                if ((ppu->layerlines[sorted_bgs[i]][x] & (1 << 15)) &&
+                if ((ppu->layerlines[sorted_bgs[i]][x] & BIT(15)) &&
                     (!win_ena ||
-                     (ppu->io->wincnt[win].bg_enable & (1 << sorted_bgs[i])))) {
+                     (ppu->io->wincnt[win].bg_enable & BIT(sorted_bgs[i])))) {
                     layers[l++] = sorted_bgs[i];
                 }
             }
@@ -719,7 +719,7 @@ void compose_lines(PPU* ppu) {
             u32 color1 = ppu->layerlines[layers[0]][x];
 
             if (layers[0] == LOBJ && ppu->objdotattrs[x].semitrans && l > 1 &&
-                (ppu->io->bldcnt.target2 & (1 << layers[1]))) {
+                (ppu->io->bldcnt.target2 & BIT(layers[1]))) {
                 u8 r1 = color1 & 0x1f;
                 u8 g1 = (color1 >> 5) & 0x1f;
                 u8 b1 = (color1 >> 10) & 0x1f;
@@ -734,7 +734,7 @@ void compose_lines(PPU* ppu) {
                 b1 = (eva * b1 + evb * b2) / 16;
                 if (b1 > 31) b1 = 31;
                 ppu->cur_line[x] = (b1 << 10) | (g1 << 5) | r1;
-            } else if ((ppu->io->bldcnt.target1 & (1 << layers[0])) &&
+            } else if ((ppu->io->bldcnt.target1 & BIT(layers[0])) &&
                        (!win_ena || ppu->io->wincnt[win].effects_enable ||
                         (layers[0] == LBG0 && ppu->bg0_3d))) {
                 u8 r1 = color1 & 0x1f;
@@ -743,7 +743,7 @@ void compose_lines(PPU* ppu) {
                 switch (effect) {
                     case EFF_ALPHA: {
                         if (l == 1 ||
-                            !(ppu->io->bldcnt.target2 & (1 << layers[1])))
+                            !(ppu->io->bldcnt.target2 & BIT(layers[1])))
                             break;
                         u16 color2 = ppu->layerlines[layers[1]][x];
                         u8 r2 = color2 & 0x1f;
@@ -790,7 +790,7 @@ void compose_lines(PPU* ppu) {
             u8 win = ppu->window[x];
             int l = 0;
             bool put_obj = ppu->draw_obj &&
-                           (ppu->layerlines[LOBJ][x] & (1 << 15)) &&
+                           (ppu->layerlines[LOBJ][x] & BIT(15)) &&
                            (!win_ena || (ppu->io->wincnt[win].obj_enable));
 
             for (int i = 0; i < bgs; i++) {
@@ -799,9 +799,9 @@ void compose_lines(PPU* ppu) {
                     layers[l++] = LOBJ;
                     break;
                 }
-                if ((ppu->layerlines[sorted_bgs[i]][x] & (1 << 15)) &&
+                if ((ppu->layerlines[sorted_bgs[i]][x] & BIT(15)) &&
                     (!win_ena ||
-                     (ppu->io->wincnt[win].bg_enable & (1 << sorted_bgs[i])))) {
+                     (ppu->io->wincnt[win].bg_enable & BIT(sorted_bgs[i])))) {
                     layers[l++] = sorted_bgs[i];
                     break;
                 }

@@ -43,7 +43,7 @@
             }                                                                  \
             case R_GBAROM:                                                     \
             case R_GBAROMEX:                                                   \
-                return *(u##size*) &nds->expansionram[addr % (1 << 25)];       \
+                return *(u##size*) &nds->expansionram[addr % BIT(25)];         \
         }                                                                      \
         nds->memerr = true;                                                    \
         return -1;                                                             \
@@ -89,7 +89,7 @@
             }                                                                  \
             case R_GBAROM:                                                     \
             case R_GBAROMEX:                                                   \
-                *(u##size*) &nds->expansionram[addr % (1 << 25)] = data;       \
+                *(u##size*) &nds->expansionram[addr % BIT(25)] = data;         \
         }                                                                      \
     }
 

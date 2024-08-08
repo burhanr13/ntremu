@@ -597,7 +597,7 @@ DECL_ARM_EXEC(leading_zeros) {
     u32 ct = 0;
     if (op == 0) ct = 32;
     else
-        while (!(op & (1 << 31))) {
+        while (!(op & BIT(31))) {
             op <<= 1;
             ct++;
         }
@@ -785,7 +785,7 @@ DECL_ARM_EXEC(block_trans) {
     u32 wback = addr;
     if (instr.block_trans.rlist) {
         for (int i = 0; i < 16; i++) {
-            if (instr.block_trans.rlist & (1 << i)) rlist[rcount++] = i;
+            if (instr.block_trans.rlist & BIT(i)) rlist[rcount++] = i;
         }
         if (instr.block_trans.u) {
             wback += 4 * rcount;
@@ -812,7 +812,7 @@ DECL_ARM_EXEC(block_trans) {
     cpu_fetch_instr(cpu);
 
     if (instr.block_trans.s &&
-        !((instr.block_trans.rlist & (1 << 15)) && instr.block_trans.l)) {
+        !((instr.block_trans.rlist & BIT(15)) && instr.block_trans.l)) {
         if (instr.block_trans.l) {
             for (int i = 0; i < rcount; i++) {
                 if (i == rcount - 1 && instr.block_trans.w)
@@ -845,7 +845,7 @@ DECL_ARM_EXEC(block_trans) {
                 if (rcount < 2 && instr.block_trans.w)
                     cpu->r[instr.block_trans.rn] = wback;
             }
-            if (instr.block_trans.rlist & (1 << 15)) {
+            if (instr.block_trans.rlist & BIT(15)) {
                 if (cpu->v5) cpu->cpsr.t = cpu->pc & 1;
                 if (instr.block_trans.s) {
                     CpuMode mode = cpu->cpsr.m;
@@ -881,7 +881,7 @@ DECL_ARM_EXEC(branch) {
     u32 dest = cpu->pc + offset;
     if (instr.branch.l || instr.cond == 0xf) {
         if (cpu->cpsr.t) {
-            if (offset & (1 << 23)) {
+            if (offset & BIT(23)) {
                 offset %= 1 << 23;
                 cpu->lr += offset;
                 dest = cpu->lr;
@@ -891,7 +891,7 @@ DECL_ARM_EXEC(branch) {
                     cpu->cpsr.t = 0;
                 }
             } else {
-                if (offset & (1 << 22)) dest += 0xff800000;
+                if (offset & BIT(22)) dest += 0xff800000;
                 cpu->lr = dest;
                 cpu_fetch_instr(cpu);
                 return;
@@ -955,7 +955,7 @@ void arm_disassemble(ArmInstr instr, u32 addr, FILE* out) {
             break;
         case ARM_BRANCH: {
             u32 off = instr.branch.offset;
-            if (off & (1 << 23)) off |= 0xff000000;
+            if (off & BIT(23)) off |= 0xff000000;
             if (instr.cond == 0xf) {
                 fprintf(out, "blx 0x%x",
                         addr + 8 * (off << 2) + (instr.branch.l << 1));

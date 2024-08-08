@@ -5,8 +5,8 @@
 #include "arm/arm_core.h"
 #include "types.h"
 
-#define ITCMSIZE (1 << 15)
-#define DTCMSIZE (1 << 14)
+#define ITCMSIZE BIT(15)
+#define DTCMSIZE BIT(14)
 
 typedef struct _NDS NDS;
 

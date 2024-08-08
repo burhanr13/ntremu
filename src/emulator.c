@@ -101,8 +101,8 @@ int emulator_init(int argc, char** argv) {
 void emulator_quit() {
     close(ntremu.dldi_sd_fd);
     destroy_card(ntremu.card);
-    jit_invalidate_all((ArmCore*) &ntremu.nds->cpu7);
-    jit_invalidate_all((ArmCore*) &ntremu.nds->cpu9);
+    jit_free_all((ArmCore*) &ntremu.nds->cpu7);
+    jit_free_all((ArmCore*) &ntremu.nds->cpu9);
     free(ntremu.nds);
     munmap(ntremu.bios7, BIOS7SIZE);
     munmap(ntremu.bios9, BIOS9SIZE);
@@ -111,8 +111,8 @@ void emulator_quit() {
 
 void emulator_reset() {
     if (ntremu.initialized) {
-        jit_invalidate_all((ArmCore*) &ntremu.nds->cpu7);
-        jit_invalidate_all((ArmCore*) &ntremu.nds->cpu9);
+        jit_free_all((ArmCore*) &ntremu.nds->cpu7);
+        jit_free_all((ArmCore*) &ntremu.nds->cpu9);
     }
     init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
              ntremu.firmware, ntremu.bootbios);
@@ -270,9 +270,9 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds,
             SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY);
         x -= 3000;
         y -= 400;
-        if (x >= (1 << 15)) x = (1 << 15) - 1;
+        if (x >= BIT(15)) x = BIT(15) - 1;
         if (x < INT16_MIN) x = INT16_MIN;
-        if (y >= (1 << 15)) y = (1 << 15) - 1;
+        if (y >= BIT(15)) y = BIT(15) - 1;
         if (y < INT16_MIN) y = INT16_MIN;
         if (abs(x) >= 3000 || abs(y) >= 3000) {
             pressed = true;

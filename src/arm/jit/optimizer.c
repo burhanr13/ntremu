@@ -1,5 +1,7 @@
 #include "optimizer.h"
 
+#include "jit.h"
+
 #define MOVX(_op2, imm)                                                        \
     ((IRInstr){.opcode = IR_MOV, .imm1 = 1, .imm2 = imm, .op1 = 0, .op2 = _op2})
 #define MOVI(op2) MOVX(op2, 1)
@@ -439,7 +441,10 @@ void optimize_constprop(IRBlock* block) {
     }
 }
 
-void optimize_constmem(IRBlock* block, ArmCore* cpu) {
+void optimize_literals(IRBlock* block, ArmCore* cpu) {
+    u32 latest_const = block->end_addr + BIT(10);
+    if (latest_const > block->start_addr + MAX_BLOCK_SIZE)
+        latest_const = block->start_addr + MAX_BLOCK_SIZE;
     for (int i = 0; i < block->code.size; i++) {
         IRInstr* inst = &block->code.d[i];
         switch (inst->opcode) {
@@ -448,7 +453,8 @@ void optimize_constmem(IRBlock* block, ArmCore* cpu) {
             case IR_LOAD_MEM16:
             case IR_LOAD_MEMS16:
             case IR_LOAD_MEM32:
-                if ((inst->op1 >> 12) == (block->start_addr >> 12)) {
+                if (inst->op1 >= block->start_addr &&
+                    inst->op1 < latest_const) {
                     switch (inst->opcode) {
                         case IR_LOAD_MEM8:
                             *inst = MOVI(cpu->read8(cpu, inst->op1, false));
@@ -468,6 +474,8 @@ void optimize_constmem(IRBlock* block, ArmCore* cpu) {
                         default:
                             break;
                     }
+                    if (inst->op1 > block->end_addr)
+                        block->end_addr = inst->op1;
                 }
                 break;
             default:
@@ -548,10 +556,10 @@ void optimize_deadcode(IRBlock* block) {
 }
 
 void optimize_waitloop(IRBlock* block) {
-#define R(n) (1 << n)
-#define CPSR (1 << 16)
-#define SPSR (1 << 17)
-#define MEM (1 << 18)
+#define R(n) BIT(n)
+#define CPSR BIT(16)
+#define SPSR BIT(17)
+#define MEM BIT(18)
 #define LOAD(v) (loaded |= v);
 #define STORE(v) (loaded & (v) ? modified |= v : 0)
 

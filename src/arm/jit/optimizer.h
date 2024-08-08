@@ -6,7 +6,7 @@
 
 void optimize_loadstore(IRBlock* block);
 void optimize_constprop(IRBlock* block);
-void optimize_constmem(IRBlock* block, ArmCore* cpu);
+void optimize_literals(IRBlock* block, ArmCore* cpu);
 void optimize_chainjumps(IRBlock* block);
 void optimize_deadcode(IRBlock* block);
 void optimize_waitloop(IRBlock* block);

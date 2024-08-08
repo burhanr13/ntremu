@@ -12,19 +12,19 @@
 #include "spu.h"
 #include "timer.h"
 
-#define RAMSIZE (1 << 22)
+#define RAMSIZE BIT(22)
 
-#define WRAMSIZE (1 << 15)
-#define WRAM7SIZE (1 << 16)
+#define WRAMSIZE BIT(15)
+#define WRAM7SIZE BIT(16)
 
-#define WIFIRAMSIZE (1 << 13)
-#define WIFIIOSIZE (1 << 12)
+#define WIFIRAMSIZE BIT(13)
+#define WIFIIOSIZE BIT(12)
 
 #define VRAMSIZE 0xa4000
-#define VRAMABCDSIZE (1 << 17)
-#define VRAMESIZE (1 << 16)
-#define VRAMFGISIZE (1 << 14)
-#define VRAMHSIZE (1 << 15)
+#define VRAMABCDSIZE BIT(17)
+#define VRAMESIZE BIT(16)
+#define VRAMFGISIZE BIT(14)
+#define VRAMHSIZE BIT(15)
 
 typedef enum {
     VRAMNULL,
@@ -39,14 +39,14 @@ typedef enum {
     VRAMI
 } VRAMBank;
 
-#define PALSIZE (1 << 10)
+#define PALSIZE BIT(10)
 
-#define OAMSIZE (1 << 10)
+#define OAMSIZE BIT(10)
 #define OAMOBJS 128
 
-#define BIOS7SIZE (1 << 14)
-#define BIOS9SIZE (1 << 12)
-#define FIRMWARESIZE (1 << 18)
+#define BIOS7SIZE BIT(14)
+#define BIOS9SIZE BIT(12)
+#define FIRMWARESIZE BIT(18)
 
 typedef enum { CPU9, CPU7 } CPUType;
 

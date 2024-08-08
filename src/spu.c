@@ -68,7 +68,8 @@ void spu_tick_channel(SPU* spu, int i) {
                 data &= 0xf;
             }
 
-            float diff = ((data & 7) * 2 + 1) * adpcm_table[spu->adpcm_idx[i]] / 8;
+            float diff =
+                ((data & 7) * 2 + 1) * adpcm_table[spu->adpcm_idx[i]] / 8;
             cur_sample = spu->adpcm_sample[i];
             if (data & 8) {
                 cur_sample -= diff;
@@ -114,7 +115,7 @@ void spu_tick_channel(SPU* spu, int i) {
     }
 
     int vol_div = spu->master->io7.sound[i].cnt.volume_div;
-    cur_sample /= (1 << vol_div);
+    cur_sample /= BIT(vol_div);
     if (vol_div == 3) cur_sample /= 2;
     cur_sample *= spu->master->io7.sound[i].cnt.volume / (float) 128;
 

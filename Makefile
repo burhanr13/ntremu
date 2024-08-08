@@ -4,7 +4,7 @@ CC := gcc
 
 CFLAGS := -Wall -Wimplicit-fallthrough -Werror
 CFLAGS_RELEASE := -O3 -flto
-CFLAGS_DEBUG := -g -fsanitize=address -fsanitize=undefined
+CFLAGS_DEBUG := -g -fsanitize=address
 
 CPPFLAGS := -MP -MMD
 

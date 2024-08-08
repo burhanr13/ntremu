@@ -193,8 +193,8 @@ void io7_write16(IO* io, u32 addr, u16 data) {
             u16 mask = 0x8404;
             io->ipcfifocnt.w &= ~mask;
             io->ipcfifocnt.w |= data & mask;
-            if (data & (1 << 14)) io->ipcfifocnt.error = 0;
-            if (data & (1 << 3)) {
+            if (data & BIT(14)) io->ipcfifocnt.error = 0;
+            if (data & BIT(3)) {
                 FIFO_clear(io->master->ipcfifo7to9);
                 io->ipcfifocnt.sendempty = 1;
                 io->ipcfifocnt.sendfull = 0;
@@ -787,8 +787,8 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             u16 mask = 0x8404;
             io->ipcfifocnt.w &= ~mask;
             io->ipcfifocnt.w |= data & mask;
-            if (data & (1 << 14)) io->ipcfifocnt.error = 0;
-            if (data & (1 << 3)) {
+            if (data & BIT(14)) io->ipcfifocnt.error = 0;
+            if (data & BIT(3)) {
                 FIFO_clear(io->master->ipcfifo9to7);
                 io->ipcfifocnt.sendempty = 1;
                 io->ipcfifocnt.sendfull = 0;
@@ -849,7 +849,7 @@ void io9_write16(IO* io, u32 addr, u16 data) {
             io9_write32(io, addr & ~3, data << 16);
             break;
         case GXSTAT:
-            if (data & (1 << 15)) io->gxstat.mtxstk_error = 0;
+            if (data & BIT(15)) io->gxstat.mtxstk_error = 0;
             break;
         case GXSTAT + 2:
             io->h[addr >> 1] &= 0x3fff;

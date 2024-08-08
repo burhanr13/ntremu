@@ -258,9 +258,9 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
                 dec.block_trans.rlist = instr.push_pop.rlist;
                 if (instr.push_pop.r) {
                     if (instr.push_pop.l) {
-                        dec.block_trans.rlist |= (1 << 15);
+                        dec.block_trans.rlist |= BIT(15);
                     } else {
-                        dec.block_trans.rlist |= (1 << 14);
+                        dec.block_trans.rlist |= BIT(14);
                     }
                 }
             }
@@ -281,7 +281,7 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
                 dec.branch.c1 = 0b101;
                 dec.branch.l = 0;
                 u32 offset = instr.b_cond.offset;
-                if (offset & (1 << 7)) offset |= 0xffffff00;
+                if (offset & BIT(7)) offset |= 0xffffff00;
                 dec.branch.offset = offset;
             } else {
                 dec.sw_intr.c1 = 0b1111;
@@ -294,7 +294,7 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
             if (instr.branch.c1 == 0b11100) {
                 dec.branch.l = 0;
                 u32 offset = instr.branch.offset;
-                if (offset & (1 << 10)) offset |= 0xfffff800;
+                if (offset & BIT(10)) offset |= 0xfffff800;
                 dec.branch.offset = offset;
             } else {
                 dec.branch.l = 1;

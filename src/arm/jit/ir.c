@@ -18,13 +18,8 @@
 
 void ir_interpret(IRBlock* block, ArmCore* cpu) {
     u32 i = 0;
-    static u32* v = NULL;
-    static int vsize = 0;
-    if (vsize < block->code.size) {
-        vsize = block->code.size;
-        free(v);
-        v = malloc(sizeof(u32) * block->code.size);
-    }
+    u32 v[block->code.size];
+
 #ifdef IR_TRACE
     if (block->start_addr == IR_TRACE_ADDR) {
         eprintf("======== tracing IR block 0x%08x =========\n",
@@ -45,11 +40,11 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 cpu->r[OP(1)] = OP(2);
                 break;
             case IR_LOAD_FLAG:
-                v[i] = (cpu->cpsr.w & (1 << (31 - OP(1)))) ? 1 : 0;
+                v[i] = (cpu->cpsr.w & BIT(31 - OP(1))) ? 1 : 0;
                 break;
             case IR_STORE_FLAG:
-                cpu->cpsr.w &= ~(1 << (31 - OP(1)));
-                if (OP(2)) cpu->cpsr.w |= (1 << (31 - OP(1)));
+                cpu->cpsr.w &= ~BIT(31 - OP(1));
+                if (OP(2)) cpu->cpsr.w |= BIT(31 - OP(1));
                 break;
             case IR_LOAD_REG_USR: {
                 int rd = OP(1);
@@ -234,7 +229,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 u32 ct = 0;
                 if (op == 0) ct = 32;
                 else
-                    while (!(op & (1 << 31))) {
+                    while (!(op & BIT(31))) {
                         op <<= 1;
                         ct++;
                     }

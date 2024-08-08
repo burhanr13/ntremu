@@ -137,13 +137,13 @@ void update_mtxs(GPU* gpu) {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             gpu->master->io9.clipmtx_result[j][i] =
-                gpu->clipmtx.p[i][j] * (1 << 12);
+                gpu->clipmtx.p[i][j] * BIT(12);
         }
     }
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
             gpu->master->io9.vecmtx_result[j][i] =
-                gpu->vecmtx.p[i][j] * (1 << 12);
+                gpu->vecmtx.p[i][j] * BIT(12);
         }
     }
 
@@ -530,7 +530,7 @@ void gxcmd_execute(GPU* gpu) {
                 for (int i = 0; i < 4; i++) {
                     s32 p;
                     FIFO_pop(gpu->param_fifo, p);
-                    m.p[i][j] = (s32) p / (float) (1 << 12);
+                    m.p[i][j] = (s32) p / (float) BIT(12);
                 }
             }
             switch (gpu->mtx_mode) {
@@ -557,7 +557,7 @@ void gxcmd_execute(GPU* gpu) {
                 for (int i = 0; i < 3; i++) {
                     s32 p;
                     FIFO_pop(gpu->param_fifo, p);
-                    m.p[i][j] = p / (float) (1 << 12);
+                    m.p[i][j] = p / (float) BIT(12);
                 }
             }
             m.p[3][0] = m.p[3][1] = m.p[3][2] = 0;
@@ -586,7 +586,7 @@ void gxcmd_execute(GPU* gpu) {
                 for (int i = 0; i < 4; i++) {
                     s32 p;
                     FIFO_pop(gpu->param_fifo, p);
-                    m.p[i][j] = p / (float) (1 << 12);
+                    m.p[i][j] = p / (float) BIT(12);
                 }
             }
             switch (gpu->mtx_mode) {
@@ -613,7 +613,7 @@ void gxcmd_execute(GPU* gpu) {
                 for (int i = 0; i < 3; i++) {
                     s32 p;
                     FIFO_pop(gpu->param_fifo, p);
-                    m.p[i][j] = p / (float) (1 << 12);
+                    m.p[i][j] = p / (float) BIT(12);
                 }
             }
             m.p[3][0] = m.p[3][1] = m.p[3][2] = 0;
@@ -642,7 +642,7 @@ void gxcmd_execute(GPU* gpu) {
                 for (int i = 0; i < 3; i++) {
                     s32 p;
                     FIFO_pop(gpu->param_fifo, p);
-                    m.p[i][j] = p / (float) (1 << 12);
+                    m.p[i][j] = p / (float) BIT(12);
                 }
             }
             m.p[3][0] = m.p[3][1] = m.p[3][2] = 0;
@@ -670,11 +670,11 @@ void gxcmd_execute(GPU* gpu) {
             mat4 m = {};
             s32 p;
             FIFO_pop(gpu->param_fifo, p);
-            m.p[0][0] = p / (float) (1 << 12);
+            m.p[0][0] = p / (float) BIT(12);
             FIFO_pop(gpu->param_fifo, p);
-            m.p[1][1] = p / (float) (1 << 12);
+            m.p[1][1] = p / (float) BIT(12);
             FIFO_pop(gpu->param_fifo, p);
-            m.p[2][2] = p / (float) (1 << 12);
+            m.p[2][2] = p / (float) BIT(12);
             m.p[3][3] = 1;
             switch (gpu->mtx_mode) {
                 case MM_PROJ:
@@ -698,11 +698,11 @@ void gxcmd_execute(GPU* gpu) {
             m.p[2][2] = 1;
             s32 p;
             FIFO_pop(gpu->param_fifo, p);
-            m.p[0][3] = p / (float) (1 << 12);
+            m.p[0][3] = p / (float) BIT(12);
             FIFO_pop(gpu->param_fifo, p);
-            m.p[1][3] = p / (float) (1 << 12);
+            m.p[1][3] = p / (float) BIT(12);
             FIFO_pop(gpu->param_fifo, p);
-            m.p[2][3] = p / (float) (1 << 12);
+            m.p[2][3] = p / (float) BIT(12);
             m.p[3][3] = 1;
             switch (gpu->mtx_mode) {
                 case MM_PROJ:
@@ -733,11 +733,11 @@ void gxcmd_execute(GPU* gpu) {
         case NORMAL: {
             vec4 normal;
             FIFO_pop(gpu->param_fifo, p0);
-            normal.p[0] = ((s32) (p0 & 0x3ff) << 22) / (float) (u32) (1 << 31);
+            normal.p[0] = ((s32) (p0 & 0x3ff) << 22) / (float) (u32) BIT(31);
             normal.p[1] =
-                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) (1 << 31);
+                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) BIT(31);
             normal.p[2] =
-                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) (1 << 31);
+                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) BIT(31);
             normal.p[3] = 0;
 
             if (gpu->cur_texparam.transform == TEXTF_NORMAL) {
@@ -755,7 +755,7 @@ void gxcmd_execute(GPU* gpu) {
             gpu->cur_vtx.g = gpu->cur_mtl1.emi_g;
             gpu->cur_vtx.b = gpu->cur_mtl1.emi_b;
             for (int l = 0; l < 4; l++) {
-                if (!(gpu->cur_attr.light_enable & (1 << l))) continue;
+                if (!(gpu->cur_attr.light_enable & BIT(l))) continue;
                 float dp = normal.p[0] * gpu->lightvec[l].p[0] +
                            normal.p[1] * gpu->lightvec[l].p[1] +
                            normal.p[2] * gpu->lightvec[l].p[2];
@@ -798,9 +798,8 @@ void gxcmd_execute(GPU* gpu) {
         case TEXCOORD:
             FIFO_pop(gpu->param_fifo, p0);
             gpu->cur_texcoord.p[0] =
-                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 20);
-            gpu->cur_texcoord.p[1] =
-                (s32) (p0 & 0xffff0000) / (float) (1 << 20);
+                ((s32) (p0 & 0xffff) << 16) / (float) BIT(20);
+            gpu->cur_texcoord.p[1] = (s32) (p0 & 0xffff0000) / (float) BIT(20);
             gpu->cur_vtx.vt = gpu->cur_texcoord;
             if (gpu->cur_texparam.transform == TEXTF_TEXCOORD) {
                 gpu->cur_vtx.vt.p[2] = 0.0625f;
@@ -811,54 +810,48 @@ void gxcmd_execute(GPU* gpu) {
         case VTX_16:
             FIFO_pop(gpu->param_fifo, p0);
             FIFO_pop(gpu->param_fifo, p1);
-            gpu->cur_vtx.v.p[0] =
-                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[2] =
-                ((s32) (p1 & 0xffff) << 16) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[0] = ((s32) (p0 & 0xffff) << 16) / (float) BIT(28);
+            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) BIT(28);
+            gpu->cur_vtx.v.p[2] = ((s32) (p1 & 0xffff) << 16) / (float) BIT(28);
             gpu->cur_vtx.v.p[3] = 1;
             add_vtx(gpu);
             break;
         case VTX_10:
             FIFO_pop(gpu->param_fifo, p0);
-            gpu->cur_vtx.v.p[0] =
-                ((s32) (p0 & 0x3ff) << 22) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[0] = ((s32) (p0 & 0x3ff) << 22) / (float) BIT(28);
             gpu->cur_vtx.v.p[1] =
-                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (1 << 28);
+                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) BIT(28);
             gpu->cur_vtx.v.p[2] =
-                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (1 << 28);
+                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) BIT(28);
             gpu->cur_vtx.v.p[3] = 1;
             add_vtx(gpu);
             break;
         case VTX_XY:
             FIFO_pop(gpu->param_fifo, p0);
-            gpu->cur_vtx.v.p[0] =
-                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[0] = ((s32) (p0 & 0xffff) << 16) / (float) BIT(28);
+            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) BIT(28);
             add_vtx(gpu);
             break;
         case VTX_XZ:
             FIFO_pop(gpu->param_fifo, p0);
-            gpu->cur_vtx.v.p[0] =
-                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[2] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[0] = ((s32) (p0 & 0xffff) << 16) / (float) BIT(28);
+            gpu->cur_vtx.v.p[2] = (s32) (p0 & 0xffff0000) / (float) BIT(28);
             add_vtx(gpu);
             break;
         case VTX_YZ:
             FIFO_pop(gpu->param_fifo, p0);
-            gpu->cur_vtx.v.p[1] =
-                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[2] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[1] = ((s32) (p0 & 0xffff) << 16) / (float) BIT(28);
+            gpu->cur_vtx.v.p[2] = (s32) (p0 & 0xffff0000) / (float) BIT(28);
             add_vtx(gpu);
             break;
         case VTX_DIFF:
             FIFO_pop(gpu->param_fifo, p0);
             gpu->cur_vtx.v.p[0] +=
-                ((s32) (p0 & 0x3ff) << 22 >> 6) / (float) (1 << 28);
+                ((s32) (p0 & 0x3ff) << 22 >> 6) / (float) BIT(28);
             gpu->cur_vtx.v.p[1] +=
-                ((s32) (p0 & (0x3ff << 10)) << 12 >> 6) / (float) (1 << 28);
+                ((s32) (p0 & (0x3ff << 10)) << 12 >> 6) / (float) BIT(28);
             gpu->cur_vtx.v.p[2] +=
-                ((s32) (p0 & (0x3ff << 20)) << 2 >> 6) / (float) (1 << 28);
+                ((s32) (p0 & (0x3ff << 20)) << 2 >> 6) / (float) BIT(28);
             add_vtx(gpu);
             break;
         case POLYGON_ATTR:
@@ -886,11 +879,11 @@ void gxcmd_execute(GPU* gpu) {
             FIFO_pop(gpu->param_fifo, p0);
             int l = p0 >> 30;
             gpu->lightvec[l].p[0] =
-                ((s32) (p0 & 0x3ff) << 22) / (float) (u32) (1 << 31);
+                ((s32) (p0 & 0x3ff) << 22) / (float) (u32) BIT(31);
             gpu->lightvec[l].p[1] =
-                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) (1 << 31);
+                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) BIT(31);
             gpu->lightvec[l].p[2] =
-                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) (1 << 31);
+                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) BIT(31);
             gpu->lightvec[l].p[3] = 0;
             vecmul(&gpu->vecmtx, &gpu->lightvec[l]);
             gpu->halfvec[l].p[0] = gpu->lightvec[l].p[0] / 2;
@@ -950,13 +943,13 @@ void gxcmd_execute(GPU* gpu) {
             FIFO_pop(gpu->param_fifo, p1);
             FIFO_pop(gpu->param_fifo, p2);
             vec4 p;
-            p.p[0] = ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
-            p.p[1] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
-            p.p[2] = ((s32) (p1 & 0xffff) << 16) / (float) (1 << 28);
+            p.p[0] = ((s32) (p0 & 0xffff) << 16) / (float) BIT(28);
+            p.p[1] = (s32) (p0 & 0xffff0000) / (float) BIT(28);
+            p.p[2] = ((s32) (p1 & 0xffff) << 16) / (float) BIT(28);
             p.p[3] = 1;
-            float w = (s32) (p1 & 0xffff0000) / (float) (1 << 28);
-            float h = ((s32) (p2 & 0xffff) << 16) / (float) (1 << 28);
-            float d = (s32) (p2 & 0xffff0000) / (float) (1 << 28);
+            float w = (s32) (p1 & 0xffff0000) / (float) BIT(28);
+            float h = ((s32) (p2 & 0xffff) << 16) / (float) BIT(28);
+            float d = (s32) (p2 & 0xffff0000) / (float) BIT(28);
             vec4 box[8];
             for (int i = 0; i < 8; i++) {
                 box[i] = p;
@@ -987,33 +980,29 @@ void gxcmd_execute(GPU* gpu) {
         case POS_TEST:
             FIFO_pop(gpu->param_fifo, p0);
             FIFO_pop(gpu->param_fifo, p1);
-            gpu->cur_vtx.v.p[0] =
-                ((s32) (p0 & 0xffff) << 16) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) (1 << 28);
-            gpu->cur_vtx.v.p[2] =
-                ((s32) (p1 & 0xffff) << 16) / (float) (1 << 28);
+            gpu->cur_vtx.v.p[0] = ((s32) (p0 & 0xffff) << 16) / (float) BIT(28);
+            gpu->cur_vtx.v.p[1] = (s32) (p0 & 0xffff0000) / (float) BIT(28);
+            gpu->cur_vtx.v.p[2] = ((s32) (p1 & 0xffff) << 16) / (float) BIT(28);
             gpu->cur_vtx.v.p[3] = 1;
             update_mtxs(gpu);
             vec4 pos = gpu->cur_vtx.v;
             vecmul(&gpu->clipmtx, &pos);
-            gpu->master->io9.pos_result[0] = pos.p[0] * (1 << 12);
-            gpu->master->io9.pos_result[1] = pos.p[1] * (1 << 12);
-            gpu->master->io9.pos_result[2] = pos.p[2] * (1 << 12);
-            gpu->master->io9.pos_result[3] = pos.p[3] * (1 << 12);
+            gpu->master->io9.pos_result[0] = pos.p[0] * BIT(12);
+            gpu->master->io9.pos_result[1] = pos.p[1] * BIT(12);
+            gpu->master->io9.pos_result[2] = pos.p[2] * BIT(12);
+            gpu->master->io9.pos_result[3] = pos.p[3] * BIT(12);
             break;
         case VEC_TEST: {
             FIFO_pop(gpu->param_fifo, p0);
             vec4 v;
-            v.p[0] = ((s32) (p0 & 0x3ff) << 22) / (float) (u32) (1 << 31);
-            v.p[1] =
-                ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) (1 << 31);
-            v.p[2] =
-                ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) (1 << 31);
+            v.p[0] = ((s32) (p0 & 0x3ff) << 22) / (float) (u32) BIT(31);
+            v.p[1] = ((s32) (p0 & (0x3ff << 10)) << 12) / (float) (u32) BIT(31);
+            v.p[2] = ((s32) (p0 & (0x3ff << 20)) << 2) / (float) (u32) BIT(31);
             v.p[3] = 0;
             vecmul(&gpu->vecmtx, &v);
-            gpu->master->io9.vec_result[0] = v.p[0] * (1 << 12);
-            gpu->master->io9.vec_result[1] = v.p[1] * (1 << 12);
-            gpu->master->io9.vec_result[2] = v.p[2] * (1 << 12);
+            gpu->master->io9.vec_result[0] = v.p[0] * BIT(12);
+            gpu->master->io9.vec_result[1] = v.p[1] * BIT(12);
+            gpu->master->io9.vec_result[2] = v.p[2] * BIT(12);
         }
     }
 
@@ -1290,19 +1279,19 @@ void render_polygon(GPU* gpu, poly* p) {
                 s32 tt = i.t / i.w;
                 if (p->texparam.s_rep) {
                     bool flip = p->texparam.s_flip && ((ss >> s_shift) & 1);
-                    ss &= (1 << s_shift) - 1;
-                    if (flip) ss = (1 << s_shift) - 1 - ss;
+                    ss &= BIT(s_shift) - 1;
+                    if (flip) ss = BIT(s_shift) - 1 - ss;
                 } else {
                     if (ss < 0) ss = 0;
-                    if (ss > (1 << s_shift) - 1) ss = (1 << s_shift) - 1;
+                    if (ss > BIT(s_shift) - 1) ss = BIT(s_shift) - 1;
                 }
                 if (p->texparam.t_rep) {
                     bool flip = p->texparam.t_flip && ((tt >> t_shift) & 1);
-                    tt &= (1 << t_shift) - 1;
-                    if (flip) tt = (1 << t_shift) - 1 - tt;
+                    tt &= BIT(t_shift) - 1;
+                    if (flip) tt = BIT(t_shift) - 1 - tt;
                 } else {
                     if (tt < 0) tt = 0;
-                    if (tt > (1 << t_shift) - 1) tt = (1 << t_shift) - 1;
+                    if (tt > BIT(t_shift) - 1) tt = BIT(t_shift) - 1;
                 }
                 u32 ofs = (tt << s_shift) + ss;
 
@@ -1492,7 +1481,7 @@ void render_polygon(GPU* gpu, poly* p) {
             }
 
             if (gpu->master->io9.disp3dcnt.alpha_blending && a < 31 &&
-                (gpu->screen[y][x] & (1 << 15))) {
+                (gpu->screen[y][x] & BIT(15))) {
                 if (gpu->attr_buf[y][x].blend &&
                     gpu->polyid_buf[y][x] == p->attr.id)
                     continue;
@@ -1538,7 +1527,7 @@ void gpu_render(GPU* gpu) {
                 float depth =
                     (*(u16*) &gpu->texram[3][(y * NDS_SCREEN_W + x) << 1] &
                      0x7fff) /
-                    (float) (1 << 12);
+                    (float) BIT(12);
                 if (gpu->w_buffer) depth *= 0x200;
                 gpu->depth_buf[y][x] = depth;
                 gpu->polyid_buf[y][x] = gpu->master->io9.clear_color.id;
@@ -1551,7 +1540,7 @@ void gpu_render(GPU* gpu) {
         if (gpu->master->io9.clear_color.alpha)
             clear_color |= 0x8000 | (gpu->master->io9.clear_color.alpha << 16);
         float clear_depth =
-            (gpu->master->io9.clear_depth & 0x7fff) / (float) (1 << 12);
+            (gpu->master->io9.clear_depth & 0x7fff) / (float) BIT(12);
         if (gpu->w_buffer) clear_depth *= 0x200;
         for (int y = 0; y < NDS_SCREEN_H; y++) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {
@@ -1581,10 +1570,10 @@ void gpu_render(GPU* gpu) {
     if (gpu->master->io9.disp3dcnt.edge_marking ||
         gpu->master->io9.disp3dcnt.fog_enable) {
         float fog_depth =
-            (gpu->master->io9.fog_offset & 0x7fff) / (float) (1 << 12);
+            (gpu->master->io9.fog_offset & 0x7fff) / (float) BIT(12);
         if (gpu->w_buffer) fog_depth *= 0x200;
         float fog_step =
-            (0x400 >> gpu->master->io9.disp3dcnt.fog_shift) / (float) (1 << 12);
+            (0x400 >> gpu->master->io9.disp3dcnt.fog_shift) / (float) BIT(12);
         if (gpu->w_buffer) fog_step *= 0x200;
         for (int y = 0; y < NDS_SCREEN_H; y++) {
             for (int x = 0; x < NDS_SCREEN_W; x++) {

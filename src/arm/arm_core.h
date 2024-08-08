@@ -97,7 +97,7 @@ typedef struct _ArmCore {
     bool irq;
 
 #ifdef CPULOG
-#define LOGMAX (1 << 15)
+#define LOGMAX BIT(15)
     struct {
         u32 addr;
         ArmInstr instr;

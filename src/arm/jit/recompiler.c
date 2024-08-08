@@ -60,6 +60,10 @@ ArmCompileFunc compile_funcs[ARM_MAX] = {
 #define EMIT_UPDATE_PC() EMITI_STORE_REG(15, addr + 2 * INSTRLEN)
 
 void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
+
+    block->start_addr = start_addr;
+    block->numinstr = 0;
+
     u32 addr = start_addr;
 
     EMIT00(BEGIN);
@@ -67,17 +71,14 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
     for (int i = 0; i < MAX_BLOCK_INSTRS; i++) {
         ArmInstr instr = cpu->cpsr.t ? thumb_lookup[cpu->fetch16(cpu, addr)]
                                      : (ArmInstr){cpu->fetch32(cpu, addr)};
-        if (!arm_compile_instr(block, cpu, addr, instr)) {
-            addr += INSTRLEN;
-            break;
-        }
+        bool can_continue = arm_compile_instr(block, cpu, addr, instr);
         addr += INSTRLEN;
+        block->numinstr++;
+        if (!can_continue) break;
     }
     EMITI_STORE_REG(15, addr);
     EMIT00(END_RET);
     block->end_addr = addr;
-    block->numinstr =
-        (block->end_addr - block->start_addr) >> (cpu->cpsr.t ? 1 : 2);
 }
 
 u32 compile_cond(IRBlock* block, ArmInstr instr) {
@@ -717,7 +718,7 @@ DECL_ARM_COMPILE(block_trans) {
     u32 wboff;
     if (instr.block_trans.rlist) {
         for (int i = 0; i < 16; i++) {
-            if (instr.block_trans.rlist & (1 << i)) rlist[rcount++] = i;
+            if (instr.block_trans.rlist & BIT(i)) rlist[rcount++] = i;
         }
         wboff = rcount << 2;
     } else {
@@ -744,7 +745,7 @@ DECL_ARM_COMPILE(block_trans) {
     vaddr = EMITVI(AND, vaddr, ~3);
 
     if (instr.block_trans.s &&
-        !((instr.block_trans.rlist & (1 << 15)) && instr.block_trans.l)) {
+        !((instr.block_trans.rlist & BIT(15)) && instr.block_trans.l)) {
         if (instr.block_trans.l) {
             for (int i = 0; i < rcount; i++) {
                 if (i == rcount - 1 && instr.block_trans.w)
@@ -790,7 +791,7 @@ DECL_ARM_COMPILE(block_trans) {
                 if (rcount < 2 && instr.block_trans.w)
                     EMITV_STORE_REG(instr.block_trans.rn, vwback);
             }
-            if (instr.block_trans.rlist & (1 << 15)) {
+            if (instr.block_trans.rlist & BIT(15)) {
                 if (instr.block_trans.s) {
                     if (!(cpu->cpsr.m == M_USER || cpu->cpsr.m == M_SYSTEM)) {
                         EMIT00(LOAD_SPSR);
@@ -851,7 +852,7 @@ DECL_ARM_COMPILE(branch) {
     u32 dest = addr + 2 * INSTRLEN + offset;
     if (instr.branch.l || instr.cond == 0xf) {
         if (cpu->cpsr.t) {
-            if (offset & (1 << 23)) {
+            if (offset & BIT(23)) {
                 offset %= 1 << 23;
                 EMIT_LOAD_REG(14, false);
                 u32 vdest = EMITVI(ADD, LASTV, offset);
@@ -864,7 +865,7 @@ DECL_ARM_COMPILE(branch) {
                 EMIT00(END_RET);
                 return false;
             } else {
-                if (offset & (1 << 22)) dest += 0xff800000;
+                if (offset & BIT(22)) dest += 0xff800000;
                 EMITI_STORE_REG(14, dest);
                 return true;
             }

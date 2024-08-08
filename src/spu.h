@@ -4,9 +4,9 @@
 #include "types.h"
 
 #define SAMPLE_BUF_LEN 1024
-#define SAMPLE_FREQ (1 << 15)
+#define SAMPLE_FREQ BIT(15)
 
-#define BUS_CLK (1 << 25)
+#define BUS_CLK BIT(25)
 
 enum { REP_MANUAL, REP_LOOP, REP_ONESHOT };
 enum { SND_PCM8, SND_PCM16, SND_ADPCM, SND_PSG };

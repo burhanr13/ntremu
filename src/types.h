@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define eprintf(...) fprintf(stderr, __VA_ARGS__)
+#define eprintf(format, ...) fprintf(stderr, format __VA_OPT__(, ) __VA_ARGS__)
 
 typedef uint8_t u8;
 typedef int8_t s8;
@@ -16,6 +16,8 @@ typedef uint32_t u32;
 typedef int32_t s32;
 typedef uint64_t u64;
 typedef int64_t s64;
+
+#define BIT(n) (1 << (n))
 
 #define FIFO(T, N)                                                             \
     struct {                                                                   \
@@ -50,12 +52,13 @@ typedef int64_t s64;
 #define Vec_free(v) (free((v).d))
 
 #define Vec_push(v, e)                                                         \
-    do {                                                                       \
+    ({                                                                         \
         if ((v).size == (v).cap) {                                             \
             (v).cap = (v).cap ? 2 * (v).cap : 8;                               \
             (v).d = realloc((v).d, (v).cap * sizeof *(v).d);                   \
         }                                                                      \
         (v).d[(v).size++] = (e);                                               \
-    } while (false)
+        (v).size - 1;                                                          \
+    })
 
 #endif

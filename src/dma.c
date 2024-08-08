@@ -79,7 +79,7 @@ void dma7_run(DMAController* dmac, int i) {
         dmac->master->io7.dma[i].cnt.enable = 0;
     }
 
-    if (dmac->master->io7.dma[i].cnt.irq) dmac->master->io7.ifl.dma |= (1 << i);
+    if (dmac->master->io7.dma[i].cnt.irq) dmac->master->io7.ifl.dma |= BIT(i);
 }
 
 void dma7_trans16(DMAController* dmac, int i, u32 daddr, u32 saddr) {
@@ -146,7 +146,7 @@ void dma9_run(DMAController* dmac, int i) {
         dmac->master->io9.dma[i].cnt.enable = 0;
     }
 
-    if (dmac->master->io9.dma[i].cnt.irq) dmac->master->io9.ifl.dma |= (1 << i);
+    if (dmac->master->io9.dma[i].cnt.irq) dmac->master->io9.ifl.dma |= BIT(i);
 }
 
 void dma9_trans16(DMAController* dmac, int i, u32 daddr, u32 saddr) {

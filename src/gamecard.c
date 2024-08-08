@@ -28,7 +28,7 @@ GameCard* create_card(char* filename) {
     v |= v >> 16;
     v |= v >> 32;
     v++;
-    if (v < (1 << 17)) v = 1 << 17;
+    if (v < BIT(17)) v = 1 << 17;
     card->rom_size = v;
     card->rom = mmap(NULL, card->rom_size, PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANON, -1, 0);
@@ -53,7 +53,7 @@ GameCard* create_card(char* filename) {
         fstat(fd, &st);
         card->eeprom_size = st.st_size;
         if (card->eeprom_size == 512) card->addrtype = 1;
-        else if (card->eeprom_size <= (1 << 16)) card->addrtype = 2;
+        else if (card->eeprom_size <= BIT(16)) card->addrtype = 2;
         else card->addrtype = 3;
         card->eeprom_detected = true;
         card->eeprom = mmap(NULL, card->eeprom_size, PROT_READ | PROT_WRITE,
