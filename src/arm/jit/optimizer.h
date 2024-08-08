@@ -10,5 +10,6 @@ void optimize_constmem(IRBlock* block, ArmCore* cpu);
 void optimize_chainjumps(IRBlock* block);
 void optimize_deadcode(IRBlock* block);
 void optimize_waitloop(IRBlock* block);
+void optimize_blocklinking(IRBlock* block, ArmCore* cpu);
 
 #endif

@@ -7,12 +7,12 @@
     ((IRInstr){.opcode = IR_NOP, .imm1 = 1, .imm2 = 1, .op1 = 0, .op2 = 0})
 
 void optimize_loadstore(IRBlock* block) {
-    u32 vreg[16] = {0};
-    bool immreg[16] = {0};
-    u32 laststorereg[16] = {0};
-    u32 vflag[5] = {0};
-    bool immflag[5] = {0};
-    u32 laststoreflag[5] = {0};
+    u32 vreg[16] = {};
+    bool immreg[16] = {};
+    u32 laststorereg[16] = {};
+    u32 vflag[5] = {};
+    bool immflag[5] = {};
+    u32 laststoreflag[5] = {};
 
     u32 jmpsource = 0;
     u32 jmptarget = -1;
@@ -48,12 +48,16 @@ void optimize_loadstore(IRBlock* block) {
             }
             case IR_STORE_REG: {
                 u32 rd = inst.op1;
-                if (laststorereg[rd] > jmpsource) {
-                    block->code.d[laststorereg[rd]] = NOP;
+                if (inst.op2 == vreg[rd] && inst.imm2 == immreg[rd]) {
+                    block->code.d[i] = NOP;
+                } else {
+                    if (laststorereg[rd] > jmpsource) {
+                        block->code.d[laststorereg[rd]] = NOP;
+                    }
+                    laststorereg[rd] = i;
+                    vreg[rd] = inst.op2;
+                    immreg[rd] = inst.imm2;
                 }
-                laststorereg[rd] = i;
-                vreg[rd] = inst.op2;
-                immreg[rd] = inst.imm2;
                 break;
             }
             case IR_LOAD_FLAG: {
@@ -68,12 +72,16 @@ void optimize_loadstore(IRBlock* block) {
             }
             case IR_STORE_FLAG: {
                 u32 f = inst.op1;
-                if (laststoreflag[f] > jmpsource) {
-                    block->code.d[laststoreflag[f]] = NOP;
+                if (inst.op2 == vflag[f] && inst.imm2 == immflag[f]) {
+                    block->code.d[i] = NOP;
+                } else {
+                    if (laststoreflag[f] > jmpsource) {
+                        block->code.d[laststoreflag[f]] = NOP;
+                    }
+                    laststoreflag[f] = i;
+                    vflag[f] = inst.op2;
+                    immflag[f] = inst.imm2;
                 }
-                laststoreflag[f] = i;
-                vflag[f] = inst.op2;
-                immflag[f] = inst.imm2;
                 break;
             }
             case IR_LOAD_CPSR:
@@ -98,7 +106,8 @@ void optimize_loadstore(IRBlock* block) {
                 jmptarget = inst.op2;
                 break;
             }
-            case IR_END: {
+            case IR_END_RET:
+            case IR_END_LINK: {
                 for (int r = 0; r < 16; r++) {
                     laststorereg[r] = 0;
                     vreg[r] = 0;
@@ -136,8 +145,8 @@ void optimize_loadstore(IRBlock* block) {
     }
 
 void optimize_constprop(IRBlock* block) {
-    u32* vops = malloc(sizeof(u32) * block->code.size);
-    bool* vimm = malloc(sizeof(bool) * block->code.size);
+    u32 vops[block->code.size];
+    bool vimm[block->code.size];
     for (int i = 0; i < block->code.size; i++) {
         IRInstr* inst = &block->code.d[i];
         if (!inst->imm1) {
@@ -224,6 +233,7 @@ void optimize_constprop(IRBlock* block) {
                                           .imm2 = 1,
                                           .op1 = 0,
                                           .op2 = 0};
+                        NOOPT();
                     }
                     break;
                 case IR_PCMASK:
@@ -378,6 +388,20 @@ void optimize_constprop(IRBlock* block) {
                         NOOPT();
                     }
                     break;
+                case IR_LSL:
+                case IR_LSR:
+                case IR_ASR:
+                case IR_ROR:
+                    if (inst->op1 == 0) {
+                        OPTI(0);
+                    } else if (inst->op1 == 0xffffffff &&
+                               (inst->opcode == IR_ASR ||
+                                inst->opcode == IR_ROR)) {
+                        OPTI(0xffffffff);
+                    } else {
+                        NOOPT();
+                    }
+                    break;
                 case IR_ADD:
                     if (inst->op1 == 0) {
                         OPTV(inst->op2);
@@ -391,12 +415,28 @@ void optimize_constprop(IRBlock* block) {
                     NOOPT();
                     break;
             }
+        } else if (inst->op1 == inst->op2) {
+            switch (inst->opcode) {
+                case IR_AND:
+                case IR_OR:
+                    OPTV(inst->op1);
+                    break;
+                case IR_XOR:
+                    OPTI(0);
+                    break;
+                case IR_SUB:
+                    OPTI(0);
+                    if (inst[1].opcode == IR_GETC) inst[1] = MOVI(1);
+                    if (inst[3].opcode == IR_GETV) inst[3] = MOVI(0);
+                    break;
+                default:
+                    NOOPT();
+                    break;
+            }
         } else {
             NOOPT();
         }
     }
-    free(vops);
-    free(vimm);
 }
 
 void optimize_constmem(IRBlock* block, ArmCore* cpu) {
@@ -467,7 +507,8 @@ void optimize_chainjumps(IRBlock* block) {
             case IR_JELSE:
                 i = inst.op2 - 1;
                 break;
-            case IR_END:
+            case IR_END_RET:
+            case IR_END_LINK:
                 for (int j = i + 1; j < block->code.size; j++) {
                     block->code.d[j] = NOP;
                 }
@@ -479,7 +520,8 @@ void optimize_chainjumps(IRBlock* block) {
 }
 
 void optimize_deadcode(IRBlock* block) {
-    bool* vused = calloc(block->code.size, sizeof(bool));
+    bool vused[block->code.size];
+    for (int i = 0; i < block->code.size; i++) vused[i] = false;
     for (int i = block->code.size - 1; i >= 0; i--) {
         IRInstr* inst = &block->code.d[i];
         if (!vused[i]) {
@@ -503,7 +545,6 @@ void optimize_deadcode(IRBlock* block) {
         if (!inst->imm1) vused[inst->op1] = true;
         if (!inst->imm2) vused[inst->op2] = true;
     }
-    free(vused);
 }
 
 void optimize_waitloop(IRBlock* block) {
@@ -586,4 +627,47 @@ void optimize_waitloop(IRBlock* block) {
 #undef MEM
 #undef LOAD
 #undef STORE
+}
+
+void optimize_blocklinking(IRBlock* block, ArmCore* cpu) {
+    bool can_link = true;
+    bool link_thumb = cpu->cpsr.t;
+    u32 link_pc = 0;
+    for (int i = 0; i < block->code.size; i++) {
+        IRInstr* inst = &block->code.d[i];
+        switch (inst->opcode) {
+            case IR_STORE_REG:
+                if (inst->op1 == 15) {
+                    if (inst->imm2) {
+                        link_pc = inst->op2;
+                    } else {
+                        can_link = false;
+                    }
+                }
+                break;
+            case IR_STORE_THUMB:
+                if (inst->imm2) {
+                    link_thumb = inst->op2;
+                } else {
+                    can_link = false;
+                }
+                break;
+            case IR_MODESWITCH:
+            case IR_EXCEPTION:
+            case IR_WFE:
+            case IR_WRITE_CP:
+                can_link = false;
+                break;
+            case IR_END_RET:
+                if (can_link) {
+                    inst->opcode = IR_END_LINK;
+                    inst->op1 = cpu->cpsr.m | (link_thumb << 5);
+                    inst->op2 = link_pc;
+                }
+                can_link = true;
+                break;
+            default:
+                break;
+        }
+    }
 }

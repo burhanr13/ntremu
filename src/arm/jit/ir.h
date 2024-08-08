@@ -43,7 +43,8 @@ typedef enum {
     IR_WFE,
 
     IR_BEGIN,
-    IR_END,
+    IR_END_RET,
+    IR_END_LINK,
 
     IR_NOP,
     IR_MOV,
@@ -94,12 +95,14 @@ typedef struct {
     u32 start_addr;
     u32 end_addr;
     u32 numinstr;
+    bool loop;
 } IRBlock;
 
 static inline void irblock_init(IRBlock* block, u32 addr) {
     Vec_init(block->code);
     block->start_addr = block->end_addr = addr;
     block->numinstr = 0;
+    block->loop = false;
 }
 static inline void irblock_free(IRBlock* block) {
     Vec_free(block->code);

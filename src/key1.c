@@ -20,7 +20,7 @@ void init_keycode(u32 idcode, int level, int mod, u32* init_keys) {
 void apply_keycode(int mod) {
     encrypt64(keycode + 1);
     encrypt64(keycode);
-    u32 scratch[2] = {0};
+    u32 scratch[2] = {};
     for (int i = 0; i < 0x12; i++) {
         keybuf[i] ^= bswap32(keycode[i % mod]);
     }

@@ -10,6 +10,7 @@ typedef struct {
     char* romfilenodir;
     char* biosPath;
 
+    bool initialized;
     bool running;
     bool uncap;
     bool bootbios;

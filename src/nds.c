@@ -186,6 +186,9 @@ void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
 void nds_run(NDS* nds) {
     while (nds->sched.now - nds->last_event < 512 &&
            !event_pending(&nds->sched)) {
+        nds->cpu9.c.max_cycles =
+            FIFO_peek(nds->sched.event_queue).time - nds->sched.now;
+        if (nds->cpu9.c.max_cycles > 512) nds->cpu9.c.max_cycles = 512;
         if (arm9_step(&nds->cpu9)) {
             nds->sched.now += nds->cpu9.c.cycles >> 1;
             if (!(nds->half_tick ^= nds->cpu9.c.cycles & 1)) {
@@ -211,6 +214,9 @@ void nds_run(NDS* nds) {
                 break;
             }
         } else {
+            nds->cpu7.c.max_cycles =
+                FIFO_peek(nds->sched.event_queue).time - nds->sched.now;
+            if (nds->cpu7.c.max_cycles > 512) nds->cpu7.c.max_cycles = 512;
             if (arm7_step(&nds->cpu7)) {
                 nds->sched.now += nds->cpu7.c.cycles;
             } else {

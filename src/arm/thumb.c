@@ -9,7 +9,7 @@ void thumb_generate_lookup() {
 }
 
 ArmInstr thumb_decode_instr(ThumbInstr instr) {
-    ArmInstr dec = {0};
+    ArmInstr dec = {};
     dec.cond = C_AL;
 
     switch (instr.n3) {

@@ -74,7 +74,7 @@ void compile_block(ArmCore* cpu, IRBlock* block, u32 start_addr) {
         addr += INSTRLEN;
     }
     EMITI_STORE_REG(15, addr);
-    EMIT00(END);
+    EMIT00(END_RET);
     block->end_addr = addr;
     block->numinstr =
         (block->end_addr - block->start_addr) >> (cpu->cpsr.t ? 1 : 2);
@@ -379,7 +379,7 @@ DECL_ARM_COMPILE(data_proc) {
             } else {
                 EMIT_ALIGN_PC();
             }
-            EMIT00(END);
+            EMIT00(END_RET);
             return false;
         }
     }
@@ -420,8 +420,12 @@ DECL_ARM_COMPILE(psr_trans) {
             return true;
         } else {
             EMIT0V(STORE_CPSR, LASTV);
-            EMITI0(MODESWITCH, cpu->cpsr.m);
-            return false;
+            if (mask & 0xffff) {
+                EMITI0(MODESWITCH, cpu->cpsr.m);
+                return false;
+            } else {
+                return true;
+            }
         }
     } else {
         if (instr.psr_trans.p) {
@@ -513,7 +517,7 @@ DECL_ARM_COMPILE(branch_exch) {
     EMITV0(PCMASK, vt);
     EMITVV(AND, vdest, LASTV);
     EMITV_STORE_REG(15, LASTV);
-    EMIT00(END);
+    EMIT00(END_RET);
     return false;
 }
 
@@ -521,7 +525,7 @@ DECL_ARM_COMPILE(leading_zeros) {
     if (!cpu->v5) {
         EMIT_UPDATE_PC();
         EMITI0(EXCEPTION, E_UND);
-        EMIT00(END);
+        EMIT00(END_RET);
         return false;
     }
 
@@ -562,7 +566,7 @@ DECL_ARM_COMPILE(half_trans) {
             EMITV_STORE_REG(instr.half_trans.rd, LASTV);
             if (instr.half_trans.rd == 15) {
                 EMIT_ALIGN_PC();
-                EMIT00(END);
+                EMIT00(END_RET);
                 return false;
             }
             return true;
@@ -598,7 +602,7 @@ DECL_ARM_COMPILE(half_trans) {
             EMITV_STORE_REG(instr.half_trans.rd, LASTV);
             if (instr.half_trans.rd == 15) {
                 EMIT_ALIGN_PC();
-                EMIT00(END);
+                EMIT00(END_RET);
                 return false;
             }
             return true;
@@ -652,7 +656,7 @@ DECL_ARM_COMPILE(single_trans) {
             EMITV_STORE_REG(instr.single_trans.rd, LASTV);
             if (instr.single_trans.rd == 15) {
                 EMIT_ALIGN_PC();
-                EMIT00(END);
+                EMIT00(END_RET);
                 return false;
             }
             return true;
@@ -661,9 +665,6 @@ DECL_ARM_COMPILE(single_trans) {
             EMITVV(STORE_MEM8, vaddr, LASTV);
             if (instr.single_trans.w || !instr.single_trans.p) {
                 EMITV_STORE_REG(instr.single_trans.rn, vwback);
-            }
-            if (!cpu->v5 && immoffset && voffset == 0x301) {
-                return false;
             }
             return true;
         }
@@ -685,7 +686,7 @@ DECL_ARM_COMPILE(single_trans) {
                 } else {
                     EMIT_ALIGN_PC();
                 }
-                EMIT00(END);
+                EMIT00(END_RET);
                 return false;
             }
             return true;
@@ -815,7 +816,7 @@ DECL_ARM_COMPILE(block_trans) {
                         EMIT_ALIGN_PC();
                     }
                 }
-                EMIT00(END);
+                EMIT00(END_RET);
                 return false;
             }
             return true;
@@ -860,7 +861,7 @@ DECL_ARM_COMPILE(branch) {
                     vdest = EMITVI(AND, vdest, ~3);
                 }
                 EMITV_STORE_REG(15, vdest);
-                EMIT00(END);
+                EMIT00(END_RET);
                 return false;
             } else {
                 if (offset & (1 << 22)) dest += 0xff800000;
@@ -877,8 +878,11 @@ DECL_ARM_COMPILE(branch) {
     }
 
     EMITI_STORE_REG(15, dest);
-    if (dest == block->start_addr) EMIT00(NOP);
-    EMIT00(END);
+    if (dest == block->start_addr) {
+        block->loop = true;
+        EMIT00(NOP);
+    }
+    EMIT00(END_RET);
     return false;
 }
 
@@ -886,7 +890,7 @@ DECL_ARM_COMPILE(cp_reg_trans) {
     if (!cpu->cp15_read || !cpu->cp15_write) {
         EMIT_UPDATE_PC();
         EMITI0(EXCEPTION, E_UND);
-        EMIT00(END);
+        EMIT00(END_RET);
         return false;
     }
 
@@ -906,13 +910,13 @@ DECL_ARM_COMPILE(cp_reg_trans) {
 DECL_ARM_COMPILE(undefined) {
     EMIT_UPDATE_PC();
     EMITI0(EXCEPTION, E_UND);
-    EMIT00(END);
+    EMIT00(END_RET);
     return false;
 }
 
 DECL_ARM_COMPILE(sw_intr) {
     EMIT_UPDATE_PC();
     EMITI0(EXCEPTION, E_SWI);
-    EMIT00(END);
+    EMIT00(END_RET);
     return false;
 }

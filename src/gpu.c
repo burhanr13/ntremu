@@ -13,7 +13,7 @@ pthread_t gpu_thread;
 pthread_mutex_t gpu_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t gpu_cond = PTHREAD_COND_INITIALIZER;
 
-const int cmd_parms[8][16] = {{0},
+const int cmd_parms[8][16] = {{},
                               {1, 0, 1, 1, 1, 0, 16, 12, 16, 12, 9, 3, 3},
                               {1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1},
                               {1, 1, 1, 1, 32},
@@ -501,7 +501,7 @@ void gxcmd_execute(GPU* gpu) {
             gpu->mtx_dirty = true;
             break;
         case MTX_IDENTITY: {
-            mat4 m = {0};
+            mat4 m = {};
             m.p[0][0] = 1;
             m.p[1][1] = 1;
             m.p[2][2] = 1;
@@ -667,7 +667,7 @@ void gxcmd_execute(GPU* gpu) {
             break;
         }
         case MTX_SCALE: {
-            mat4 m = {0};
+            mat4 m = {};
             s32 p;
             FIFO_pop(gpu->param_fifo, p);
             m.p[0][0] = p / (float) (1 << 12);
@@ -692,7 +692,7 @@ void gxcmd_execute(GPU* gpu) {
             break;
         }
         case MTX_TRANS: {
-            mat4 m = {0};
+            mat4 m = {};
             m.p[0][0] = 1;
             m.p[1][1] = 1;
             m.p[2][2] = 1;

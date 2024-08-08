@@ -1,5 +1,7 @@
 #include "ir.h"
 
+#include "jit.h"
+
 // #define IR_TRACE
 #define IR_TRACE_ADDR 0x2004348
 
@@ -291,10 +293,24 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 break;
             case IR_BEGIN:
                 break;
-            case IR_END:
+            case IR_END_LINK:
+                cpu->cycles += block->numinstr;
+                if (cpu->cycles < cpu->max_cycles) {
+                    JITBlock* next = get_jitblock(cpu, OP(1), OP(2));
+                    if (next) {
+                        jit_exec(next);
+                        return;
+                    }
+                }
                 cpu->cur_instr_addr = cpu->pc;
                 cpu->pending_flush = true;
+                cpu->max_cycles = 0;
+                return;
+            case IR_END_RET:
                 cpu->cycles += block->numinstr;
+                cpu->cur_instr_addr = cpu->pc;
+                cpu->pending_flush = true;
+                cpu->max_cycles = 0;
                 return;
         }
 #ifdef IR_TRACE
@@ -476,8 +492,10 @@ void ir_disasm_instr(IRInstr inst, int i) {
             break;
         case IR_BEGIN:
             DISASM(begin, 0, 0, 0);
-        case IR_END:
-            DISASM(end, 0, 0, 0);
+        case IR_END_RET:
+            DISASM(end_ret, 0, 0, 0);
+        case IR_END_LINK:
+            DISASM(end_link, 0, 1, 1);
     }
 }
 

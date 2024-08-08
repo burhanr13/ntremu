@@ -2,9 +2,10 @@
 
 #include "optimizer.h"
 #include "recompiler.h"
+#include "register_allocator.h"
 
-//#define IR_DISASM
-//#define JIT_LOG
+#define IR_DISASM
+// #define JIT_LOG
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
@@ -25,11 +26,17 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     optimize_loadstore(&block->ir);
     optimize_constprop(&block->ir);
     optimize_deadcode(&block->ir);
-    optimize_waitloop(&block->ir);
+    if (block->ir.loop) optimize_waitloop(&block->ir);
+    optimize_blocklinking(&block->ir, cpu);
+
+    RegisterAllocation regalloc = allocate_registers(&block->ir);
 
 #ifdef IR_DISASM
     ir_disassemble(&block->ir);
+    regalloc_print(&block->ir, &regalloc);
 #endif
+
+    regalloc_free(&regalloc);
 
     return block;
 }
@@ -46,11 +53,9 @@ void jit_exec(JITBlock* block) {
     ir_interpret(&block->ir, block->cpu);
 }
 
-JITBlock* get_jitblock(ArmCore* cpu, u32 addr) {
+JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
     u32 addrhi = addr >> 16;
     u32 addrlo = (addr & 0xffff) >> 1;
-
-    u32 attrs = cpu->cpsr.w & 0x3f;
 
     if (!cpu->jit_cache[attrs])
         cpu->jit_cache[attrs] = calloc(1 << 16, sizeof(JITBlock**));
@@ -103,7 +108,8 @@ void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
 }
 
 void arm_exec_jit(ArmCore* cpu) {
-    JITBlock* block = get_jitblock(cpu, cpu->cur_instr_addr);
+    JITBlock* block =
+        get_jitblock(cpu, cpu->cpsr.w & 0x3f, cpu->cur_instr_addr);
     if (block) {
         jit_exec(block);
     } else {

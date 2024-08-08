@@ -8,9 +8,10 @@
 #include <unistd.h>
 
 #include "arm/arm.h"
+#include "arm/thumb.h"
+#include "arm/jit/jit.h"
 #include "emulator_state.h"
 #include "nds.h"
-#include "arm/thumb.h"
 
 #define TRANSLATE_SPEED 5.0
 #define ROTATE_SPEED 0.02
@@ -100,6 +101,8 @@ int emulator_init(int argc, char** argv) {
 void emulator_quit() {
     close(ntremu.dldi_sd_fd);
     destroy_card(ntremu.card);
+    jit_invalidate_all((ArmCore*) &ntremu.nds->cpu7);
+    jit_invalidate_all((ArmCore*) &ntremu.nds->cpu9);
     free(ntremu.nds);
     munmap(ntremu.bios7, BIOS7SIZE);
     munmap(ntremu.bios9, BIOS9SIZE);
@@ -107,8 +110,13 @@ void emulator_quit() {
 }
 
 void emulator_reset() {
+    if (ntremu.initialized) {
+        jit_invalidate_all((ArmCore*) &ntremu.nds->cpu7);
+        jit_invalidate_all((ArmCore*) &ntremu.nds->cpu9);
+    }
     init_nds(ntremu.nds, ntremu.card, ntremu.bios7, ntremu.bios9,
              ntremu.firmware, ntremu.bootbios);
+    ntremu.initialized = true;
 }
 
 void read_args(int argc, char** argv) {
@@ -180,7 +188,7 @@ void hotkey_press(SDL_KeyCode key) {
                 ntremu.freecam = false;
             } else {
                 ntremu.freecam = true;
-                ntremu.freecam_mtx = (mat4){0};
+                ntremu.freecam_mtx = (mat4){};
                 ntremu.freecam_mtx.p[0][0] = 1;
                 ntremu.freecam_mtx.p[1][1] = 1;
                 ntremu.freecam_mtx.p[2][2] = 1;
@@ -324,7 +332,7 @@ void update_input_freecam() {
     if (keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT]) speed /= 20;
 
     if (keys[SDL_SCANCODE_E]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = 1;
@@ -335,7 +343,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_Q]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = 1;
@@ -346,7 +354,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_DOWN]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[3][3] = 1;
         m.p[0][0] = 1;
         m.p[1][1] = cosf(ROTATE_SPEED);
@@ -358,7 +366,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_UP]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[3][3] = 1;
         m.p[0][0] = 1;
         m.p[1][1] = cosf(-ROTATE_SPEED);
@@ -370,7 +378,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_A]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = 1;
@@ -381,7 +389,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_D]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = 1;
@@ -392,7 +400,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_LEFT]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[3][3] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = cosf(-ROTATE_SPEED);
@@ -404,7 +412,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_RIGHT]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[3][3] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = cosf(ROTATE_SPEED);
@@ -416,7 +424,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_W]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = 1;
@@ -427,7 +435,7 @@ void update_input_freecam() {
         ntremu.freecam_mtx = tmp;
     }
     if (keys[SDL_SCANCODE_S]) {
-        mat4 m = {0};
+        mat4 m = {};
         m.p[0][0] = 1;
         m.p[1][1] = 1;
         m.p[2][2] = 1;
