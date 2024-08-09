@@ -111,7 +111,9 @@ struct Code : Xbyak::CodeGenerator {
 Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
     : regalloc(regalloc), cpu(cpu) {
 
-    hralloc = allocate_host_registers(regalloc, 7, 5);
+    hralloc =
+        allocate_host_registers(regalloc, sizeof(tempregs) / sizeof(*tempregs),
+                                sizeof(savedregs) / sizeof(*savedregs));
 
 #ifdef BACKEND_DISASM
     print_hostregs();
@@ -190,76 +192,75 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_LOAD_MEM8: {
-                mov(rdi, rbx);
+                xor_(edx, edx);
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    auto src = getOp(inst.op1);
+                    if (src != esi) mov(esi, src);
                 }
-                xor_(edx, edx);
+                mov(rdi, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS8: {
-                mov(rdi, rbx);
+                mov(edx, 1);
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    auto src = getOp(inst.op1);
+                    if (src != esi) mov(esi, src);
                 }
-                mov(edx, 1);
+                mov(rdi, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEM16: {
-                mov(rdi, rbx);
+                xor_(edx, edx);
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    auto src = getOp(inst.op1);
+                    if (src != esi) mov(esi, src);
                 }
-                xor_(edx, edx);
+                mov(rdi, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS16: {
-                mov(rdi, rbx);
+                mov(edx, 1);
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    auto src = getOp(inst.op1);
+                    if (src != esi) mov(esi, src);
                 }
-                mov(edx, 1);
+                mov(rdi, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEM32: {
-                mov(rdi, rbx);
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    mov(esi, getOp(inst.op1));
+                    auto src = getOp(inst.op1);
+                    if (src != esi) mov(esi, src);
                 }
+                mov(rdi, rbx);
                 mov(rax, (u64) cpu->read32);
                 call(rax);
                 mov(getOp(i), eax);
                 break;
             }
             case IR_STORE_MEM8: {
-                mov(rdi, rbx);
-                if (inst.imm1) {
-                    mov(esi, inst.op1);
-                } else {
-                    mov(esi, getOp(inst.op1));
-                }
                 if (inst.imm2) {
                     mov(edx, inst.op2 & 0xff);
                 } else {
@@ -271,17 +272,18 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                     movzx(edx, src);
                 }
+                if (inst.imm1) {
+                    mov(esi, inst.op1);
+                } else {
+                    auto src = getOp(inst.op1);
+                    if (src != esi) mov(esi, src);
+                }
+                mov(rdi, rbx);
                 mov(rax, (u64) cpu->write8);
                 call(rax);
                 break;
             }
             case IR_STORE_MEM16: {
-                mov(rdi, rbx);
-                if (inst.imm1) {
-                    mov(esi, inst.op1);
-                } else {
-                    mov(esi, getOp(inst.op1));
-                }
                 if (inst.imm2) {
                     mov(edx, inst.op2 & 0xffff);
                 } else {
@@ -293,22 +295,30 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                     movzx(edx, src);
                 }
+                if (inst.imm1) {
+                    mov(esi, inst.op1);
+                } else {
+                    auto src = getOp(inst.op1);
+                    if (src != esi) mov(esi, src);
+                }
+                mov(rdi, rbx);
                 mov(rax, (u64) cpu->write16);
                 call(rax);
                 break;
             }
             case IR_STORE_MEM32: {
-                mov(rdi, rbx);
-                if (inst.imm1) {
-                    mov(esi, inst.op1);
-                } else {
-                    mov(esi, getOp(inst.op1));
-                }
                 if (inst.imm2) {
                     mov(edx, inst.op2);
                 } else {
                     mov(edx, getOp(inst.op2));
                 }
+                if (inst.imm1) {
+                    mov(esi, inst.op1);
+                } else {
+                    auto src = getOp(inst.op1);
+                    if (src != esi) mov(esi, src);
+                }
+                mov(rdi, rbx);
                 mov(rax, (u64) cpu->write32);
                 call(rax);
                 break;
