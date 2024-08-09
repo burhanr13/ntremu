@@ -1,5 +1,6 @@
 #include "jit.h"
 
+#include "backend/backend.h"
 #include "optimizer.h"
 #include "recompiler.h"
 #include "register_allocator.h"
@@ -11,43 +12,43 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
     block->start_addr = addr;
 
-    IRBlock* ir = malloc(sizeof(*block->ir));
-    irblock_init(ir);
+    IRBlock ir;
+    irblock_init(&ir);
 
-    block->cpu = cpu;
-    block->ir = ir;
+    compile_block(cpu, &ir, addr);
 
-    compile_block(cpu, ir, addr);
+    block->numinstr = ir.numinstr;
 
-    block->numinstr = ir->numinstr;
+    optimize_loadstore(&ir);
+    optimize_constprop(&ir);
+    optimize_literals(&ir, cpu);
+    optimize_chainjumps(&ir);
+    optimize_loadstore(&ir);
+    optimize_constprop(&ir);
+    optimize_deadcode(&ir);
+    if (ir.loop) optimize_waitloop(&ir);
+    optimize_blocklinking(&ir, cpu);
 
-    optimize_loadstore(ir);
-    optimize_constprop(ir);
-    optimize_literals(ir, cpu);
-    optimize_chainjumps(ir);
-    optimize_loadstore(ir);
-    optimize_constprop(ir);
-    optimize_deadcode(ir);
-    if (ir->loop) optimize_waitloop(ir);
-    optimize_blocklinking(ir, cpu);
+    block->end_addr = ir.end_addr;
 
-    block->end_addr = ir->end_addr;
-
-    RegisterAllocation regalloc = allocate_registers(ir);
+    RegAllocation regalloc = allocate_registers(&ir);
 
 #ifdef IR_DISASM
-    ir_disassemble(ir);
+    ir_disassemble(&ir);
     regalloc_print(&regalloc);
 #endif
 
+    block->backend = generate_code(&ir, &regalloc, cpu);
+    block->code = get_code(block->backend);
+
     regalloc_free(&regalloc);
+    irblock_free(&ir);
 
     return block;
 }
 
 void destroy_jit_block(JITBlock* block) {
-    irblock_free(block->ir);
-    free(block->ir);
+    free_code(block->backend);
     free(block);
 }
 
@@ -55,7 +56,7 @@ void jit_exec(JITBlock* block) {
 #ifdef JIT_LOG
     eprintf("executing block at 0x%08x\n", block->start_addr);
 #endif
-    ir_interpret(block->ir, block->cpu);
+    block->code();
 }
 
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {

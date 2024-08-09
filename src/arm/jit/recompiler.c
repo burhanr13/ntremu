@@ -475,12 +475,12 @@ DECL_ARM_COMPILE(multiply_long) {
         vreshi = EMITVV(ADC, vreshi, achi);
     }
     if (instr.multiply_long.s) {
-        EMIT0V(GETN, vreshi);
-        EMITIV(STORE_FLAG, NF, LASTV);
         u32 zlo = EMIT0V(GETZ, vreslo);
         EMIT0V(GETZ, vreshi);
         EMITVV(AND, zlo, LASTV);
         EMITIV(STORE_FLAG, ZF, LASTV);
+        EMIT0V(GETN, vreshi);
+        EMITIV(STORE_FLAG, NF, LASTV);
     }
     EMITV_STORE_REG(instr.multiply_long.rdlo, vreslo);
     EMITV_STORE_REG(instr.multiply_long.rdhi, vreshi);

@@ -495,7 +495,7 @@ void ir_disasm_instr(IRInstr inst, int i) {
 }
 
 void ir_disassemble(IRBlock* block) {
-    eprintf("===== IR Block 0x%08x =====\n", block->start_addr);
+    eprintf("============= IR Block 0x%08x =================\n", block->start_addr);
     u32 jmptarget = -1;
     for (int i = 0; i < block->code.size; i++) {
         if (i == jmptarget) eprintf("%d:\n", i);

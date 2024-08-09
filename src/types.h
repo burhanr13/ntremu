@@ -55,7 +55,7 @@ typedef int64_t s64;
     ({                                                                         \
         if ((v).size == (v).cap) {                                             \
             (v).cap = (v).cap ? 2 * (v).cap : 8;                               \
-            (v).d = realloc((v).d, (v).cap * sizeof *(v).d);                   \
+            (v).d = (typeof((v).d)) realloc((v).d, (v).cap * sizeof *(v).d);                   \
         }                                                                      \
         (v).d[(v).size++] = (e);                                               \
         (v).size - 1;                                                          \

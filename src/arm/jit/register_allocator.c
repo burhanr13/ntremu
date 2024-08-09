@@ -1,5 +1,8 @@
 #include "register_allocator.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+
 void find_uses(IRBlock* block, u32* vuses) {
     for (int i = 0; i < block->code.size; i++) {
         vuses[i] = 0;
@@ -9,11 +12,11 @@ void find_uses(IRBlock* block, u32* vuses) {
     }
 }
 
-RegisterAllocation allocate_registers(IRBlock* block) {
+RegAllocation allocate_registers(IRBlock* block) {
     u32 vuses[block->code.size];
     find_uses(block, vuses);
 
-    RegisterAllocation ret;
+    RegAllocation ret;
     Vec_init(ret.reg_info);
     ret.reg_assn = malloc(block->code.size * sizeof(u32));
     ret.nassns = block->code.size;
@@ -89,25 +92,82 @@ RegisterAllocation allocate_registers(IRBlock* block) {
     return ret;
 }
 
-void regalloc_free(RegisterAllocation* regalloc) {
+void regalloc_free(RegAllocation* regalloc) {
     Vec_free(regalloc->reg_info);
     free(regalloc->reg_assn);
 }
 
-void regalloc_print(RegisterAllocation* regalloc) {
-    static const char typenames[3][2] = {"k", "t", "s"};
+RegAllocation* regalloc_cmp;
+int compare(const void* i, const void* j) {
+    return regalloc_cmp->reg_info.d[*(int*) j].uses -
+           regalloc_cmp->reg_info.d[*(int*) i].uses;
+}
+
+HostRegAllocation allocate_host_registers(RegAllocation* regalloc, u32 ntemp,
+                                          u32 nsaved) {
+    int nregs = regalloc->reg_info.size;
+
+    HostRegAllocation ret = {};
+    ret.nregs = nregs;
+    ret.hostreg_info = calloc(nregs, sizeof(HostRegInfo));
+    int sorted[nregs];
+    for (int i = 0; i < nregs; i++) sorted[i] = i;
+    regalloc_cmp = regalloc;
+    qsort(sorted, nregs, sizeof(int), compare);
+
+    for (int i = 0; i < nregs; i++) {
+        if (regalloc->reg_info.d[i].type == REG_SCRATCH) {
+            ret.hostreg_info[i].index = 0;
+            ret.hostreg_info[i].type = REG_SCRATCH;
+            ret.count[REG_SCRATCH]++;
+            break;
+        }
+    }
+
+    for (int _i = 0; _i < nregs; _i++) {
+        int i = sorted[_i];
+        if (ret.hostreg_info[i].type == REG_NONE &&
+            regalloc->reg_info.d[i].type == REG_TEMP) {
+            ret.hostreg_info[i].type = REG_TEMP;
+            ret.hostreg_info[i].index = ret.count[REG_TEMP]++;
+            if (ret.count[REG_TEMP] == ntemp) break;
+        }
+    }
+    for (int _i = 0; _i < nregs; _i++) {
+        int i = sorted[_i];
+        if (ret.hostreg_info[i].type == REG_NONE) {
+            ret.hostreg_info[i].type = REG_SAVED;
+            ret.hostreg_info[i].index = ret.count[REG_SAVED]++;
+            if (ret.count[REG_SAVED] == nsaved) break;
+        }
+    }
+    for (int i = 0; i < nregs; i++) {
+        if (ret.hostreg_info[i].type == REG_NONE) {
+            ret.hostreg_info[i].type = REG_STACK;
+            ret.hostreg_info[i].index = ret.count[REG_STACK]++;
+        }
+    }
+
+    return ret;
+}
+
+void hostregalloc_free(HostRegAllocation* hostregs) {
+    free(hostregs->hostreg_info);
+}
+
+void regalloc_print(RegAllocation* regalloc) {
+    static const char *typenames[] = {"", "scr", "tmp", "sav", "stk"};
 
     eprintf("Registers:");
     for (int i = 0; i < regalloc->reg_info.size; i++) {
-        eprintf(" %s%d(%d)", typenames[regalloc->reg_info.d[i].type], i,
+        eprintf(" $%d(%s,%d)", i, typenames[regalloc->reg_info.d[i].type],
                 regalloc->reg_info.d[i].uses);
     }
     eprintf("\nAssignments:");
     for (int i = 0; i < regalloc->nassns; i++) {
         u32 assn = regalloc->reg_assn[i];
         if (assn == -1) continue;
-        eprintf(" v%d:%s%d", i, typenames[regalloc->reg_info.d[assn].type],
-                assn);
+        eprintf(" v%d:$%d", i, assn);
     }
     eprintf("\n");
 }
