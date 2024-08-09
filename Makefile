@@ -3,7 +3,7 @@ TARGET_EXEC := ntremu
 CC := gcc
 CXX := g++
 
-CFLAGS := -Wall -Wimplicit-fallthrough -Werror
+CFLAGS := -Wall -Wimplicit-fallthrough -Wno-format -Werror
 CFLAGS_RELEASE := -O3 -flto
 CFLAGS_DEBUG := -g -fsanitize=address
 
