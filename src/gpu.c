@@ -1421,11 +1421,6 @@ void render_polygon(GPU* gpu, poly* p) {
                 }
             }
 
-            if (alpha <= (gpu->master->io9.disp3dcnt.alpha_test
-                              ? (gpu->master->io9.alpha_test_ref & 0x1f)
-                              : 0))
-                continue;
-
             u16 tr = color & 0x1f;
             u16 tg = color >> 5 & 0x1f;
             u16 tb = color >> 10 & 0x1f;
@@ -1450,18 +1445,22 @@ void render_polygon(GPU* gpu, poly* p) {
                     u16 shr = tooncolor & 0x1f;
                     u16 shg = tooncolor >> 5 & 0x1f;
                     u16 shb = tooncolor >> 10 & 0x1f;
-                    r = ((shr + 1) * (tr + 1) - 1) / 32;
-                    g = ((shg + 1) * (tg + 1) - 1) / 32;
-                    b = ((shb + 1) * (tb + 1) - 1) / 32;
-                    a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
                     if (gpu->master->io9.disp3dcnt.shading_mode) {
+                        r = ((i.r / i.w + 1) * (tr + 1) - 1) / 32;
+                        g = ((i.r / i.w + 1) * (tg + 1) - 1) / 32;
+                        b = ((i.r / i.w + 1) * (tb + 1) - 1) / 32;
                         r += shr;
                         if (r > 31) r = 31;
                         g += shg;
                         if (g > 31) g = 31;
                         b += shb;
                         if (b > 31) b = 31;
+                    } else {
+                        r = ((shr + 1) * (tr + 1) - 1) / 32;
+                        g = ((shg + 1) * (tg + 1) - 1) / 32;
+                        b = ((shb + 1) * (tb + 1) - 1) / 32;
                     }
+                    a = ((p->attr.alpha + 1) * (alpha + 1) - 1) / 32;
                     break;
                 }
                 case POLYMODE_SHADOW: {
@@ -1486,6 +1485,11 @@ void render_polygon(GPU* gpu, poly* p) {
                     break;
                 }
             }
+
+            if (a <= (gpu->master->io9.disp3dcnt.alpha_test
+                          ? (gpu->master->io9.alpha_test_ref & 0x1f)
+                          : 0))
+                continue;
 
             if (a == 31 || p->attr.depth_transparent) {
                 if (gpu->w_buffer) gpu->depth_buf[y][x] = 1 / i.w;
