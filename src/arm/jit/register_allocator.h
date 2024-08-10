@@ -6,7 +6,6 @@
 
 typedef enum {
     REG_NONE,
-    REG_SCRATCH,
     REG_TEMP,
     REG_SAVED,
     REG_STACK,

@@ -10,8 +10,9 @@ struct Code : Xbyak::CodeGenerator {
     HostRegAllocation hralloc;
     ArmCore* cpu;
 
-    Xbyak::Reg32 tempregs[6] = {esi, edi, r8d, r9d, r10d, r11d};
-    Xbyak::Reg32 savedregs[5] = {ebp, r12d, r13d, r14d, r15d};
+    std::vector<Xbyak::Reg32> tempregs = {esi, edi, r8d, r9d, r10d, r11d};
+    std::vector<Xbyak::Reg32> savedregs = {ebp, r12d, r13d, r14d, r15d};
+    std::vector<Xbyak::Address> stackslots;
 
     Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
 
@@ -19,7 +20,7 @@ struct Code : Xbyak::CodeGenerator {
         eprintf("Host Regs:");
         for (u32 i = 0; i < hralloc.nregs; i++) {
             eprintf(" $%d:", i);
-            auto operand = _getOp(i);
+            auto& operand = _getOp(i);
             if (operand.isREG()) eprintf("%s", operand.toString());
             else eprintf("[rsp+%d]", 4 * hralloc.hostreg_info[i].index);
         }
@@ -34,24 +35,22 @@ struct Code : Xbyak::CodeGenerator {
         return disp;
     }
 
-    Xbyak::Operand _getOp(int i) {
+    const Xbyak::Operand& _getOp(int i) {
         HostRegInfo hr = hralloc.hostreg_info[i];
         switch (hr.type) {
-            case REG_SCRATCH:
-                return edx;
             case REG_TEMP:
                 return tempregs[hr.index];
             case REG_SAVED:
                 return savedregs[hr.index];
             case REG_STACK:
-                return ptr[rsp + 4 * hr.index];
+                return stackslots[hr.index];
             default:
                 break;
         }
         return rdx;
     }
 
-    Xbyak::Operand getOp(int i) {
+    const Xbyak::Operand& getOp(int i) {
         return _getOp(regalloc->reg_assn[i]);
     }
 };
@@ -69,7 +68,7 @@ struct Code : Xbyak::CodeGenerator {
 
 #define LOAD(addr)                                                             \
     ({                                                                         \
-        auto dest = getOp(i);                                                  \
+        auto& dest = getOp(i);                                                 \
         OP(mov, dest, ptr[addr]);                                              \
         dest;                                                                  \
     })
@@ -79,7 +78,7 @@ struct Code : Xbyak::CodeGenerator {
         if (inst.imm2) {                                                       \
             mov(dword[addr], inst.op2);                                        \
         } else {                                                               \
-            auto src = getOp(inst.op2);                                        \
+            auto& src = getOp(inst.op2);                                       \
             OP(mov, ptr[addr], src);                                           \
         }                                                                      \
     })
@@ -93,7 +92,7 @@ struct Code : Xbyak::CodeGenerator {
             mov(eax, getOp(inst.op2));                                         \
             op2eax = true;                                                     \
         }                                                                      \
-        auto dest = getOp(i);                                                  \
+        auto& dest = getOp(i);                                                 \
         if (inst.imm1) {                                                       \
             mov(dest, inst.op1);                                               \
         } else if (!SAMEREG(inst.op1, i)) {                                    \
@@ -112,8 +111,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
     : regalloc(regalloc), cpu(cpu) {
 
     hralloc =
-        allocate_host_registers(regalloc, sizeof(tempregs) / sizeof(*tempregs),
-                                sizeof(savedregs) / sizeof(*savedregs));
+        allocate_host_registers(regalloc, tempregs.size(), savedregs.size());
+    for (u32 i = 0; i < hralloc.count[REG_STACK]; i++) {
+        stackslots.push_back(dword[rsp + 4 * i]);
+    }
 
 #ifdef BACKEND_DISASM
     print_hostregs();
@@ -138,7 +139,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 STORE(CPUR(inst.op1));
                 break;
             case IR_LOAD_FLAG: {
-                auto dest = LOAD(CPU(cpsr));
+                auto& dest = LOAD(CPU(cpsr));
                 shr(dest, 31 - inst.op1);
                 and_(dest, 1);
                 break;
@@ -175,7 +176,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 STORE(CPU(spsr));
                 break;
             case IR_LOAD_THUMB: {
-                auto dest = LOAD(CPU(cpsr));
+                auto& dest = LOAD(CPU(cpsr));
                 shr(dest, 5);
                 and_(dest, 1);
                 break;
@@ -196,7 +197,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src != esi) mov(esi, src);
                 }
                 mov(rdi, rbx);
@@ -210,7 +211,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src != esi) mov(esi, src);
                 }
                 mov(rdi, rbx);
@@ -224,7 +225,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src != esi) mov(esi, src);
                 }
                 mov(rdi, rbx);
@@ -238,7 +239,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src != esi) mov(esi, src);
                 }
                 mov(rdi, rbx);
@@ -251,7 +252,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src != esi) mov(esi, src);
                 }
                 mov(rdi, rbx);
@@ -262,20 +263,14 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_STORE_MEM8: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2 & 0xff);
+                    mov(edx, inst.op2);
                 } else {
-                    auto src = getOp(inst.op2);
-                    if (src.isMEM()) {
-                        src.setBit(8);
-                    } else {
-                        src = src.getReg().changeBit(8);
-                    }
-                    movzx(edx, src);
+                    mov(edx, getOp(inst.op2));
                 }
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src != esi) mov(esi, src);
                 }
                 mov(rdi, rbx);
@@ -285,20 +280,14 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_STORE_MEM16: {
                 if (inst.imm2) {
-                    mov(edx, inst.op2 & 0xffff);
+                    mov(edx, inst.op2);
                 } else {
-                    auto src = getOp(inst.op2);
-                    if (src.isMEM()) {
-                        src.setBit(16);
-                    } else {
-                        src = src.getReg().changeBit(16);
-                    }
-                    movzx(edx, src);
+                    mov(edx, getOp(inst.op2));
                 }
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src != esi) mov(esi, src);
                 }
                 mov(rdi, rbx);
@@ -315,7 +304,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     mov(esi, inst.op1);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src != esi) mov(esi, src);
                 }
                 mov(rdi, rbx);
@@ -324,7 +313,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_MOV: {
-                auto dst = getOp(i);
+                auto& dst = getOp(i);
                 if (inst.imm2) {
                     mov(dst, inst.op2);
                 } else if (!SAMEREG(inst.op2, i)) {
@@ -342,7 +331,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 BINARY(xor_);
                 break;
             case IR_NOT: {
-                auto dst = getOp(i);
+                auto& dst = getOp(i);
                 if (inst.imm2) {
                     mov(dst, inst.op2);
                 } else if (!SAMEREG(inst.op2, i)) {
@@ -357,7 +346,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mov(eax, getOp(inst.op2));
                     op2eax = true;
                 }
-                auto dest = getOp(i);
+                auto& dest = getOp(i);
                 if (inst.imm1) {
                     mov(dest, inst.op1);
                 } else if (!SAMEREG(inst.op1, i)) {
@@ -393,7 +382,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mov(eax, getOp(inst.op2));
                     op2eax = true;
                 }
-                auto dest = getOp(i);
+                auto& dest = getOp(i);
                 if (inst.imm1) {
                     mov(dest, inst.op1);
                 } else if (!SAMEREG(inst.op1, i)) {
@@ -429,7 +418,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mov(eax, getOp(inst.op2));
                     op2eax = true;
                 }
-                auto dest = getOp(i);
+                auto& dest = getOp(i);
                 if (inst.imm1) {
                     mov(dest, inst.op1);
                 } else if (!SAMEREG(inst.op1, i)) {
@@ -465,7 +454,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mov(eax, getOp(inst.op2));
                     op2eax = true;
                 }
-                auto dest = getOp(i);
+                auto& dest = getOp(i);
                 if (inst.imm1) {
                     mov(dest, inst.op1);
                 } else if (!SAMEREG(inst.op1, i)) {
@@ -484,7 +473,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_RRC: {
-                auto dst = getOp(i);
+                auto& dst = getOp(i);
                 if (inst.imm1) {
                     mov(dst, inst.op1);
                 } else if (!SAMEREG(inst.op1, i)) {
@@ -509,12 +498,12 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (ir->code.d[i + 1].opcode == IR_GETC) cmc();
                 break;
             case IR_GETN: {
-                auto dest = getOp(i);
+                auto& dest = getOp(i);
                 if (inst.imm2) {
                     mov(dest, inst.op2 >> 31);
                 } else {
                     if (lastflags != inst.op2) {
-                        auto src = getOp(inst.op2);
+                        auto& src = getOp(inst.op2);
                         if (src.isMEM()) {
                             cmp(src, 0);
                         } else {
@@ -531,19 +520,18 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     } else {
                         xor_(dest, dest);
                         test(ah, BIT(7));
-                        dest = dest.getReg().changeBit(8);
-                        setnz(dest);
+                        setnz(dest.getReg().cvt8());
                     }
                 }
                 break;
             }
             case IR_GETZ: {
-                auto dest = getOp(i);
+                auto& dest = getOp(i);
                 if (inst.imm2) {
                     mov(dest, inst.op2 == 0);
                 } else {
                     if (lastflags != inst.op2) {
-                        auto src = getOp(inst.op2);
+                        auto& src = getOp(inst.op2);
                         if (src.isMEM()) {
                             cmp(src, 0);
                         } else {
@@ -560,8 +548,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     } else {
                         xor_(dest, dest);
                         test(ah, BIT(6));
-                        dest = dest.getReg().changeBit(8);
-                        setnz(dest);
+                        setnz(dest.getReg().cvt8());
                     }
                 }
                 break;
@@ -570,7 +557,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 lahf();
                 seto(al);
                 lastflags = inst.op2;
-                auto dest = getOp(i);
+                auto& dest = getOp(i);
                 if (dest.isMEM()) {
                     xor_(edx, edx);
                     test(ah, BIT(0));
@@ -579,8 +566,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 } else {
                     xor_(dest, dest);
                     test(ah, BIT(0));
-                    dest = dest.getReg().changeBit(8);
-                    setnz(dest);
+                    setnz(dest.getReg().cvt8());
                 }
                 break;
             }
@@ -602,7 +588,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                             OP(mov, getOp(i), getOp(inst.op2));
                         }
                     } else {
-                        auto dest = getOp(i);
+                        auto& dest = getOp(i);
                         setc(dl);
                         movzx(edx, dl);
                         mov(dest, edx);
@@ -610,7 +596,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 } else {
                     setc(dl);
                     movzx(edx, dl);
-                    auto op1 = getOp(inst.op1);
+                    auto& op1 = getOp(inst.op1);
                     if (op1.isMEM()) {
                         cmp(op1, 0);
                     } else {
@@ -627,7 +613,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_GETV: {
-                auto dest = getOp(i);
+                auto& dest = getOp(i);
                 if (dest.isMEM()) {
                     movzx(edx, al);
                     mov(dest, edx);
@@ -640,13 +626,13 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     mov(getOp(i), inst.op1 ? ~1 : ~3);
                 } else {
-                    auto op1 = getOp(inst.op1);
+                    auto& op1 = getOp(inst.op1);
                     if (op1.isMEM()) {
                         cmp(op1, 0);
                     } else {
                         test(op1.getReg(), op1.getReg());
                     }
-                    auto dest = getOp(i);
+                    auto& dest = getOp(i);
                     if (dest.isMEM()) {
                         mov(ecx, ~3);
                         mov(edx, ~1);
@@ -665,7 +651,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     if (!inst.op1) jmp(std::to_string(nlabels), T_NEAR);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src.isMEM()) {
                         cmp(src, 0);
                     } else {
@@ -680,7 +666,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 if (inst.imm1) {
                     if (inst.op1) jmp(std::to_string(nlabels), T_NEAR);
                 } else {
-                    auto src = getOp(inst.op1);
+                    auto& src = getOp(inst.op1);
                     if (src.isMEM()) {
                         cmp(src, 0);
                     } else {

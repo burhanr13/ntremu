@@ -28,21 +28,11 @@ RegAllocation allocate_registers(IRBlock* block) {
         if (!inst.imm1) {
             if (!--vuses[inst.op1]) {
                 reg_active.d[ret.reg_assn[inst.op1]] = false;
-                if (inst.op1 < i - 1) {
-                    if (ret.reg_info.d[ret.reg_assn[inst.op1]].type ==
-                        REG_SCRATCH)
-                        ret.reg_info.d[ret.reg_assn[inst.op1]].type = REG_TEMP;
-                }
             }
         }
         if (!inst.imm2) {
             if (!--vuses[inst.op2]) {
                 reg_active.d[ret.reg_assn[inst.op2]] = false;
-                if (inst.op2 < i - 1) {
-                    if (ret.reg_info.d[ret.reg_assn[inst.op2]].type ==
-                        REG_SCRATCH)
-                        ret.reg_info.d[ret.reg_assn[inst.op2]].type = REG_TEMP;
-                }
             }
         }
 
@@ -76,7 +66,7 @@ RegAllocation allocate_registers(IRBlock* block) {
             }
             if (assignment == -1) {
                 assignment = reg_active.size;
-                Vec_push(ret.reg_info, ((RegInfo){0, REG_SCRATCH}));
+                Vec_push(ret.reg_info, ((RegInfo){0, REG_TEMP}));
                 Vec_push(reg_active, true);
             }
             ret.reg_info.d[assignment].uses += 1 + vuses[i];
@@ -115,15 +105,6 @@ HostRegAllocation allocate_host_registers(RegAllocation* regalloc, u32 ntemp,
     regalloc_cmp = regalloc;
     qsort(sorted, nregs, sizeof(int), compare);
 
-    for (int i = 0; i < nregs; i++) {
-        if (regalloc->reg_info.d[i].type == REG_SCRATCH) {
-            ret.hostreg_info[i].index = 0;
-            ret.hostreg_info[i].type = REG_SCRATCH;
-            ret.count[REG_SCRATCH]++;
-            break;
-        }
-    }
-
     for (int _i = 0; _i < nregs; _i++) {
         int i = sorted[_i];
         if (ret.hostreg_info[i].type == REG_NONE &&
@@ -156,7 +137,7 @@ void hostregalloc_free(HostRegAllocation* hostregs) {
 }
 
 void regalloc_print(RegAllocation* regalloc) {
-    static const char *typenames[] = {"", "scr", "tmp", "sav", "stk"};
+    static const char *typenames[] = {"", "tmp", "sav", "stk"};
 
     eprintf("Registers:");
     for (int i = 0; i < regalloc->reg_info.size; i++) {
