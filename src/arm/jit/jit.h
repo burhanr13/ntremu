@@ -4,7 +4,7 @@
 #include "../arm_core.h"
 #include "ir.h"
 
-#define MAX_BLOCK_INSTRS 512
+#define MAX_BLOCK_INSTRS 128
 #define MAX_BLOCK_SIZE (MAX_BLOCK_INSTRS * 4)
 
 typedef void (*JITFunc)();
@@ -16,6 +16,9 @@ typedef struct _JITBlock {
     u32 start_addr;
     u32 end_addr;
     u32 numinstr;
+
+    ArmCore* cpu;
+    IRBlock* ir;
 } JITBlock;
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr);

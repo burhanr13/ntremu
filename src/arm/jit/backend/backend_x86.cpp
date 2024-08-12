@@ -3,7 +3,7 @@
 #include <capstone/capstone.h>
 #include <xbyak/xbyak.h>
 
-#define BACKEND_DISASM
+// #define BACKEND_DISASM
 
 struct Code : Xbyak::CodeGenerator {
     RegAllocation* regalloc;
@@ -29,9 +29,9 @@ struct Code : Xbyak::CodeGenerator {
 
     int getSPDisp() {
         int disp =
-            (hralloc.count[REG_SAVED] + 1) * 8 + hralloc.count[REG_STACK] * 4;
+            (hralloc.count[REG_SAVED] + 2) * 8 + hralloc.count[REG_STACK] * 4;
         disp = (disp + 15) & ~15;
-        disp -= (hralloc.count[REG_SAVED] + 1) * 8;
+        disp -= (hralloc.count[REG_SAVED] + 2) * 8;
         return disp;
     }
 
@@ -55,8 +55,7 @@ struct Code : Xbyak::CodeGenerator {
     }
 };
 
-#define CPU(m) (rbx + offsetof(ArmCore, m))
-#define CPUR(n) (rbx + offsetof(ArmCore, r) + 4 * n)
+#define CPU(m) (rbx + ((char*) &cpu->m - (char*) cpu))
 
 #define OP(op, dest, src)                                                      \
     ({                                                                         \
@@ -123,21 +122,45 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
     u32 flags_mask = 0;
     u32 lastflags = 0;
     u32 nlabels = 0;
-    u32 jmptarget = 0;
+    u32 jmptarget = -1;
 
     for (u32 i = 0; i < ir->code.size; i++) {
+        while (i < ir->code.size && ir->code.d[i].opcode == IR_NOP) i++;
+        if (i == ir->code.size) break;
         IRInstr inst = ir->code.d[i];
-        if (i == jmptarget && inst.opcode != IR_JELSE) {
+        if (i >= jmptarget && inst.opcode != IR_JELSE) {
             L(std::to_string(nlabels++));
-            jmptarget = 0;
+            jmptarget = -1;
         }
         switch (inst.opcode) {
             case IR_LOAD_REG:
-                LOAD(CPUR(inst.op1));
+                LOAD(CPU(r[inst.op1]));
                 break;
             case IR_STORE_REG:
-                STORE(CPUR(inst.op1));
+                STORE(CPU(r[inst.op1]));
                 break;
+            case IR_LOAD_REG_USR: {
+                int rd = inst.op1;
+                if (rd < 13) {
+                    LOAD(CPU(banked_r8_12[0][rd - 8]));
+                } else if (rd == 13) {
+                    LOAD(CPU(banked_sp[0]));
+                } else if (rd == 14) {
+                    LOAD(CPU(banked_lr[0]));
+                }
+                break;
+            }
+            case IR_STORE_REG_USR: {
+                int rd = inst.op1;
+                if (rd < 13) {
+                    STORE(CPU(banked_r8_12[0][rd - 8]));
+                } else if (rd == 13) {
+                    STORE(CPU(banked_sp[0]));
+                } else if (rd == 14) {
+                    STORE(CPU(banked_lr[0]));
+                }
+                break;
+            }
             case IR_LOAD_FLAG: {
                 auto& dest = LOAD(CPU(cpsr));
                 shr(dest, 31 - inst.op1);
@@ -192,6 +215,32 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 }
                 break;
             }
+            case IR_READ_CP: {
+                ArmInstr cpinst = {inst.op1};
+                mov(rdi, rbx);
+                mov(esi, cpinst.cp_reg_trans.crn);
+                mov(edx, cpinst.cp_reg_trans.crm);
+                mov(ecx, cpinst.cp_reg_trans.cp);
+                mov(rax, (u64) cpu->cp15_read);
+                call(rax);
+                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
+                break;
+            }
+            case IR_WRITE_CP: {
+                if (inst.imm2) {
+                    mov(r8d, inst.op2);
+                } else {
+                    mov(r8d, getOp(inst.op2));
+                }
+                ArmInstr cpinst = {inst.op1};
+                mov(rdi, rbx);
+                mov(esi, cpinst.cp_reg_trans.crn);
+                mov(edx, cpinst.cp_reg_trans.crm);
+                mov(ecx, cpinst.cp_reg_trans.cp);
+                mov(rax, (u64) cpu->cp15_write);
+                call(rax);
+                break;
+            }
             case IR_LOAD_MEM8: {
                 xor_(edx, edx);
                 if (inst.imm1) {
@@ -203,7 +252,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
-                mov(getOp(i), eax);
+                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS8: {
@@ -217,7 +266,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
-                mov(getOp(i), eax);
+                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEM16: {
@@ -231,7 +280,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
-                mov(getOp(i), eax);
+                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS16: {
@@ -245,7 +294,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
-                mov(getOp(i), eax);
+                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEM32: {
@@ -258,7 +307,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read32);
                 call(rax);
-                mov(getOp(i), eax);
+                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
                 break;
             }
             case IR_STORE_MEM8: {
@@ -497,6 +546,77 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 BINARY(sbb);
                 if (ir->code.d[i + 1].opcode == IR_GETC) cmc();
                 break;
+            case IR_MUL: {
+                IRInstr hinst = ir->code.d[i + 1];
+                if (hinst.opcode == IR_SMULH || hinst.opcode == IR_UMULH) {
+                    if (inst.imm1) {
+                        mov(eax, inst.op1);
+                    } else {
+                        mov(eax, getOp(inst.op1));
+                    }
+                    auto& msrc = inst.imm2 ? edx : getOp(inst.op2);
+                    if (inst.imm2) mov(edx, inst.op2);
+                    if (hinst.opcode == IR_SMULH) {
+                        imul(msrc);
+                    } else {
+                        mul(msrc);
+                    }
+                    mov(getOp(i), eax);
+                    mov(getOp(i + 1), edx);
+                } else {
+                    auto& dest = getOp(i);
+                    if (inst.imm2) {
+                        if (inst.imm1) {
+                            mov(dest, inst.op1 * inst.op2);
+                        } else {
+                            auto& mdst = dest.isMEM() ? edx : dest;
+                            imul(mdst.getReg(), getOp(inst.op1), inst.op2);
+                            if (dest.isMEM()) mov(dest, mdst);
+                        }
+                    } else {
+                        bool op2eax = false;
+                        if (!dest.isMEM() && SAMEREG(i, inst.op2)) {
+                            mov(eax, getOp(inst.op2));
+                            op2eax = true;
+                        }
+                        auto& mdst = dest.isMEM() ? edx : dest;
+                        if (inst.imm1) {
+                            mov(mdst, inst.op1);
+                        } else {
+                            mov(mdst, getOp(inst.op1));
+                        }
+                        if (op2eax) {
+                            imul(mdst.getReg(), eax);
+                        } else {
+                            imul(mdst.getReg(), getOp(inst.op2));
+                        }
+                        if (dest.isMEM()) mov(dest, mdst);
+                    }
+                }
+                break;
+            }
+            case IR_CLZ: {
+                auto& dest = getOp(i);
+                if (inst.imm2) {
+                    u32 op = inst.op2;
+                    u32 ct = 0;
+                    if (op == 0) ct = 32;
+                    else
+                        while (!(op & BIT(31))) {
+                            op <<= 1;
+                            ct++;
+                        }
+                    mov(dest, ct);
+                } else {
+                    if (dest.isMEM()) {
+                        lzcnt(edx, getOp(inst.op2));
+                        mov(dest, edx);
+                    } else {
+                        lzcnt(dest.getReg(), getOp(inst.op2));
+                    }
+                }
+                break;
+            }
             case IR_GETN: {
                 auto& dest = getOp(i);
                 if (inst.imm2) {
