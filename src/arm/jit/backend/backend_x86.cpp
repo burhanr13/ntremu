@@ -852,28 +852,48 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             }
             case IR_BEGIN: {
                 push(rbx);
-                mov(rbx, (u64) cpu);
                 for (u32 i = 0; i < hralloc.count[REG_SAVED]; i++) {
                     push(savedregs[i].changeBit(64));
                 }
                 int spdisp = getSPDisp();
                 if (spdisp) sub(rsp, spdisp);
-
-                add(dword[CPU(cycles)], ir->numinstr);
+                mov(rbx, (u64) cpu);
                 break;
             }
             case IR_END_LINK:
             case IR_END_RET: {
-                mov(eax, ptr[CPU(pc)]);
-                mov(ptr[CPU(cur_instr_addr)], eax);
-                mov(byte[CPU(pending_flush)], 1);
-                mov(dword[CPU(max_cycles)], 0);
-
                 int spdisp = getSPDisp();
                 if (spdisp) add(rsp, spdisp);
                 for (int i = hralloc.count[REG_SAVED] - 1; i >= 0; i--) {
                     pop(savedregs[i].changeBit(64));
                 }
+
+                add(dword[CPU(cycles)], ir->numinstr);
+
+                if (inst.opcode == IR_END_LINK) {
+                    inLocalLabel();
+                    mov(eax, dword[CPU(max_cycles)]);
+                    cmp(dword[CPU(cycles)], eax);
+                    jge(".cantlink");
+
+                    mov(edx, inst.op2);
+                    mov(esi, inst.op1);
+                    mov(rdi, rbx);
+                    mov(rax, (u64) get_jitblock);
+                    call(rax);
+                    test(rax, rax);
+                    je(".cantlink");
+                    pop(rbx);
+                    jmp(ptr[rax + offsetof(JITBlock, code)]);
+                    L(".cantlink");
+                    outLocalLabel();
+                }
+
+                mov(dword[CPU(max_cycles)], 0);
+                mov(eax, ptr[CPU(pc)]);
+                mov(ptr[CPU(cur_instr_addr)], eax);
+                mov(byte[CPU(pending_flush)], 1);
+
                 pop(rbx);
                 ret();
                 break;
