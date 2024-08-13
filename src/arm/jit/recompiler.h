@@ -19,6 +19,7 @@ DECL_ARM_COMPILE(data_proc);
 DECL_ARM_COMPILE(psr_trans);
 DECL_ARM_COMPILE(multiply);
 DECL_ARM_COMPILE(multiply_long);
+DECL_ARM_COMPILE(multiply_short);
 DECL_ARM_COMPILE(swap);
 DECL_ARM_COMPILE(branch_exch);
 DECL_ARM_COMPILE(leading_zeros);

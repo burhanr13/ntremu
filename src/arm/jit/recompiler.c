@@ -10,6 +10,7 @@ ArmCompileFunc compile_funcs[ARM_MAX] = {
     [ARM_PSRTRANS] = compile_arm_psr_trans,
     [ARM_MULTIPLY] = compile_arm_multiply,
     [ARM_MULTIPLYLONG] = compile_arm_multiply_long,
+    [ARM_MULTIPLYSHORT] = compile_arm_multiply_short,
     [ARM_SWAP] = compile_arm_swap,
     [ARM_BRANCHEXCH] = compile_arm_branch_exch,
     [ARM_LEADINGZEROS] = compile_arm_leading_zeros,
@@ -136,9 +137,9 @@ bool arm_compile_instr(IRBlock* block, ArmCore* cpu, u32 addr, ArmInstr instr) {
     }
     if (instr.cond < C_AL) {
         u32 jmpaddr = compile_cond(block, instr);
-        bool retval = func(block, cpu, addr, instr);
+        func(block, cpu, addr, instr);
         block->code.d[jmpaddr].op2 = LASTV + 1;
-        return retval;
+        return true;
     } else {
         return func(block, cpu, addr, instr);
     }
@@ -484,6 +485,59 @@ DECL_ARM_COMPILE(multiply_long) {
     }
     EMITV_STORE_REG(instr.multiply_long.rdlo, vreslo);
     EMITV_STORE_REG(instr.multiply_long.rdhi, vreshi);
+    return true;
+}
+
+DECL_ARM_COMPILE(multiply_short) {
+    if (!cpu->v5) {
+        EMIT_UPDATE_PC();
+        EMITI0(EXCEPTION, E_UND);
+        EMIT00(END_RET);
+        return false;
+    }
+
+    u32 vop1 = EMIT_LOAD_REG(instr.multiply_short.rs, true);
+    if (!instr.multiply_short.y) vop1 = EMITVI(LSL, vop1, 16);
+    vop1 = EMITVI(ASR, vop1, 16);
+
+    u32 vop2 = EMIT_LOAD_REG(instr.multiply_short.rm, true);
+    if (instr.multiply_short.op != 0b01) {
+        if (!instr.multiply_short.x) vop2 = EMITVI(LSL, vop2, 16);
+        vop2 = EMITVI(ASR, vop2, 16);
+    }
+    // s64 res = op1 * op2;
+    switch (instr.multiply_short.op) {
+        case 0: {
+            u32 vres = EMITVV(MUL, vop1, vop2);
+            EMIT_LOAD_REG(instr.multiply_short.rn, true);
+            vres = EMITVV(ADD, vres, LASTV);
+            // if (res > INT32_MAX || res < INT32_MIN) {
+            //     cpu->cpsr.q = 1;
+            // }
+            EMITV_STORE_REG(instr.multiply_short.rd, vres);
+            break;
+        }
+        case 1:
+            // res >>= 16;
+            // if (!instr.multiply_short.x) {
+            //     res += (s32) cpu->r[instr.multiply_short.rn];
+            //     if (res > INT32_MAX || res < INT32_MIN) {
+            //         cpu->cpsr.q = 1;
+            //     }
+            // }
+            // cpu->r[instr.multiply_short.rd] = res;
+            break;
+        case 2:
+            // res += cpu->r[instr.multiply_short.rn];
+            // res += (s64) cpu->r[instr.multiply_short.rd] << 32;
+            // cpu->r[instr.multiply_short.rn] = res;
+            // cpu->r[instr.multiply_short.rd] = res >> 32;
+            // break;
+        case 3:
+            EMITVV(MUL, vop1, vop2);
+            EMITV_STORE_REG(instr.multiply_short.rd, LASTV);
+            break;
+    }
     return true;
 }
 
