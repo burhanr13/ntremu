@@ -1,9 +1,9 @@
 #include "thumb.h"
 
-ArmInstr thumb_lookup[1 << 16];
+ArmInstr thumb_lookup[BIT(16)];
 
 void thumb_generate_lookup() {
-    for (int i = 0; i < 1 << 16; i++) {
+    for (int i = 0; i < BIT(16); i++) {
         thumb_lookup[i] = thumb_decode_instr((ThumbInstr){i});
     }
 }
@@ -71,28 +71,28 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
                         case T_LSL:
                             dec.data_proc.opcode = A_MOV;
                             dec.data_proc.op2 = instr.alu.rd;
-                            dec.data_proc.op2 |= 1 << 4;
+                            dec.data_proc.op2 |= BIT(4);
                             dec.data_proc.op2 |= S_LSL << 5;
                             dec.data_proc.op2 |= instr.alu.rs << 8;
                             break;
                         case T_LSR:
                             dec.data_proc.opcode = A_MOV;
                             dec.data_proc.op2 = instr.alu.rd;
-                            dec.data_proc.op2 |= 1 << 4;
+                            dec.data_proc.op2 |= BIT(4);
                             dec.data_proc.op2 |= S_LSR << 5;
                             dec.data_proc.op2 |= instr.alu.rs << 8;
                             break;
                         case T_ASR:
                             dec.data_proc.opcode = A_MOV;
                             dec.data_proc.op2 = instr.alu.rd;
-                            dec.data_proc.op2 |= 1 << 4;
+                            dec.data_proc.op2 |= BIT(4);
                             dec.data_proc.op2 |= S_ASR << 5;
                             dec.data_proc.op2 |= instr.alu.rs << 8;
                             break;
                         case T_ROR:
                             dec.data_proc.opcode = A_MOV;
                             dec.data_proc.op2 = instr.alu.rd;
-                            dec.data_proc.op2 |= 1 << 4;
+                            dec.data_proc.op2 |= BIT(4);
                             dec.data_proc.op2 |= S_ROR << 5;
                             dec.data_proc.op2 |= instr.alu.rs << 8;
                             break;
@@ -300,7 +300,7 @@ ArmInstr thumb_decode_instr(ThumbInstr instr) {
                 dec.branch.l = 1;
                 if (instr.branch_l.h) {
                     dec.branch.offset = instr.branch_l.offset;
-                    dec.branch.offset |= 1 << 22;
+                    dec.branch.offset |= BIT(22);
                     if (!instr.branch_l.h1) dec.cond = 0xf;
                 } else {
                     dec.branch.offset = instr.branch_l.offset << 11;

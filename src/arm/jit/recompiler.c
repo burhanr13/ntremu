@@ -907,7 +907,7 @@ DECL_ARM_COMPILE(branch) {
     if (instr.branch.l || instr.cond == 0xf) {
         if (cpu->cpsr.t) {
             if (offset & BIT(23)) {
-                offset %= 1 << 23;
+                offset %= BIT(23);
                 EMIT_LOAD_REG(14, false);
                 u32 vdest = EMITVI(ADD, LASTV, offset);
                 EMITI_STORE_REG(14, addr + 3);

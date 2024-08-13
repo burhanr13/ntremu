@@ -177,7 +177,7 @@ typedef struct _NDS {
         u8 oam[2 * OAMSIZE];
     };
 
-    u8 expansionram[1 << 25];
+    u8 expansionram[BIT(25)];
 
     u8* bios7;
     u8* bios9;

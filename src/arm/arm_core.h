@@ -84,6 +84,7 @@ typedef struct _ArmCore {
     void (*cp15_write)(ArmCore* cpu, u32 cn, u32 cm, u32 cp, u32 data);
 
     JITBlock*** jit_cache[64];
+    u8** jit_dirty;
     bool pending_flush;
 
     bool v5;

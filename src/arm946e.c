@@ -86,10 +86,11 @@ u32 arm9_read32(Arm946E* cpu, u32 addr) {
 }
 
 #define WRITE(size, addr)                                                      \
-    if (cpu->cp15_control.itcm_on && (addr) < cpu->itcm_virtsize)              \
+    if (cpu->cp15_control.itcm_on && (addr) < cpu->itcm_virtsize) {            \
+        jit_mark_dirty((ArmCore*) cpu, addr);                                  \
         *(u##size*) &cpu->itcm[(addr) % ITCMSIZE] = data;                      \
-    else if (cpu->cp15_control.dtcm_on &&                                      \
-             (addr) - cpu->dtcm_base < cpu->dtcm_virtsize)                     \
+    } else if (cpu->cp15_control.dtcm_on &&                                    \
+               (addr) - cpu->dtcm_base < cpu->dtcm_virtsize)                   \
         *(u##size*) &cpu->dtcm[(addr) % DTCMSIZE] = data;                      \
     else bus9_write##size(cpu->master, addr, data);
 

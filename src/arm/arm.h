@@ -271,7 +271,7 @@ typedef enum {
 
 typedef struct _ArmCore ArmCore;
 
-extern ArmInstrFormat arm_lookup[1 << 8][1 << 4];
+extern ArmInstrFormat arm_lookup[BIT(8)][BIT(4)];
 
 void arm_generate_lookup();
 ArmInstrFormat arm_decode_instr(ArmInstr instr);

@@ -50,10 +50,10 @@ void dma7_activate(DMAController* dmac, int i) {
 }
 
 void dma7_run(DMAController* dmac, int i) {
-    if (i > 0) dmac->dma[i].sptr %= 1 << 28;
-    else dmac->dma[i].sptr %= 1 << 27;
-    if (i < 3) dmac->dma[i].dptr %= 1 << 27;
-    else dmac->dma[i].dptr %= 1 << 28;
+    if (i > 0) dmac->dma[i].sptr %= BIT(28);
+    else dmac->dma[i].sptr %= BIT(27);
+    if (i < 3) dmac->dma[i].dptr %= BIT(27);
+    else dmac->dma[i].dptr %= BIT(28);
 
     if (dmac->master->io7.dma[i].cnt.wsize) {
         do {
@@ -119,8 +119,8 @@ void dma9_activate(DMAController* dmac, int i) {
 }
 
 void dma9_run(DMAController* dmac, int i) {
-    dmac->dma[i].sptr %= 1 << 28;
-    dmac->dma[i].dptr %= 1 << 28;
+    dmac->dma[i].sptr %= BIT(28);
+    dmac->dma[i].dptr %= BIT(28);
 
     if (dmac->master->io9.dma[i].cnt.wsize) {
         do {

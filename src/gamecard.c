@@ -28,7 +28,7 @@ GameCard* create_card(char* filename) {
     v |= v >> 16;
     v |= v >> 32;
     v++;
-    if (v < BIT(17)) v = 1 << 17;
+    if (v < BIT(17)) v = BIT(17);
     card->rom_size = v;
     card->rom = mmap(NULL, card->rom_size, PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANON, -1, 0);
@@ -45,8 +45,8 @@ GameCard* create_card(char* filename) {
     fd = open(card->sav_filename, O_RDWR);
     if (fd < 0) {
         card->sav_new = true;
-        card->eeprom = calloc(1 << 16, 1);
-        card->eeprom_size = 1 << 16;
+        card->eeprom = calloc(BIT(16), 1);
+        card->eeprom_size = BIT(16);
         card->addrtype = 2;
     } else {
         struct stat st;
@@ -270,15 +270,15 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
                     break;
                 case 34:
                     card->addrtype = 2;
-                    card->eeprom_size = 1 << 13;
+                    card->eeprom_size = BIT(13);
                     break;
                 case 130:
                     card->addrtype = 2;
-                    card->eeprom_size = 1 << 16;
+                    card->eeprom_size = BIT(16);
                     break;
                 case 259:
                     card->addrtype = 3;
-                    card->eeprom_size = 1 << 20;
+                    card->eeprom_size = BIT(20);
                     break;
                 default:
                     card->eeprom_detected = false;

@@ -1,6 +1,7 @@
 #include "bus9.h"
 
 #include "nds.h"
+#include "arm/jit/jit.h"
 
 #define BUS9READDECL(size)                                                     \
     u##size bus9_read##size(NDS* nds, u32 addr) {                              \
@@ -47,6 +48,7 @@
 #define BUS9WRITEDECL(size)                                                    \
     void bus9_write##size(NDS* nds, u32 addr, u##size data) {                  \
         nds->memerr = false;                                                   \
+        jit_mark_dirty((ArmCore*) &nds->cpu9, addr);                            \
         switch (addr >> 24) {                                                  \
             case R_RAM:                                                        \
                 *(u##size*) (&nds->ram[addr % RAMSIZE]) = data;                \

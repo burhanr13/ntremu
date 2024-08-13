@@ -5,12 +5,12 @@
 #include "recompiler.h"
 #include "register_allocator.h"
 
-//#define IR_DISASM
-//#define BACKEND_DISASM
-// #define JIT_LOG
-//#define JIT_CPULOG
-//#define IR_INTERPRET
-//#define DISABLE_OPT
+// #define IR_DISASM
+// #define BACKEND_DISASM
+//  #define JIT_LOG
+// #define JIT_CPULOG
+// #define IR_INTERPRET
+// #define DISABLE_OPT
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
@@ -53,7 +53,7 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 #endif
 
     regalloc_free(&regalloc);
-    //irblock_free(&ir);
+    // irblock_free(&ir);
 
     block->cpu = cpu;
     block->ir = malloc(sizeof(IRBlock));
@@ -83,20 +83,14 @@ void jit_exec(JITBlock* block) {
 #endif
 }
 
-JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
+void jit_mark_dirty(ArmCore* cpu, u32 addr) {
     u32 addrhi = addr >> 16;
-    u32 addrlo = (addr & 0xffff) >> 1;
-
-    if (!cpu->jit_cache[attrs])
-        cpu->jit_cache[attrs] = calloc(1 << 16, sizeof(JITBlock**));
-
-    if (!cpu->jit_cache[attrs][addrhi])
-        cpu->jit_cache[attrs][addrhi] = calloc(1 << 15, sizeof(JITBlock*));
-
-    if (!cpu->jit_cache[attrs][addrhi][addrlo])
-        cpu->jit_cache[attrs][addrhi][addrlo] = create_jit_block(cpu, addr);
-
-    return cpu->jit_cache[attrs][addrhi][addrlo];
+    u32 addrlo = addr & 0xffff;
+    u32 byte = addrlo >> 9;
+    u32 bit = (addrlo >> 6) & 7;
+    if (cpu->jit_dirty && cpu->jit_dirty[addrhi]) {
+        cpu->jit_dirty[addrhi][byte] |= BIT(bit);
+    }
 }
 
 void invalidate_l2(ArmCore* cpu, u32 attr, u32 addrhi, u32 startlo, u32 endlo) {
@@ -113,7 +107,7 @@ void invalidate_l2(ArmCore* cpu, u32 attr, u32 addrhi, u32 startlo, u32 endlo) {
     }
 }
 
-void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
+void jit_clean_blocks(ArmCore* cpu, u32 start_addr, u32 end_addr) {
     u32 sthi = start_addr >> 16;
     u32 stlo = (start_addr & 0xffff) >> 1;
     u32 endhi = end_addr >> 16;
@@ -124,9 +118,9 @@ void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
         if (sthi == endhi) {
             invalidate_l2(cpu, i, sthi, stlo, endlo);
         } else {
-            invalidate_l2(cpu, i, sthi, stlo, 1 << 15);
+            invalidate_l2(cpu, i, sthi, stlo, BIT(16) >> 1);
             for (int j = sthi + 1; j < endhi; j++) {
-                invalidate_l2(cpu, i, j, 0, 1 << 15);
+                invalidate_l2(cpu, i, j, 0, BIT(16) >> 1);
             }
             invalidate_l2(cpu, i, endhi, 0, endlo);
         }
@@ -137,12 +131,104 @@ void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
     }
 }
 
+bool clean_byte(u8* b, u32 stbit, u32 endbit) {
+    u32 mask = (BIT(endbit + 1) - BIT(stbit));
+    bool dirty = (*b & mask) != 0;
+    *b &= ~mask;
+    return dirty;
+}
+
+bool jit_mark_clean(ArmCore* cpu, u32 start, u32 end) {
+    if (start > end) return false;
+    u32 sthi = start >> 16;
+    u32 stbyte = (start >> 12) & 0xf;
+    u32 stbit = (start >> 6) & 0x3f;
+    u32 endhi = end >> 16;
+    u32 endbyte = (end >> 12) & 0xf;
+    u32 endbit = (end >> 6) & 0x3f;
+
+    bool wasdirty = 0;
+    if (sthi == endhi) {
+        if (!cpu->jit_dirty[sthi]) return false;
+        if (stbyte == endbyte) {
+            wasdirty |=
+                clean_byte(&cpu->jit_dirty[sthi][stbyte], stbit, endbit);
+        } else {
+            clean_byte(&cpu->jit_dirty[sthi][stbyte], stbit, 8);
+            for (int i = stbyte + 1; i < endbyte; i++) {
+                wasdirty |= cpu->jit_dirty[sthi][i] != 0;
+                cpu->jit_dirty[sthi][i] = 0;
+            }
+            clean_byte(&cpu->jit_dirty[sthi][endbyte], 0, endbit);
+        }
+    } else {
+        wasdirty |=
+            jit_mark_clean(cpu, start, ((start + 0xffff) & ~0xffff) - 1);
+        for (u32 a = ((start + 0xffff) & ~0xffff); a < (end & ~0xffff);
+             a += BIT(16)) {
+            wasdirty |= jit_mark_clean(cpu, a, a + 0xffff);
+        }
+        wasdirty |= jit_mark_clean(cpu, end & ~0xffff, end);
+    }
+    return wasdirty;
+}
+
+void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
+    jit_mark_clean(cpu, start_addr, end_addr);
+    jit_clean_blocks(cpu, start_addr, end_addr);
+}
+
+JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
+    u32 addrhi = addr >> 16;
+    u32 addrlo = (addr & 0xffff) >> 1;
+
+    if (!cpu->jit_cache[attrs]) {
+        cpu->jit_cache[attrs] = calloc(BIT(16), sizeof(JITBlock**));
+        if (!cpu->jit_dirty) cpu->jit_dirty = calloc(BIT(16), sizeof(u8*));
+    }
+
+    if (!cpu->jit_cache[attrs][addrhi]) {
+        cpu->jit_cache[attrs][addrhi] = calloc(BIT(16) >> 1, sizeof(JITBlock*));
+        if (!cpu->jit_dirty[addrhi])
+            cpu->jit_dirty[addrhi] = calloc(BIT(16) >> 6 >> 3, sizeof(u8));
+    }
+
+    JITBlock* block = NULL;
+    if (!cpu->jit_cache[attrs][addrhi][addrlo]) {
+        block = create_jit_block(cpu, addr);
+        if (block->end_addr >> 16 != addrhi &&
+            !cpu->jit_dirty[(addrhi + 1) & 0xffff]) {
+            cpu->jit_dirty[(addrhi + 1) & 0xffff] =
+                calloc(BIT(16) >> 6 >> 3, sizeof(u8));
+        }
+        if (jit_mark_clean(cpu, block->start_addr, block->end_addr - 1)) {
+            jit_clean_blocks(cpu, block->start_addr, block->end_addr);
+        }
+        cpu->jit_cache[attrs][addrhi][addrlo] = block;
+    } else {
+        block = cpu->jit_cache[attrs][addrhi][addrlo];
+        if (jit_mark_clean(cpu, block->start_addr, block->end_addr)) {
+            jit_clean_blocks(cpu, block->start_addr, block->end_addr);
+            block = create_jit_block(cpu, addr);
+            if (block->end_addr >> 16 != addrhi &&
+                !cpu->jit_dirty[(addrhi + 1) & 0xffff]) {
+                cpu->jit_dirty[(addrhi + 1) & 0xffff] =
+                    calloc(BIT(16) >> 6 >> 3, sizeof(u8));
+            }
+            jit_mark_clean(cpu, block->start_addr, block->end_addr - 1);
+            cpu->jit_cache[attrs][addrhi][addrlo] = block;
+        }
+    }
+
+    return block;
+}
+
 void jit_free_all(ArmCore* cpu) {
     for (int i = 0; i < 64; i++) {
         if (cpu->jit_cache[i]) {
-            for (int j = 0; j < 1 << 16; j++) {
+            for (int j = 0; j < BIT(16); j++) {
                 if (cpu->jit_cache[i][j]) {
-                    for (int k = 0; k < 1 << 15; k++) {
+                    for (int k = 0; k < BIT(16) >> 1; k++) {
                         if (cpu->jit_cache[i][j][k]) {
                             destroy_jit_block(cpu->jit_cache[i][j][k]);
                         }
@@ -151,6 +237,14 @@ void jit_free_all(ArmCore* cpu) {
                 }
             }
             free(cpu->jit_cache[i]);
+            cpu->jit_cache[i] = NULL;
+        }
+        if (cpu->jit_dirty) {
+            for (int j = 0; j < BIT(16); j++) {
+                free(cpu->jit_dirty[j]);
+            }
+            free(cpu->jit_dirty);
+            cpu->jit_dirty = NULL;
         }
     }
 }

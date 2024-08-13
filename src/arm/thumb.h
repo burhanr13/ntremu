@@ -136,7 +136,7 @@ typedef union {
     } branch_l;
 } ThumbInstr;
 
-extern ArmInstr thumb_lookup[1 << 16];
+extern ArmInstr thumb_lookup[BIT(16)];
 
 void thumb_generate_lookup();
 

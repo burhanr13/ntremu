@@ -8,7 +8,7 @@
 #include "dldi.h"
 #include "ppu.h"
 
-//#define FIXRTC
+// #define FIXRTC
 
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
               bool bootbios) {
@@ -404,7 +404,7 @@ void rtc_write(NDS* nds) {
             day = (t->tm_mday / 10) << 4 | t->tm_mday % 10;
             wday = t->tm_wday;
             hour = (t->tm_hour / 10) << 4 | t->tm_hour % 10;
-            if (t->tm_hour >= 12) hour |= 1 << 6;
+            if (t->tm_hour >= 12) hour |= BIT(6);
             min = (t->tm_min / 10) << 4 | t->tm_min % 10;
             sec = (t->tm_sec / 10) << 4 | t->tm_sec % 10;
 #endif

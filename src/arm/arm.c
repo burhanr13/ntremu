@@ -5,7 +5,7 @@
 #include "arm_core.h"
 #include "jit/jit.h"
 
-ArmInstrFormat arm_lookup[1 << 8][1 << 4];
+ArmInstrFormat arm_lookup[BIT(8)][BIT(4)];
 
 ArmExecFunc exec_funcs[] = {
     [ARM_DATAPROC] = exec_arm_data_proc,
@@ -27,11 +27,11 @@ ArmExecFunc exec_funcs[] = {
     [ARM_MOV] = exec_arm_mov,
 };
 
-ArmExecFunc func_lookup[1 << 8][1 << 4];
+ArmExecFunc func_lookup[BIT(8)][BIT(4)];
 
 void arm_generate_lookup() {
-    for (int dechi = 0; dechi < 1 << 8; dechi++) {
-        for (int declo = 0; declo < 1 << 4; declo++) {
+    for (int dechi = 0; dechi < BIT(8); dechi++) {
+        for (int declo = 0; declo < BIT(4); declo++) {
             arm_lookup[dechi][declo] =
                 arm_decode_instr((ArmInstr){.dechi = dechi, .declo = declo});
             func_lookup[dechi][declo] = exec_funcs[arm_lookup[dechi][declo]];
@@ -882,7 +882,7 @@ DECL_ARM_EXEC(branch) {
     if (instr.branch.l || instr.cond == 0xf) {
         if (cpu->cpsr.t) {
             if (offset & BIT(23)) {
-                offset %= 1 << 23;
+                offset %= BIT(23);
                 cpu->lr += offset;
                 dest = cpu->lr;
                 cpu->lr = (cpu->pc - 2) | 1;

@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 
+#include "arm/jit/jit.h"
 #include "bus7.h"
 #include "dldi.h"
 #include "nds.h"
@@ -580,6 +581,10 @@ void io9_write8(IO* io, u32 addr, u8 data) {
             break;
         }
         case WRAMCNT:
+            jit_invalidate_range((ArmCore*) &io->master->cpu7, 0x3000000,
+                                 0x37fffff);
+            jit_invalidate_range((ArmCore*) &io->master->cpu9, 0x3000000,
+                                 0x3ffffff);
             io->wramcnt = data & 3;
             io->master->io7.wramstat = io->wramcnt;
             break;
