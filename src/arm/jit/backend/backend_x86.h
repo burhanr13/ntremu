@@ -13,6 +13,7 @@ extern "C" {
 void* generate_code_x86(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
 JITFunc get_code_x86(void* backend);
 void free_code_x86(void* backend);
+void backend_disassemble_x86(void* backend);
 
 #ifdef __cplusplus
 }

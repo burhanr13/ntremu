@@ -133,7 +133,7 @@ void optimize_loadstore(IRBlock* block) {
 #define OPTI(op) (vops[i] = op, vimm[i] = true, *inst = NOP)
 
 #define ADDCV(op1, op2, c)                                                     \
-    {                                                                          \
+    ({                                                                         \
         u32 res = op1 + op2;                                                   \
         u32 tmpc = res < op1;                                                  \
         res += c;                                                              \
@@ -144,7 +144,28 @@ void optimize_loadstore(IRBlock* block) {
         vops[i] = res;                                                         \
         vimm[i] = true;                                                        \
         *inst = NOP;                                                           \
+    })
+
+void constant_jmp_helper(IRBlock* block, IRInstr* jmp, bool jmpTaken) {
+    for (int i = jmp->op2; i < block->code.size; i++) {
+        IRInstr* next = &block->code.d[i];
+        if (next->opcode != IR_NOP) {
+            if (next->opcode == IR_JELSE) {
+                constant_jmp_helper(block, next, !jmpTaken);
+            } else {
+                break;
+            }
+        }
     }
+    if (jmpTaken) {
+        IRInstr* next = &block->code.d[jmp->op2];
+        for (IRInstr* i = jmp; i < next; i++) {
+            *i = NOP;
+        }
+    } else {
+        *jmp = NOP;
+    }
+}
 
 void optimize_constprop(IRBlock* block) {
     u32 vops[block->code.size];
@@ -242,34 +263,10 @@ void optimize_constprop(IRBlock* block) {
                     OPTI(inst->op1 ? ~1 : ~3);
                     break;
                 case IR_JZ:
-                    if (block->code.d[inst->op2].opcode == IR_JELSE) {
-                        NOOPT();
-                        break;
-                    }
-                    if (inst->op1) {
-                        *inst = NOP;
-                    } else {
-                        u32 dest = inst->op2;
-                        for (int j = 0; j < dest - i; j++) {
-                            inst[j] = NOP;
-                        }
-                        i = dest - 1;
-                    }
+                    constant_jmp_helper(block, inst, inst->op1 == 0);
                     break;
                 case IR_JNZ:
-                    if (block->code.d[inst->op2].opcode == IR_JELSE) {
-                        NOOPT();
-                        break;
-                    }
-                    if (!inst->op1) {
-                        *inst = NOP;
-                    } else {
-                        u32 dest = inst->op2;
-                        for (int j = 0; j < dest - i; j++) {
-                            inst[j] = NOP;
-                        }
-                        i = dest - 1;
-                    }
+                    constant_jmp_helper(block, inst, inst->op1 != 0);
                     break;
                 default:
                     NOOPT();
@@ -534,7 +531,8 @@ void optimize_deadcode(IRBlock* block) {
         IRInstr* inst = &block->code.d[i];
         if (!vused[i]) {
             if (inst->opcode > IR_NOP) {
-                *inst = NOP;
+                if (!(inst->opcode == IR_ADD && inst[1].opcode == IR_ADC))
+                    *inst = NOP;
             } else {
                 switch (inst->opcode) {
                     case IR_LOAD_REG:

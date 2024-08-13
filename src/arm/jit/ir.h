@@ -74,6 +74,7 @@ typedef enum {
     IR_GETZ,
     IR_GETC,
     IR_GETV,
+    
     IR_GETCIFZ,
 
     IR_PCMASK,

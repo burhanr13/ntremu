@@ -5,9 +5,10 @@
 #include "recompiler.h"
 #include "register_allocator.h"
 
-// #define IR_DISASM
+//#define IR_DISASM
+//#define BACKEND_DISASM
 // #define JIT_LOG
-// #define JIT_CPULOG
+//#define JIT_CPULOG
 //#define IR_INTERPRET
 //#define DISABLE_OPT
 
@@ -29,6 +30,7 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     optimize_chainjumps(&ir);
     optimize_loadstore(&ir);
     optimize_constprop(&ir);
+    optimize_chainjumps(&ir);
     optimize_deadcode(&ir);
     if (ir.loop) optimize_waitloop(&ir);
     optimize_blocklinking(&ir, cpu);
@@ -45,6 +47,10 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     block->backend = generate_code(&ir, &regalloc, cpu);
     block->code = get_code(block->backend);
+
+#ifdef BACKEND_DISASM
+    backend_disassemble(block->backend);
+#endif
 
     regalloc_free(&regalloc);
     //irblock_free(&ir);
@@ -65,7 +71,7 @@ void destroy_jit_block(JITBlock* block) {
 
 void jit_exec(JITBlock* block) {
 #ifdef JIT_LOG
-    eprintf("executing block at 0x%08x\n", block->start_addr);
+    printf("executing block at 0x%08x\n", block->start_addr);
 #endif
 #ifdef JIT_CPULOG
     cpu_print_state(block->cpu);

@@ -83,7 +83,7 @@ u16 arm7_fetch16(Arm7TDMI* cpu, u32 addr) {
     cpu->c.cycles++;
     u16 data = bus7_read16(cpu->master, addr & ~1);
     if (cpu->master->memerr && !cpu->master->cpuerr) {
-        printf("Invalid CPU7 (thumb) instruction fetch at 0x%08x\n", addr);
+        eprintf("Invalid CPU7 (thumb) instruction fetch at 0x%08x\n", addr);
         cpu->master->cpuerr = true;
     }
     return data;
@@ -93,7 +93,7 @@ u32 arm7_fetch32(Arm7TDMI* cpu, u32 addr) {
     cpu->c.cycles++;
     u32 data = bus7_read32(cpu->master, addr & ~3);
     if (cpu->master->memerr && !cpu->master->cpuerr) {
-        printf("Invalid CPU7 instruction fetch at 0x%08x\n", addr);
+        eprintf("Invalid CPU7 instruction fetch at 0x%08x\n", addr);
         cpu->master->cpuerr = true;
     }
     return data;

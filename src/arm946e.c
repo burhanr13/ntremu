@@ -116,7 +116,7 @@ u16 arm9_fetch16(Arm946E* cpu, u32 addr) {
     else {
         data = bus9_read16(cpu->master, addr & ~1);
         if (cpu->master->memerr && !cpu->master->cpuerr) {
-            printf("Invalid CPU9 (thumb) instruction fetch at 0x%08x\n", addr);
+            eprintf("Invalid CPU9 (thumb) instruction fetch at 0x%08x\n", addr);
             cpu->master->cpuerr = true;
         }
     }
@@ -131,7 +131,7 @@ u32 arm9_fetch32(Arm946E* cpu, u32 addr) {
     else {
         data = bus9_read32(cpu->master, addr & ~3);
         if (cpu->master->memerr && !cpu->master->cpuerr) {
-            printf("Invalid CPU9 instruction fetch at 0x%08x\n", addr);
+            eprintf("Invalid CPU9 instruction fetch at 0x%08x\n", addr);
             cpu->master->cpuerr = true;
         }
     }

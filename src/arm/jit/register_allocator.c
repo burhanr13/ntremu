@@ -56,7 +56,7 @@ RegAllocation allocate_registers(IRBlock* block) {
                 break;
         }
 
-        if (vuses[i]) {
+        if (vuses[i] || inst.opcode > IR_NOP) {
             u32 assignment = -1;
             for (int r = 0; r < reg_active.size; r++) {
                 if (!reg_active.d[r]) {
@@ -72,6 +72,7 @@ RegAllocation allocate_registers(IRBlock* block) {
             ret.reg_info.d[assignment].uses += 1 + vuses[i];
             reg_active.d[assignment] = true;
             ret.reg_assn[i] = assignment;
+            if (!vuses[i]) reg_active.d[assignment] = false;
         } else {
             ret.reg_assn[i] = -1;
         }
@@ -137,18 +138,18 @@ void hostregalloc_free(HostRegAllocation* hostregs) {
 }
 
 void regalloc_print(RegAllocation* regalloc) {
-    static const char *typenames[] = {"", "tmp", "sav", "stk"};
+    static const char* typenames[] = {"", "tmp", "sav", "stk"};
 
-    eprintf("Registers:");
+    printf("Registers:");
     for (int i = 0; i < regalloc->reg_info.size; i++) {
-        eprintf(" $%d(%s,%d)", i, typenames[regalloc->reg_info.d[i].type],
+        printf(" $%d(%s,%d)", i, typenames[regalloc->reg_info.d[i].type],
                 regalloc->reg_info.d[i].uses);
     }
-    eprintf("\nAssignments:");
+    printf("\nAssignments:");
     for (int i = 0; i < regalloc->nassns; i++) {
         u32 assn = regalloc->reg_assn[i];
         if (assn == -1) continue;
-        eprintf(" v%d:$%d", i, assn);
+        printf(" v%d:$%d", i, assn);
     }
-    eprintf("\n");
+    printf("\n");
 }

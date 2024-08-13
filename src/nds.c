@@ -8,6 +8,8 @@
 #include "dldi.h"
 #include "ppu.h"
 
+//#define FIXRTC
+
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
               bool bootbios) {
     memset(nds, 0, sizeof *nds);
@@ -392,15 +394,20 @@ void rtc_write(NDS* nds) {
             nds->rtc.bi = -1;
             nds->rtc.i++;
 
+            u8 year, month, day, wday, hour, min, sec;
+#ifdef FIXRTC
+            year = month = day = wday = hour = min = sec = 0;
+#else
             struct tm* t = localtime(&(time_t){time(NULL)});
-            u8 year = (t->tm_year / 10 % 10) << 4 | t->tm_year % 10;
-            u8 month = ((t->tm_mon + 1) / 10) << 4 | (t->tm_mon + 1) % 10;
-            u8 day = (t->tm_mday / 10) << 4 | t->tm_mday % 10;
-            u8 wday = t->tm_wday;
-            u8 hour = (t->tm_hour / 10) << 4 | t->tm_hour % 10;
+            year = (t->tm_year / 10 % 10) << 4 | t->tm_year % 10;
+            month = ((t->tm_mon + 1) / 10) << 4 | (t->tm_mon + 1) % 10;
+            day = (t->tm_mday / 10) << 4 | t->tm_mday % 10;
+            wday = t->tm_wday;
+            hour = (t->tm_hour / 10) << 4 | t->tm_hour % 10;
             if (t->tm_hour >= 12) hour |= 1 << 6;
-            u8 min = (t->tm_min / 10) << 4 | t->tm_min % 10;
-            u8 sec = (t->tm_sec / 10) << 4 | t->tm_sec % 10;
+            min = (t->tm_min / 10) << 4 | t->tm_min % 10;
+            sec = (t->tm_sec / 10) << 4 | t->tm_sec % 10;
+#endif
 
             switch ((nds->rtc.com >> 4) & 7) {
                 case 2:

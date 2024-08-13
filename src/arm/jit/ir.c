@@ -22,7 +22,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
 
 #ifdef IR_TRACE
     if (block->start_addr == IR_TRACE_ADDR) {
-        eprintf("======== tracing IR block 0x%08x =========\n",
+        printf("======== tracing IR block 0x%08x =========\n",
                 block->start_addr);
     }
 #endif
@@ -311,7 +311,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
 #ifdef IR_TRACE
         if (block->start_addr == IR_TRACE_ADDR) {
             ir_disasm_instr(inst, i);
-            eprintf(" (v%d = 0x%x, cf=%d)\n", i, v[i], cf);
+            printf(" (v%d = 0x%x, cf=%d)\n", i, v[i], cf);
         }
 #endif
         i++;
@@ -319,32 +319,32 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
 }
 
 #define DISASM_OP(n)                                                           \
-    ((inst.imm##n) ? eprintf("0x%x", inst.op##n) : eprintf("v%d", inst.op##n))
+    ((inst.imm##n) ? printf("0x%x", inst.op##n) : printf("v%d", inst.op##n))
 
 #define DISASM(name, r, op1, op2)                                              \
-    if (r) eprintf("v%d = ", i);                                               \
-    eprintf(#name);                                                            \
+    if (r) printf("v%d = ", i);                                               \
+    printf(#name);                                                            \
     if (op1) {                                                                 \
-        eprintf(" ");                                                          \
+        printf(" ");                                                          \
         DISASM_OP(1);                                                          \
     }                                                                          \
     if (op2) {                                                                 \
-        eprintf(" ");                                                          \
+        printf(" ");                                                          \
         DISASM_OP(2);                                                          \
     }                                                                          \
     return
 
 #define DISASM_REG(name, r, op2)                                               \
-    if (r) eprintf("v%d = ", i);                                               \
-    eprintf(#name);                                                            \
-    eprintf(" r%d ", inst.op1);                                                \
+    if (r) printf("v%d = ", i);                                               \
+    printf(#name);                                                            \
+    printf(" r%d ", inst.op1);                                                \
     if (op2) DISASM_OP(2);                                                     \
     return
 
 #define DISASM_FLAG(name, r, op2)                                              \
-    if (r) eprintf("v%d = ", i);                                               \
-    eprintf(#name);                                                            \
-    eprintf(" %s ", inst.op1 == NF   ? "n"                                     \
+    if (r) printf("v%d = ", i);                                               \
+    printf(#name);                                                            \
+    printf(" %s ", inst.op1 == NF   ? "n"                                     \
                     : inst.op1 == ZF ? "z"                                     \
                     : inst.op1 == CF ? "c"                                     \
                     : inst.op1 == VF ? "v"                                     \
@@ -353,21 +353,21 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
     return
 
 #define DISASM_MEM(name, r, op2)                                               \
-    if (r) eprintf("v%d = ", i);                                               \
-    eprintf(#name " ");                                                        \
-    eprintf("[");                                                              \
+    if (r) printf("v%d = ", i);                                               \
+    printf(#name " ");                                                        \
+    printf("[");                                                              \
     DISASM_OP(1);                                                              \
-    eprintf("] ");                                                             \
+    printf("] ");                                                             \
     if (op2) DISASM_OP(2);                                                     \
     return
 
 #define DISASM_JMP(name, op1)                                                  \
-    eprintf(#name);                                                            \
+    printf(#name);                                                            \
     if (op1) {                                                                 \
-        eprintf(" ");                                                          \
+        printf(" ");                                                          \
         DISASM_OP(1);                                                          \
     }                                                                          \
-    eprintf(" %d", inst.op2);                                                  \
+    printf(" %d", inst.op2);                                                  \
     return
 
 void ir_disasm_instr(IRInstr inst, int i) {
@@ -495,16 +495,16 @@ void ir_disasm_instr(IRInstr inst, int i) {
 }
 
 void ir_disassemble(IRBlock* block) {
-    eprintf("============= IR Block 0x%08x =================\n", block->start_addr);
+    printf("============= IR Block 0x%08x =================\n", block->start_addr);
     u32 jmptarget = -1;
     for (int i = 0; i < block->code.size; i++) {
-        if (i == jmptarget) eprintf("%d:\n", i);
+        if (i == jmptarget) printf("%d:\n", i);
         if (block->code.d[i].opcode == IR_NOP) continue;
         if (block->code.d[i].opcode == IR_JZ ||
             block->code.d[i].opcode == IR_JNZ ||
             block->code.d[i].opcode == IR_JELSE)
             jmptarget = block->code.d[i].op2;
         ir_disasm_instr(block->code.d[i], i);
-        eprintf("\n");
+        printf("\n");
     }
 }

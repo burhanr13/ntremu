@@ -3,8 +3,6 @@
 #include <capstone/capstone.h>
 #include <xbyak/xbyak.h>
 
-// #define BACKEND_DISASM
-
 struct Code : Xbyak::CodeGenerator {
     RegAllocation* regalloc;
     HostRegAllocation hralloc;
@@ -16,15 +14,19 @@ struct Code : Xbyak::CodeGenerator {
 
     Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
 
+    ~Code() {
+        hostregalloc_free(&hralloc);
+    }
+
     void print_hostregs() {
-        eprintf("Host Regs:");
+        printf("Host Regs:");
         for (u32 i = 0; i < hralloc.nregs; i++) {
-            eprintf(" $%d:", i);
+            printf(" $%d:", i);
             auto& operand = _getOp(i);
-            if (operand.isREG()) eprintf("%s", operand.toString());
-            else eprintf("[rsp+%d]", 4 * hralloc.hostreg_info[i].index);
+            if (operand.isREG()) printf("%s", operand.toString());
+            else printf("[rsp+%d]", 4 * hralloc.hostreg_info[i].index);
         }
-        eprintf("\n");
+        printf("\n");
     }
 
     int getSPDisp() {
@@ -107,17 +109,14 @@ struct Code : Xbyak::CodeGenerator {
     })
 
 Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
-    : regalloc(regalloc), cpu(cpu) {
+    : Xbyak::CodeGenerator(4096, Xbyak::AutoGrow), regalloc(regalloc),
+      cpu(cpu) {
 
     hralloc =
         allocate_host_registers(regalloc, tempregs.size(), savedregs.size());
     for (u32 i = 0; i < hralloc.count[REG_STACK]; i++) {
         stackslots.push_back(dword[rsp + 4 * i]);
     }
-
-#ifdef BACKEND_DISASM
-    print_hostregs();
-#endif
 
     u32 flags_mask = 0;
     u32 lastflags = 0;
@@ -132,6 +131,10 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
             L(std::to_string(nlabels++));
             jmptarget = -1;
         }
+        if (!(inst.opcode == IR_NOP || inst.opcode == IR_STORE_FLAG ||
+              inst.opcode == IR_GETC || inst.opcode == IR_GETV ||
+              inst.opcode == IR_GETN || inst.opcode == IR_GETZ))
+            lastflags = 0;
         switch (inst.opcode) {
             case IR_LOAD_REG:
                 LOAD(CPU(r[inst.op1]));
@@ -563,6 +566,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                     mov(getOp(i), eax);
                     mov(getOp(i + 1), edx);
+                    i++;
                 } else {
                     auto& dest = getOp(i);
                     if (inst.imm2) {
@@ -593,6 +597,23 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                         if (dest.isMEM()) mov(dest, mdst);
                     }
                 }
+                break;
+            }
+            case IR_SMULH:
+            case IR_UMULH: {
+                if (inst.imm1) {
+                    mov(eax, inst.op1);
+                } else {
+                    mov(eax, getOp(inst.op1));
+                }
+                auto& msrc = inst.imm2 ? edx : getOp(inst.op2);
+                if (inst.imm2) mov(edx, inst.op2);
+                if (inst.opcode == IR_SMULH) {
+                    imul(msrc);
+                } else {
+                    mul(msrc);
+                }
+                mov(getOp(i), edx);
                 break;
             }
             case IR_CLZ: {
@@ -674,9 +695,11 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_GETC: {
-                lahf();
-                seto(al);
-                lastflags = inst.op2;
+                if (lastflags != inst.op2) {
+                    lahf();
+                    seto(al);
+                    lastflags = inst.op2;
+                }
                 auto& dest = getOp(i);
                 if (dest.isMEM()) {
                     xor_(edx, edx);
@@ -733,6 +756,11 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_GETV: {
+                if (lastflags != inst.op2) {
+                    lahf();
+                    seto(al);
+                    lastflags = inst.op2;
+                }
                 auto& dest = getOp(i);
                 if (dest.isMEM()) {
                     movzx(edx, al);
@@ -855,21 +883,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
         }
     }
 
-#ifdef BACKEND_DISASM
-    csh handle;
-    cs_insn* insn;
-    cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
-    size_t count =
-        cs_disasm(handle, getCode(), getSize(), (u64) getCode(), 0, &insn);
-    eprintf("--------- JIT Disassembly ------------\n");
-    for (size_t i = 0; i < count; i++) {
-        eprintf("%04lx: %s %s\n", insn[i].address, insn[i].mnemonic,
-                insn[i].op_str);
-    }
-    cs_free(insn, count);
-#endif
-
-    hostregalloc_free(&hralloc);
+    ready();
 }
 
 extern "C" {
@@ -884,5 +898,21 @@ JITFunc get_code_x86(void* backend) {
 
 void free_code_x86(void* backend) {
     delete ((Code*) backend);
+}
+
+void backend_disassemble_x86(void* backend) {
+    Code* code = (Code*) backend;
+    code->print_hostregs();
+    csh handle;
+    cs_insn* insn;
+    cs_open(CS_ARCH_X86, CS_MODE_64, &handle);
+    size_t count =
+        cs_disasm(handle, code->getCode(), code->getSize(), 0, 0, &insn);
+    printf("--------- JIT Disassembly at 0x%p ------------\n", code->getCode());
+    for (size_t i = 0; i < count; i++) {
+        printf("%04lx: %s %s\n", insn[i].address, insn[i].mnemonic,
+               insn[i].op_str);
+    }
+    cs_free(insn, count);
 }
 }
