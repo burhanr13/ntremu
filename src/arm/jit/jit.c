@@ -93,89 +93,100 @@ void jit_mark_dirty(ArmCore* cpu, u32 addr) {
     }
 }
 
+void clean_byte(u8* b, u32 stbit, u32 endbit) {
+    u32 mask = (BIT(endbit + 1) - BIT(stbit));
+    *b &= ~mask;
+}
+
 void invalidate_l2(ArmCore* cpu, u32 attr, u32 addrhi, u32 startlo, u32 endlo) {
     if (!cpu->jit_cache[attr][addrhi]) return;
-    for (int i = startlo; i < endlo; i++) {
-        if (cpu->jit_cache[attr][addrhi][i]) {
-            destroy_jit_block(cpu->jit_cache[attr][addrhi][i]);
-            cpu->jit_cache[attr][addrhi][i] = NULL;
+    for (int i = startlo; i < endlo; i += 2) {
+        if (cpu->jit_cache[attr][addrhi][i >> 1]) {
+            destroy_jit_block(cpu->jit_cache[attr][addrhi][i >> 1]);
+            cpu->jit_cache[attr][addrhi][i >> 1] = NULL;
         }
     }
-    if (startlo == 0 && endlo == BIT(15)) {
+    if (startlo == 0 && endlo == BIT(16)) {
         free(cpu->jit_cache[attr][addrhi]);
         cpu->jit_cache[attr][addrhi] = NULL;
     }
+    if (cpu->jit_dirty[addrhi]) {
+        endlo -= 1;
+        u32 startbyte = startlo >> 9;
+        u32 startbit = (startlo >> 6) & 7;
+        u32 endbyte = endlo >> 9;
+        u32 endbit = (endlo >> 6) & 7;
+        if (startbyte == endbyte) {
+            clean_byte(&cpu->jit_dirty[addrhi][startbyte], startbit, endbit);
+        } else {
+            clean_byte(&cpu->jit_dirty[addrhi][startbyte], startbit, 7);
+            for (int i = startbyte + 1; i < endbyte; i++) {
+                cpu->jit_dirty[addrhi][i] = 0;
+            }
+            clean_byte(&cpu->jit_dirty[addrhi][endbyte], 0, endbit);
+        }
+    }
 }
 
-void jit_clean_blocks(ArmCore* cpu, u32 start_addr, u32 end_addr) {
+void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
+    if (start_addr >= end_addr) return;
+    start_addr &= ~0x3f;
+    end_addr = ((end_addr + 0x3f) & ~0x3f) - 1;
     u32 sthi = start_addr >> 16;
-    u32 stlo = (start_addr & 0xffff) >> 1;
+    u32 stlo = start_addr & 0xffff;
     u32 endhi = end_addr >> 16;
-    u32 endlo = (end_addr & 0xffff) >> 1;
+    u32 endlo = end_addr & 0xffff;
 
     for (int i = 0; i < 64; i++) {
         if (!cpu->jit_cache[i]) continue;
         if (sthi == endhi) {
-            invalidate_l2(cpu, i, sthi, stlo, endlo);
+            invalidate_l2(cpu, i, sthi, stlo, endlo + 1);
         } else {
-            invalidate_l2(cpu, i, sthi, stlo, BIT(16) >> 1);
+            invalidate_l2(cpu, i, sthi, stlo, BIT(16));
             for (int j = sthi + 1; j < endhi; j++) {
-                invalidate_l2(cpu, i, j, 0, BIT(16) >> 1);
+                invalidate_l2(cpu, i, j, 0, BIT(16));
             }
-            invalidate_l2(cpu, i, endhi, 0, endlo);
-        }
-        if (start_addr == 0 && end_addr == -1) {
-            free(cpu->jit_cache[i]);
-            cpu->jit_cache[i] = NULL;
+            invalidate_l2(cpu, i, endhi, 0, endlo + 1);
         }
     }
 }
 
-bool clean_byte(u8* b, u32 stbit, u32 endbit) {
+bool is_byte_dirty(u8 b, u32 stbit, u32 endbit) {
     u32 mask = (BIT(endbit + 1) - BIT(stbit));
-    bool dirty = (*b & mask) != 0;
-    *b &= ~mask;
-    return dirty;
+    return (b & mask) != 0;
 }
 
-bool jit_mark_clean(ArmCore* cpu, u32 start, u32 end) {
-    if (start > end) return false;
+bool jit_isdirty(ArmCore* cpu, u32 start, u32 end) {
+    if (start >= end) return false;
+    end -= 1;
     u32 sthi = start >> 16;
-    u32 stbyte = (start >> 12) & 0xf;
-    u32 stbit = (start >> 6) & 0x3f;
+    u32 stbyte = (start >> 9) & 0x7f;
+    u32 stbit = (start >> 6) & 7;
     u32 endhi = end >> 16;
-    u32 endbyte = (end >> 12) & 0xf;
-    u32 endbit = (end >> 6) & 0x3f;
+    u32 endbyte = (end >> 9) & 0x7f;
+    u32 endbit = (end >> 6) & 7;
 
     bool wasdirty = 0;
     if (sthi == endhi) {
         if (!cpu->jit_dirty[sthi]) return false;
         if (stbyte == endbyte) {
-            wasdirty |=
-                clean_byte(&cpu->jit_dirty[sthi][stbyte], stbit, endbit);
+            return is_byte_dirty(cpu->jit_dirty[sthi][stbyte], stbit, endbit);
         } else {
-            clean_byte(&cpu->jit_dirty[sthi][stbyte], stbit, 8);
+            wasdirty |= is_byte_dirty(cpu->jit_dirty[sthi][stbyte], stbit, 7);
             for (int i = stbyte + 1; i < endbyte; i++) {
                 wasdirty |= cpu->jit_dirty[sthi][i] != 0;
-                cpu->jit_dirty[sthi][i] = 0;
             }
-            clean_byte(&cpu->jit_dirty[sthi][endbyte], 0, endbit);
+            wasdirty |= is_byte_dirty(cpu->jit_dirty[sthi][endbyte], 0, endbit);
         }
     } else {
-        wasdirty |=
-            jit_mark_clean(cpu, start, ((start + 0xffff) & ~0xffff) - 1);
+        wasdirty |= jit_isdirty(cpu, start, ((start + 0xffff) & ~0xffff));
         for (u32 a = ((start + 0xffff) & ~0xffff); a < (end & ~0xffff);
              a += BIT(16)) {
-            wasdirty |= jit_mark_clean(cpu, a, a + 0xffff);
+            wasdirty |= jit_isdirty(cpu, a, a + BIT(16));
         }
-        wasdirty |= jit_mark_clean(cpu, end & ~0xffff, end);
+        wasdirty |= jit_isdirty(cpu, end & ~0xffff, end + 1);
     }
     return wasdirty;
-}
-
-void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
-    jit_mark_clean(cpu, start_addr, end_addr);
-    jit_clean_blocks(cpu, start_addr, end_addr);
 }
 
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
@@ -201,21 +212,20 @@ JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
             cpu->jit_dirty[(addrhi + 1) & 0xffff] =
                 calloc(BIT(16) >> 6 >> 3, sizeof(u8));
         }
-        if (jit_mark_clean(cpu, block->start_addr, block->end_addr - 1)) {
-            jit_clean_blocks(cpu, block->start_addr, block->end_addr);
+        if (jit_isdirty(cpu, block->start_addr, block->end_addr)) {
+            jit_invalidate_range(cpu, block->start_addr, block->end_addr);
         }
         cpu->jit_cache[attrs][addrhi][addrlo] = block;
     } else {
         block = cpu->jit_cache[attrs][addrhi][addrlo];
-        if (jit_mark_clean(cpu, block->start_addr, block->end_addr)) {
-            jit_clean_blocks(cpu, block->start_addr, block->end_addr);
+        if (jit_isdirty(cpu, block->start_addr, block->end_addr)) {
             block = create_jit_block(cpu, addr);
             if (block->end_addr >> 16 != addrhi &&
                 !cpu->jit_dirty[(addrhi + 1) & 0xffff]) {
                 cpu->jit_dirty[(addrhi + 1) & 0xffff] =
                     calloc(BIT(16) >> 6 >> 3, sizeof(u8));
             }
-            jit_mark_clean(cpu, block->start_addr, block->end_addr - 1);
+            jit_invalidate_range(cpu, block->start_addr, block->end_addr);
             cpu->jit_cache[attrs][addrhi][addrlo] = block;
         }
     }

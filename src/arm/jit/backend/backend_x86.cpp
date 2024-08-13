@@ -870,24 +870,24 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
 
                 add(dword[CPU(cycles)], ir->numinstr);
 
-                if (inst.opcode == IR_END_LINK) {
-                    inLocalLabel();
-                    mov(eax, dword[CPU(max_cycles)]);
-                    cmp(dword[CPU(cycles)], eax);
-                    jge(".cantlink");
+                // if (inst.opcode == IR_END_LINK) {
+                //     inLocalLabel();
+                //     mov(eax, dword[CPU(max_cycles)]);
+                //     cmp(dword[CPU(cycles)], eax);
+                //     jge(".cantlink");
 
-                    mov(edx, inst.op2);
-                    mov(esi, inst.op1);
-                    mov(rdi, rbx);
-                    mov(rax, (u64) get_jitblock);
-                    call(rax);
-                    test(rax, rax);
-                    je(".cantlink");
-                    pop(rbx);
-                    jmp(ptr[rax + offsetof(JITBlock, code)]);
-                    L(".cantlink");
-                    outLocalLabel();
-                }
+                //     mov(edx, inst.op2);
+                //     mov(esi, inst.op1);
+                //     mov(rdi, rbx);
+                //     mov(rax, (u64) get_jitblock);
+                //     call(rax);
+                //     test(rax, rax);
+                //     je(".cantlink");
+                //     pop(rbx);
+                //     jmp(ptr[rax + offsetof(JITBlock, code)]);
+                //     L(".cantlink");
+                //     outLocalLabel();
+                // }
 
                 mov(dword[CPU(max_cycles)], 0);
                 mov(eax, ptr[CPU(pc)]);

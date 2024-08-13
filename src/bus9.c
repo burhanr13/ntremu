@@ -48,7 +48,7 @@
 #define BUS9WRITEDECL(size)                                                    \
     void bus9_write##size(NDS* nds, u32 addr, u##size data) {                  \
         nds->memerr = false;                                                   \
-        jit_mark_dirty((ArmCore*) &nds->cpu9, addr);                            \
+        jit_mark_dirty((ArmCore*) &nds->cpu9, addr);                           \
         switch (addr >> 24) {                                                  \
             case R_RAM:                                                        \
                 *(u##size*) (&nds->ram[addr % RAMSIZE]) = data;                \

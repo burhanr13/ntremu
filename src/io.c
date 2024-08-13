@@ -582,9 +582,9 @@ void io9_write8(IO* io, u32 addr, u8 data) {
         }
         case WRAMCNT:
             jit_invalidate_range((ArmCore*) &io->master->cpu7, 0x3000000,
-                                 0x37fffff);
+                                 0x3800000);
             jit_invalidate_range((ArmCore*) &io->master->cpu9, 0x3000000,
-                                 0x3ffffff);
+                                 0x4000000);
             io->wramcnt = data & 3;
             io->master->io7.wramstat = io->wramcnt;
             break;

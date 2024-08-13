@@ -217,6 +217,7 @@ void cp15_write(Arm946E* cpu, u32 cn, u32 cm, u32 cp, u32 data) {
                     cpu->dtcm_base = base;
                 } else if (cp == 1) {
                     cpu->itcm_virtsize = virtsize;
+                    jit_invalidate_range((ArmCore*) cpu, 0x0, 0x2000000);
                 }
                 return;
             }
