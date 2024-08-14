@@ -251,12 +251,16 @@ void optimize_constprop(IRBlock* block) {
                     if (inst->op1) {
                         OPTI(inst->op2);
                     } else {
-                        *inst = (IRInstr){.opcode = IR_GETC,
-                                          .imm1 = 1,
-                                          .imm2 = 1,
-                                          .op1 = 0,
-                                          .op2 = 0};
-                        NOOPT();
+                        if (inst[-1].opcode == IR_SETC) {
+                            if (inst[-1].imm2) {
+                                OPTI(inst[-1].op2);
+                            } else {
+                                OPTV(inst[-1].op2);
+                            }
+                            inst[-1] = NOP;
+                        } else {
+                            NOOPT();
+                        }
                     }
                     break;
                 case IR_PCMASK:
@@ -529,24 +533,10 @@ void optimize_deadcode(IRBlock* block) {
     for (int i = 0; i < block->code.size; i++) vused[i] = false;
     for (int i = block->code.size - 1; i >= 0; i--) {
         IRInstr* inst = &block->code.d[i];
-        if (!vused[i]) {
-            if (inst->opcode > IR_NOP) {
-                if (!(inst->opcode == IR_ADD && inst[1].opcode == IR_ADC))
-                    *inst = NOP;
-            } else {
-                switch (inst->opcode) {
-                    case IR_LOAD_REG:
-                    case IR_LOAD_FLAG:
-                    case IR_LOAD_REG_USR:
-                    case IR_LOAD_CPSR:
-                    case IR_LOAD_SPSR:
-                    case IR_LOAD_THUMB:
-                        *inst = NOP;
-                        break;
-                    default:
-                        break;
-                }
-            }
+        if (!vused[i] && iropc_hasresult(inst->opcode) &&
+            !iropc_iscallback(inst->opcode)) {
+            if (!(inst->opcode == IR_ADD && inst[1].opcode == IR_ADC))
+                *inst = NOP;
         }
         if (!inst->imm1) vused[inst->op1] = true;
         if (!inst->imm2) vused[inst->op2] = true;

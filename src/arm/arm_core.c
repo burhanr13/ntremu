@@ -91,7 +91,7 @@ void cpu_update_mode(ArmCore* cpu, CpuMode old) {
         case M_SYSTEM:
             return;
         default:
-            eprintf("illegal cpu mode: pc = %08x\n", cpu->pc);
+            eprintf("illegal cpu mode %x (pc = %08x)\n", cpu->cpsr.m, cpu->pc);
     }
 }
 

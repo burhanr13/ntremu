@@ -8,8 +8,6 @@
 #include "dldi.h"
 #include "ppu.h"
 
-// #define FIXRTC
-
 void init_nds(NDS* nds, GameCard* card, u8* bios7, u8* bios9, u8* firmware,
               bool bootbios) {
     memset(nds, 0, sizeof *nds);

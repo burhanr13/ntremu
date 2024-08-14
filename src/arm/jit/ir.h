@@ -74,7 +74,7 @@ typedef enum {
     IR_GETZ,
     IR_GETC,
     IR_GETV,
-    
+
     IR_GETCIFZ,
 
     IR_PCMASK,
@@ -111,6 +111,9 @@ static inline void irblock_free(IRBlock* block) {
 static inline u32 irblock_write(IRBlock* block, IRInstr instr) {
     return Vec_push(block->code, instr);
 }
+
+bool iropc_hasresult(IROpcode opc);
+bool iropc_iscallback(IROpcode opc);
 
 void ir_interpret(IRBlock* block, ArmCore* cpu);
 

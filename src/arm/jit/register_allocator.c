@@ -36,27 +36,13 @@ RegAllocation allocate_registers(IRBlock* block) {
             }
         }
 
-        switch (inst.opcode) {
-            case IR_READ_CP:
-            case IR_WRITE_CP:
-            case IR_LOAD_MEM8:
-            case IR_LOAD_MEMS8:
-            case IR_LOAD_MEM16:
-            case IR_LOAD_MEMS16:
-            case IR_LOAD_MEM32:
-            case IR_STORE_MEM8:
-            case IR_STORE_MEM16:
-            case IR_STORE_MEM32:
-            case IR_MODESWITCH:
-            case IR_EXCEPTION:
-                for (int r = 0; r < ret.reg_info.size; r++) {
-                    if (reg_active.d[r]) ret.reg_info.d[r].type = REG_SAVED;
-                }
-            default:
-                break;
+        if (iropc_iscallback(inst.opcode)) {
+            for (int r = 0; r < ret.reg_info.size; r++) {
+                if (reg_active.d[r]) ret.reg_info.d[r].type = REG_SAVED;
+            }
         }
 
-        if (vuses[i] || inst.opcode > IR_NOP) {
+        if (iropc_hasresult(inst.opcode)) {
             u32 assignment = -1;
             for (int r = 0; r < reg_active.size; r++) {
                 if (!reg_active.d[r]) {
@@ -143,7 +129,7 @@ void regalloc_print(RegAllocation* regalloc) {
     printf("Registers:");
     for (int i = 0; i < regalloc->reg_info.size; i++) {
         printf(" $%d(%s,%d)", i, typenames[regalloc->reg_info.d[i].type],
-                regalloc->reg_info.d[i].uses);
+               regalloc->reg_info.d[i].uses);
     }
     printf("\nAssignments:");
     for (int i = 0; i < regalloc->nassns; i++) {

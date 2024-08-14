@@ -71,7 +71,6 @@ struct Code : Xbyak::CodeGenerator {
     ({                                                                         \
         auto& dest = getOp(i);                                                 \
         OP(mov, dest, ptr[addr]);                                              \
-        dest;                                                                  \
     })
 
 #define STORE(addr)                                                            \
@@ -165,7 +164,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 break;
             }
             case IR_LOAD_FLAG: {
-                auto& dest = LOAD(CPU(cpsr));
+                LOAD(CPU(cpsr));
+                auto& dest = getOp(i);
                 shr(dest, 31 - inst.op1);
                 and_(dest, 1);
                 break;
@@ -202,7 +202,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 STORE(CPU(spsr));
                 break;
             case IR_LOAD_THUMB: {
-                auto& dest = LOAD(CPU(cpsr));
+                LOAD(CPU(cpsr));
+                auto& dest = getOp(i);
                 shr(dest, 5);
                 and_(dest, 1);
                 break;
@@ -226,7 +227,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(ecx, cpinst.cp_reg_trans.cp);
                 mov(rax, (u64) cpu->cp15_read);
                 call(rax);
-                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
+                mov(getOp(i), eax);
                 break;
             }
             case IR_WRITE_CP: {
@@ -255,7 +256,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
-                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
+                mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS8: {
@@ -269,7 +270,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read8);
                 call(rax);
-                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
+                mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEM16: {
@@ -283,7 +284,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
-                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
+                mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEMS16: {
@@ -297,7 +298,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read16);
                 call(rax);
-                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
+                mov(getOp(i), eax);
                 break;
             }
             case IR_LOAD_MEM32: {
@@ -310,7 +311,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 mov(rdi, rbx);
                 mov(rax, (u64) cpu->read32);
                 call(rax);
-                if (regalloc->reg_assn[i] != (u32) -1) mov(getOp(i), eax);
+                mov(getOp(i), eax);
                 break;
             }
             case IR_STORE_MEM8: {
@@ -718,7 +719,8 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     if (inst.op2) stc();
                     else clc();
                 } else {
-                    shr(getOp(inst.op2), 1);
+                    mov(edx, getOp(inst.op2));
+                    shr(edx, 1);
                 }
                 break;
             }

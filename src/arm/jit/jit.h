@@ -18,7 +18,6 @@ typedef struct _JITBlock {
     u32 numinstr;
 
     ArmCore* cpu;
-    IRBlock* ir;
 } JITBlock;
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr);

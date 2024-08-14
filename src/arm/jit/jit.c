@@ -5,12 +5,13 @@
 #include "recompiler.h"
 #include "register_allocator.h"
 
-// #define IR_DISASM
-// #define BACKEND_DISASM
-//  #define JIT_LOG
-// #define JIT_CPULOG
-// #define IR_INTERPRET
-// #define DISABLE_OPT
+//#define JIT_DISASM
+//#define JIT_CPULOG
+
+#ifdef JIT_DISASM
+#define IR_DISASM
+#define BACKEND_DISASM
+#endif
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
@@ -23,7 +24,6 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     block->numinstr = ir.numinstr;
 
-#ifndef DISABLE_OPT
     optimize_loadstore(&ir);
     optimize_constprop(&ir);
     optimize_literals(&ir, cpu);
@@ -34,7 +34,6 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     optimize_deadcode(&ir);
     if (ir.loop) optimize_waitloop(&ir);
     optimize_blocklinking(&ir, cpu);
-#endif
 
     block->end_addr = ir.end_addr;
 
@@ -53,19 +52,15 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 #endif
 
     regalloc_free(&regalloc);
-    // irblock_free(&ir);
+    irblock_free(&ir);
 
     block->cpu = cpu;
-    block->ir = malloc(sizeof(IRBlock));
-    *block->ir = ir;
 
     return block;
 }
 
 void destroy_jit_block(JITBlock* block) {
     free_code(block->backend);
-
-    free(block->ir);
     free(block);
 }
 
@@ -76,11 +71,7 @@ void jit_exec(JITBlock* block) {
 #ifdef JIT_CPULOG
     cpu_print_state(block->cpu);
 #endif
-#ifdef IR_INTERPRET
-    ir_interpret(block->ir, block->cpu);
-#else
     block->code();
-#endif
 }
 
 void jit_mark_dirty(ArmCore* cpu, u32 addr) {

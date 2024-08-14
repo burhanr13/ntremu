@@ -2,8 +2,46 @@
 
 #include "jit.h"
 
-// #define IR_TRACE
-#define IR_TRACE_ADDR 0x2004348
+bool iropc_hasresult(IROpcode opc) {
+    if (opc > IR_NOP) return true;
+    switch (opc) {
+        case IR_LOAD_REG:
+        case IR_LOAD_FLAG:
+        case IR_LOAD_REG_USR:
+        case IR_LOAD_CPSR:
+        case IR_LOAD_SPSR:
+        case IR_LOAD_THUMB:
+        case IR_READ_CP:
+        case IR_LOAD_MEM8:
+        case IR_LOAD_MEMS8:
+        case IR_LOAD_MEM16:
+        case IR_LOAD_MEMS16:
+        case IR_LOAD_MEM32:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool iropc_iscallback(IROpcode opc) {
+    switch (opc) {
+        case IR_READ_CP:
+        case IR_WRITE_CP:
+        case IR_LOAD_MEM8:
+        case IR_LOAD_MEMS8:
+        case IR_LOAD_MEM16:
+        case IR_LOAD_MEMS16:
+        case IR_LOAD_MEM32:
+        case IR_STORE_MEM8:
+        case IR_STORE_MEM16:
+        case IR_STORE_MEM32:
+        case IR_MODESWITCH:
+        case IR_EXCEPTION:
+            return true;
+        default:
+            return false;
+    }
+}
 
 #define OP(n) (inst.imm##n ? inst.op##n : v[inst.op##n])
 
@@ -23,7 +61,7 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
 #ifdef IR_TRACE
     if (block->start_addr == IR_TRACE_ADDR) {
         printf("======== tracing IR block 0x%08x =========\n",
-                block->start_addr);
+               block->start_addr);
     }
 #endif
 
@@ -322,52 +360,52 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
     ((inst.imm##n) ? printf("0x%x", inst.op##n) : printf("v%d", inst.op##n))
 
 #define DISASM(name, r, op1, op2)                                              \
-    if (r) printf("v%d = ", i);                                               \
-    printf(#name);                                                            \
+    if (r) printf("v%d = ", i);                                                \
+    printf(#name);                                                             \
     if (op1) {                                                                 \
-        printf(" ");                                                          \
+        printf(" ");                                                           \
         DISASM_OP(1);                                                          \
     }                                                                          \
     if (op2) {                                                                 \
-        printf(" ");                                                          \
+        printf(" ");                                                           \
         DISASM_OP(2);                                                          \
     }                                                                          \
     return
 
 #define DISASM_REG(name, r, op2)                                               \
-    if (r) printf("v%d = ", i);                                               \
-    printf(#name);                                                            \
-    printf(" r%d ", inst.op1);                                                \
+    if (r) printf("v%d = ", i);                                                \
+    printf(#name);                                                             \
+    printf(" r%d ", inst.op1);                                                 \
     if (op2) DISASM_OP(2);                                                     \
     return
 
 #define DISASM_FLAG(name, r, op2)                                              \
-    if (r) printf("v%d = ", i);                                               \
-    printf(#name);                                                            \
-    printf(" %s ", inst.op1 == NF   ? "n"                                     \
-                    : inst.op1 == ZF ? "z"                                     \
-                    : inst.op1 == CF ? "c"                                     \
-                    : inst.op1 == VF ? "v"                                     \
-                                     : "q");                                   \
+    if (r) printf("v%d = ", i);                                                \
+    printf(#name);                                                             \
+    printf(" %s ", inst.op1 == NF   ? "n"                                      \
+                   : inst.op1 == ZF ? "z"                                      \
+                   : inst.op1 == CF ? "c"                                      \
+                   : inst.op1 == VF ? "v"                                      \
+                                    : "q");                                    \
     if (op2) DISASM_OP(2);                                                     \
     return
 
 #define DISASM_MEM(name, r, op2)                                               \
-    if (r) printf("v%d = ", i);                                               \
-    printf(#name " ");                                                        \
-    printf("[");                                                              \
+    if (r) printf("v%d = ", i);                                                \
+    printf(#name " ");                                                         \
+    printf("[");                                                               \
     DISASM_OP(1);                                                              \
-    printf("] ");                                                             \
+    printf("] ");                                                              \
     if (op2) DISASM_OP(2);                                                     \
     return
 
 #define DISASM_JMP(name, op1)                                                  \
-    printf(#name);                                                            \
+    printf(#name);                                                             \
     if (op1) {                                                                 \
-        printf(" ");                                                          \
+        printf(" ");                                                           \
         DISASM_OP(1);                                                          \
     }                                                                          \
-    printf(" %d", inst.op2);                                                  \
+    printf(" %d", inst.op2);                                                   \
     return
 
 void ir_disasm_instr(IRInstr inst, int i) {
@@ -495,7 +533,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
 }
 
 void ir_disassemble(IRBlock* block) {
-    printf("============= IR Block 0x%08x =================\n", block->start_addr);
+    printf("============= IR Block 0x%08x =================\n",
+           block->start_addr);
     u32 jmptarget = -1;
     for (int i = 0; i < block->code.size; i++) {
         if (i == jmptarget) printf("%d:\n", i);
