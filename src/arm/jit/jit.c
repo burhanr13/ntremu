@@ -11,7 +11,9 @@
 
 #ifdef JIT_DISASM
 #define IR_DISASM
+#ifndef IR_INTERPRET
 #define BACKEND_DISASM
+#endif
 #endif
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {

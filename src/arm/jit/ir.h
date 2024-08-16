@@ -115,6 +115,7 @@ static inline u32 irblock_write(IRBlock* block, IRInstr instr) {
 
 bool iropc_hasresult(IROpcode opc);
 bool iropc_iscallback(IROpcode opc);
+bool iropc_ispure(IROpcode opc);
 
 void ir_interpret(IRBlock* block, ArmCore* cpu);
 

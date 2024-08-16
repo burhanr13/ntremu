@@ -43,6 +43,19 @@ bool iropc_iscallback(IROpcode opc) {
     }
 }
 
+bool iropc_ispure(IROpcode opc) {
+    if (opc <= IR_NOP) return false;
+    switch (opc) {
+        case IR_RRC:
+        case IR_ADC:
+        case IR_SBC:
+        case IR_GETCIFZ:
+            return false;
+        default:
+            return true;
+    }
+}
+
 #define OP(n) (inst.imm##n ? inst.op##n : v[inst.op##n])
 
 #define ADDCV(op1, op2, c)                                                     \

@@ -1,5 +1,7 @@
 #include "optimizer.h"
 
+#include <string.h>
+
 #include "jit.h"
 
 #define MOVX(_op2, imm)                                                        \
@@ -170,6 +172,9 @@ void constant_jmp_helper(IRBlock* block, IRInstr* jmp, bool jmpTaken) {
 void optimize_constprop(IRBlock* block) {
     u32 vops[block->code.size];
     bool vimm[block->code.size];
+    bool notcurcond[block->code.size];
+    u32 jmpsrc = -1;
+    u32 jmptarget = -1;
     for (int i = 0; i < block->code.size; i++) {
         IRInstr* inst = &block->code.d[i];
         if (!inst->imm1) {
@@ -460,6 +465,29 @@ void optimize_constprop(IRBlock* block) {
             }
         } else {
             NOOPT();
+        }
+
+        if (i == jmptarget) {
+            for (int j = jmpsrc; j < jmptarget; j++) {
+                notcurcond[j] = true;
+            }
+        }
+        if (iropc_ispure(inst->opcode) &&
+            !(inst[1].opcode == IR_ADC || inst[1].opcode == IR_GETC ||
+              inst[3].opcode == IR_GETV)) {
+            for (int j = 0; j < i; j++) {
+                if (notcurcond[j]) continue;
+                if (!memcmp(&block->code.d[j], inst, sizeof(IRInstr))) {
+                    *inst = MOVX(j, 0);
+                    break;
+                }
+            }
+        }
+        notcurcond[i] = false;
+        if (inst->opcode == IR_JZ || inst->opcode == IR_JNZ ||
+            inst->opcode == IR_JELSE) {
+            jmpsrc = i;
+            jmptarget = inst->op2;
         }
     }
 }
