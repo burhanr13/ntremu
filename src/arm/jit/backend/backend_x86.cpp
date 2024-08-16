@@ -417,9 +417,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     } else {
                         mov(ecx, getOp(inst.op2));
                     }
-                    cmp(ecx, 32);
+                    cmp(cl, 32);
                     inLocalLabel();
-                    jl(".normal");
+                    jb(".normal");
                     mov(dest, 0);
                     jmp(".end");
                     L(".normal");
@@ -453,9 +453,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     } else {
                         mov(ecx, getOp(inst.op2));
                     }
-                    cmp(ecx, 32);
+                    cmp(cl, 32);
                     inLocalLabel();
-                    jl(".normal");
+                    jb(".normal");
                     mov(dest, 0);
                     jmp(".end");
                     L(".normal");
@@ -489,9 +489,9 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     } else {
                         mov(ecx, getOp(inst.op2));
                     }
-                    cmp(ecx, 32);
+                    cmp(cl, 32);
                     inLocalLabel();
-                    jl(".normal");
+                    jb(".normal");
                     sar(dest, 31);
                     jmp(".end");
                     L(".normal");
