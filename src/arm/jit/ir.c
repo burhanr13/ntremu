@@ -355,6 +355,16 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
                 cpu->pending_flush = true;
                 cpu->max_cycles = 0;
                 return;
+            case IR_END_LOOP:
+                cpu->cycles += block->numinstr;
+                if (cpu->cycles < cpu->max_cycles) {
+                    ir_interpret(block, cpu);
+                    return;
+                }
+                cpu->cur_instr_addr = cpu->pc;
+                cpu->pending_flush = true;
+                cpu->max_cycles = 0;
+                return;
             case IR_END_RET:
                 cpu->cycles += block->numinstr;
                 cpu->cur_instr_addr = cpu->pc;
@@ -547,6 +557,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
             DISASM(end_ret, 0, 0, 0);
         case IR_END_LINK:
             DISASM(end_link, 0, 1, 1);
+        case IR_END_LOOP:
+            DISASM(end_loop, 0, 0, 0);
     }
 }
 

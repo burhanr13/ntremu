@@ -5,9 +5,9 @@
 #include "translator.h"
 #include "register_allocator.h"
 
-//#define JIT_DISASM
-//#define JIT_CPULOG
-//#define IR_INTERPRET
+// #define JIT_DISASM
+// #define JIT_CPULOG
+#define IR_INTERPRET
 
 #ifdef JIT_DISASM
 #define IR_DISASM
@@ -19,6 +19,9 @@
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
     block->start_addr = addr;
+    block->attrs = cpu->cpsr.w & 0x3f;
+    Vec_init(block->linkingblocks);
+    block->created = false;
 
     IRBlock ir;
     irblock_init(&ir);
@@ -47,8 +50,8 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     regalloc_print(&regalloc);
 #endif
 
-    block->backend = generate_code(&ir, &regalloc, cpu);
-    block->code = get_code(block->backend);
+    block->backend = backend_generate_code(&ir, &regalloc, cpu);
+    block->code = backend_get_code(block->backend);
 
 #ifdef BACKEND_DISASM
     backend_disassemble(block->backend);
@@ -64,15 +67,36 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 
     block->cpu = cpu;
 
+    cpu->jit_cache[block->attrs][addr >> 16][(addr & 0xffff) >> 1] = block;
+    backend_patch_links(block);
+
+    block->created = true;
+
     return block;
 }
 
 void destroy_jit_block(JITBlock* block) {
+    if (!block->created) return;
+    
 #ifdef IR_INTERPRET
     irblock_free(block->ir);
     free(block->ir);
 #endif
-    free_code(block->backend);
+
+    block->cpu->jit_cache[block->attrs][block->start_addr >> 16]
+                         [(block->start_addr & 0xffff) >> 1] = NULL;
+    backend_free(block->backend);
+    for (int i = 0; i < block->linkingblocks.size; i++) {
+        BlockLocation l = block->linkingblocks.d[i];
+        if (!(block->cpu->jit_cache[l.attrs] &&
+              block->cpu->jit_cache[l.attrs][l.addr >> 16]))
+            continue;
+        JITBlock* linkingblock =
+            block->cpu
+                ->jit_cache[l.attrs][l.addr >> 16][(l.addr & 0xffff) >> 1];
+        if (linkingblock) destroy_jit_block(linkingblock);
+    }
+    Vec_free(block->linkingblocks);
     free(block);
 }
 
@@ -107,7 +131,6 @@ void invalidate_l2(ArmCore* cpu, u32 attr, u32 addrhi, u32 startlo, u32 endlo) {
     for (int i = startlo; i < endlo; i += 2) {
         if (cpu->jit_cache[attr][addrhi][i >> 1]) {
             destroy_jit_block(cpu->jit_cache[attr][addrhi][i >> 1]);
-            cpu->jit_cache[attr][addrhi][i >> 1] = NULL;
         }
     }
     if (startlo == 0 && endlo == BIT(16)) {
@@ -206,31 +229,22 @@ JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
         cpu->jit_cache[attrs][addrhi] = calloc(BIT(16) >> 1, sizeof(JITBlock*));
         if (!cpu->jit_dirty[addrhi])
             cpu->jit_dirty[addrhi] = calloc(BIT(16) >> 6 >> 3, sizeof(u8));
+        if (!cpu->jit_dirty[(addrhi + 1) & 0xffff])
+            cpu->jit_dirty[(addrhi + 1) & 0xffff] =
+                calloc(BIT(16) >> 6 >> 3, sizeof(u8));
     }
 
     JITBlock* block = NULL;
     if (!cpu->jit_cache[attrs][addrhi][addrlo]) {
+        if (jit_isdirty(cpu, addr, addr + MAX_BLOCK_SIZE)) {
+            jit_invalidate_range(cpu, addr, addr + MAX_BLOCK_SIZE);
+        }
         block = create_jit_block(cpu, addr);
-        if (block->end_addr >> 16 != addrhi &&
-            !cpu->jit_dirty[(addrhi + 1) & 0xffff]) {
-            cpu->jit_dirty[(addrhi + 1) & 0xffff] =
-                calloc(BIT(16) >> 6 >> 3, sizeof(u8));
-        }
-        if (jit_isdirty(cpu, block->start_addr, block->end_addr)) {
-            jit_invalidate_range(cpu, block->start_addr, block->end_addr);
-        }
-        cpu->jit_cache[attrs][addrhi][addrlo] = block;
     } else {
         block = cpu->jit_cache[attrs][addrhi][addrlo];
         if (jit_isdirty(cpu, block->start_addr, block->end_addr)) {
+            jit_invalidate_range(cpu, addr, addr + MAX_BLOCK_SIZE);
             block = create_jit_block(cpu, addr);
-            if (block->end_addr >> 16 != addrhi &&
-                !cpu->jit_dirty[(addrhi + 1) & 0xffff]) {
-                cpu->jit_dirty[(addrhi + 1) & 0xffff] =
-                    calloc(BIT(16) >> 6 >> 3, sizeof(u8));
-            }
-            jit_invalidate_range(cpu, block->start_addr, block->end_addr);
-            cpu->jit_cache[attrs][addrhi][addrlo] = block;
         }
     }
 
@@ -248,6 +262,7 @@ void jit_free_all(ArmCore* cpu) {
                         }
                     }
                     free(cpu->jit_cache[i][j]);
+                    cpu->jit_cache[i][j] = NULL;
                 }
             }
             free(cpu->jit_cache[i]);

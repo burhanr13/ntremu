@@ -9,16 +9,25 @@
 
 typedef void (*JITFunc)();
 
+typedef struct {
+    u32 attrs;
+    u32 addr;
+} BlockLocation;
+
 typedef struct _JITBlock {
     JITFunc code;
     void* backend;
 
+    u32 attrs;
     u32 start_addr;
     u32 end_addr;
     u32 numinstr;
 
     ArmCore* cpu;
     IRBlock* ir;
+
+    Vector(BlockLocation) linkingblocks;
+    bool created;
 } JITBlock;
 
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr);
@@ -28,6 +37,7 @@ void jit_exec(JITBlock* block);
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr);
 
 void jit_mark_dirty(ArmCore* cpu, u32 addr);
+bool jit_isdirty(ArmCore* cpu, u32 start, u32 end);
 void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr);
 void jit_free_all(ArmCore* cpu);
 

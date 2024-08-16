@@ -105,7 +105,8 @@ void optimize_loadstore(IRBlock* block) {
                 break;
             }
             case IR_END_RET:
-            case IR_END_LINK: {
+            case IR_END_LINK:
+            case IR_END_LOOP: {
                 for (int r = 0; r < 16; r++) {
                     if (laststorereg[r] > jmpsource ||
                         (vreg[r] > jmpsource && !immreg[r])) {
@@ -478,7 +479,7 @@ void optimize_constprop(IRBlock* block) {
             for (int j = 0; j < i; j++) {
                 if (notcurcond[j]) continue;
                 if (!memcmp(&block->code.d[j], inst, sizeof(IRInstr))) {
-                    *inst = MOVX(j, 0);
+                    OPTV(j);
                     break;
                 }
             }
@@ -568,6 +569,7 @@ void optimize_chainjumps(IRBlock* block) {
                 break;
             case IR_END_RET:
             case IR_END_LINK:
+            case IR_END_LOOP:
                 for (int j = i + 1; j < block->code.size; j++) {
                     block->code.d[j] = NOP;
                 }
@@ -706,9 +708,14 @@ void optimize_blocklinking(IRBlock* block, ArmCore* cpu) {
                 break;
             case IR_END_RET:
                 if (can_link) {
-                    inst->opcode = IR_END_LINK;
-                    inst->op1 = cpu->cpsr.m | (link_thumb << 5);
-                    inst->op2 = link_pc;
+                    if (link_pc == block->start_addr &&
+                        link_thumb == cpu->cpsr.t) {
+
+                    } else {
+                        inst->opcode = IR_END_LINK;
+                        inst->op1 = cpu->cpsr.m | (link_thumb << 5);
+                        inst->op2 = link_pc;
+                    }
                 }
                 can_link = true;
                 break;

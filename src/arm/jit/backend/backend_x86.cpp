@@ -3,6 +3,12 @@
 #include <capstone/capstone.h>
 #include <xbyak/xbyak.h>
 
+struct LinkPatch {
+    u32 jmp_offset;
+    u32 attrs;
+    u32 addr;
+};
+
 struct Code : Xbyak::CodeGenerator {
     RegAllocation* regalloc;
     HostRegAllocation hralloc;
@@ -11,6 +17,8 @@ struct Code : Xbyak::CodeGenerator {
     std::vector<Xbyak::Reg32> tempregs = {esi, edi, r8d, r9d, r10d, r11d};
     std::vector<Xbyak::Reg32> savedregs = {ebp, r12d, r13d, r14d, r15d};
     std::vector<Xbyak::Address> stackslots;
+
+    std::vector<LinkPatch> links;
 
     Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu);
 
@@ -878,36 +886,46 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                 int spdisp = getSPDisp();
                 if (spdisp) sub(rsp, spdisp);
                 mov(rbx, (u64) cpu);
+                L("loopblock");
                 break;
             }
+            case IR_END_RET:
             case IR_END_LINK:
-            case IR_END_RET: {
+            case IR_END_LOOP: {
+
+                add(dword[CPU(cycles)], ir->numinstr);
+
+                if (inst.opcode == IR_END_LOOP) {
+                    mov(eax, dword[CPU(max_cycles)]);
+                    cmp(dword[CPU(cycles)], eax);
+                    jl("loopblock");
+                }
+
                 int spdisp = getSPDisp();
                 if (spdisp) add(rsp, spdisp);
                 for (int i = hralloc.count[REG_SAVED] - 1; i >= 0; i--) {
                     pop(savedregs[i].changeBit(64));
                 }
 
-                add(dword[CPU(cycles)], ir->numinstr);
-
-                // if (inst.opcode == IR_END_LINK) {
-                //     inLocalLabel();
-                //     mov(eax, dword[CPU(max_cycles)]);
-                //     cmp(dword[CPU(cycles)], eax);
-                //     jge(".cantlink");
-
-                //     mov(edx, inst.op2);
-                //     mov(esi, inst.op1);
-                //     mov(rdi, rbx);
-                //     mov(rax, (u64) get_jitblock);
-                //     call(rax);
-                //     test(rax, rax);
-                //     je(".cantlink");
-                //     pop(rbx);
-                //     jmp(ptr[rax + offsetof(JITBlock, code)]);
-                //     L(".cantlink");
-                //     outLocalLabel();
-                // }
+                if (inst.opcode == IR_END_LINK) {
+                    inLocalLabel();
+                    mov(eax, dword[CPU(max_cycles)]);
+                    cmp(dword[CPU(cycles)], eax);
+                    jge(".nolink");
+                    mov(rdi, rbx);
+                    mov(esi, inst.op2);
+                    mov(edx, inst.op2 + MAX_BLOCK_SIZE);
+                    mov(rax, (u64) jit_isdirty);
+                    call(rax);
+                    test(al, al);
+                    jnz(".nolink");
+                    pop(rbx);
+                    links.push_back((LinkPatch){(u32) (getCurr() - getCode()),
+                                                inst.op1, inst.op2});
+                    nop(5);
+                    L(".nolink");
+                    outLocalLabel();
+                }
 
                 mov(dword[CPU(max_cycles)], 0);
                 mov(eax, ptr[CPU(pc)]);
@@ -928,19 +946,36 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
 
 extern "C" {
 
-void* generate_code_x86(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu) {
+void* backend_x86_generate_code(IRBlock* ir, RegAllocation* regalloc,
+                                ArmCore* cpu) {
     return new Code(ir, regalloc, cpu);
 }
 
-JITFunc get_code_x86(void* backend) {
+JITFunc backend_x86_get_code(void* backend) {
     return (JITFunc) ((Code*) backend)->getCode();
 }
 
-void free_code_x86(void* backend) {
+void backend_x86_patch_links(JITBlock* block) {
+    Code* code = (Code*) block->backend;
+    for (auto [offset, attrs, addr] : code->links) {
+        char* jmpsrc = (char*) code->getCode() + offset;
+        JITBlock* linkblock = get_jitblock(code->cpu, attrs, addr);
+        int rel32 = (char*) linkblock->code - (jmpsrc + 5);
+        jmpsrc[0] = 0xe9;
+        jmpsrc[1] = rel32 & 0xff;
+        jmpsrc[2] = (rel32 >> 8) & 0xff;
+        jmpsrc[3] = (rel32 >> 16) & 0xff;
+        jmpsrc[4] = (rel32 >> 24) & 0xff;
+        Vec_push(linkblock->linkingblocks,
+                 ((BlockLocation){block->attrs, block->start_addr}));
+    }
+}
+
+void backend_x86_free(void* backend) {
     delete ((Code*) backend);
 }
 
-void backend_disassemble_x86(void* backend) {
+void backend_x86_disassemble(void* backend) {
     Code* code = (Code*) backend;
     code->print_hostregs();
     csh handle;
