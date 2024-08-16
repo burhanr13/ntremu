@@ -86,6 +86,8 @@ HostRegAllocation allocate_host_registers(RegAllocation* regalloc, u32 ntemp,
 
     HostRegAllocation ret = {};
     ret.nregs = nregs;
+    if (!nregs) return ret;
+    
     ret.hostreg_info = calloc(nregs, sizeof(HostRegInfo));
     int sorted[nregs];
     for (int i = 0; i < nregs; i++) sorted[i] = i;

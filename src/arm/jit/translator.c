@@ -1,4 +1,4 @@
-#include "recompiler.h"
+#include "translator.h"
 
 #include "../arm.h"
 #include "../thumb.h"
@@ -518,21 +518,27 @@ DECL_ARM_COMPILE(multiply_short) {
             break;
         }
         case 1:
-            // res >>= 16;
-            // if (!instr.multiply_short.x) {
-            //     res += (s32) cpu->r[instr.multiply_short.rn];
-            //     if (res > INT32_MAX || res < INT32_MIN) {
-            //         cpu->cpsr.q = 1;
-            //     }
-            // }
-            // cpu->r[instr.multiply_short.rd] = res;
+            u32 vres = EMITVV(SMULW, vop1, vop2);
+            if (!instr.multiply_short.x) {
+                EMIT_LOAD_REG(instr.multiply_short.rn, true);
+                vres = EMITVV(ADD, vres, LASTV);
+                // if (res > INT32_MAX || res < INT32_MIN) {
+                //     cpu->cpsr.q = 1;
+                // }
+            }
+            EMITV_STORE_REG(instr.multiply_short.rd, vres);
             break;
-        case 2:
-            // res += cpu->r[instr.multiply_short.rn];
-            // res += (s64) cpu->r[instr.multiply_short.rd] << 32;
-            // cpu->r[instr.multiply_short.rn] = res;
-            // cpu->r[instr.multiply_short.rd] = res >> 32;
-            // break;
+        case 2: {
+            u32 vres = EMITVV(MUL, vop1, vop2);
+            u32 vsx = EMITVI(ASR, vres, 31);
+            u32 vrn = EMIT_LOAD_REG(instr.multiply_short.rn, true);
+            u32 vrd = EMIT_LOAD_REG(instr.multiply_short.rd, true);
+            u32 vareslo = EMITVV(ADD, vrn, vres);
+            u32 vareshi = EMITVV(ADC, vrd, vsx);
+            EMITV_STORE_REG(instr.multiply_short.rn, vareslo);
+            EMITV_STORE_REG(instr.multiply_short.rd, vareshi);
+            break;
+        }
         case 3:
             EMITVV(MUL, vop1, vop2);
             EMITV_STORE_REG(instr.multiply_short.rd, LASTV);

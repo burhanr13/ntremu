@@ -22,14 +22,16 @@ void optimize_loadstore(IRBlock* block) {
         IRInstr inst = block->code.d[i];
         if (i == jmptarget) {
             for (int r = 0; r < 16; r++) {
-                if (laststorereg[r] > jmpsource || vreg[r] > jmpsource) {
+                if (laststorereg[r] > jmpsource ||
+                    (vreg[r] > jmpsource && !immreg[r])) {
                     laststorereg[r] = 0;
                     vreg[r] = 0;
                     immreg[r] = false;
                 }
             }
             for (int f = 0; f < 5; f++) {
-                if (laststoreflag[f] > jmpsource || vflag[f] > jmpsource) {
+                if (laststoreflag[f] > jmpsource ||
+                    (vflag[f] > jmpsource && !immflag[f])) {
                     laststoreflag[f] = 0;
                     vflag[f] = 0;
                     immflag[f] = false;
@@ -50,16 +52,12 @@ void optimize_loadstore(IRBlock* block) {
             }
             case IR_STORE_REG: {
                 u32 rd = inst.op1;
-                if (inst.op2 == vreg[rd] && inst.imm2 == immreg[rd]) {
-                    block->code.d[i] = NOP;
-                } else {
-                    if (laststorereg[rd] > jmpsource) {
-                        block->code.d[laststorereg[rd]] = NOP;
-                    }
-                    laststorereg[rd] = i;
-                    vreg[rd] = inst.op2;
-                    immreg[rd] = inst.imm2;
+                if (laststorereg[rd] > jmpsource) {
+                    block->code.d[laststorereg[rd]] = NOP;
                 }
+                laststorereg[rd] = i;
+                vreg[rd] = inst.op2;
+                immreg[rd] = inst.imm2;
                 break;
             }
             case IR_LOAD_FLAG: {
@@ -74,16 +72,12 @@ void optimize_loadstore(IRBlock* block) {
             }
             case IR_STORE_FLAG: {
                 u32 f = inst.op1;
-                if (inst.op2 == vflag[f] && inst.imm2 == immflag[f]) {
-                    block->code.d[i] = NOP;
-                } else {
-                    if (laststoreflag[f] > jmpsource) {
-                        block->code.d[laststoreflag[f]] = NOP;
-                    }
-                    laststoreflag[f] = i;
-                    vflag[f] = inst.op2;
-                    immflag[f] = inst.imm2;
+                if (laststoreflag[f] > jmpsource) {
+                    block->code.d[laststoreflag[f]] = NOP;
                 }
+                laststoreflag[f] = i;
+                vflag[f] = inst.op2;
+                immflag[f] = inst.imm2;
                 break;
             }
             case IR_LOAD_CPSR:
@@ -111,14 +105,20 @@ void optimize_loadstore(IRBlock* block) {
             case IR_END_RET:
             case IR_END_LINK: {
                 for (int r = 0; r < 16; r++) {
+                    if (laststorereg[r] > jmpsource ||
+                        (vreg[r] > jmpsource && !immreg[r])) {
+                        vreg[r] = 0;
+                        immreg[r] = false;
+                    }
                     laststorereg[r] = 0;
-                    vreg[r] = 0;
-                    immreg[r] = false;
                 }
                 for (int f = 0; f < 5; f++) {
+                    if (laststoreflag[f] > jmpsource ||
+                        (vflag[f] > jmpsource && !immflag[f])) {
+                        vflag[f] = 0;
+                        immflag[f] = false;
+                    }
                     laststoreflag[f] = 0;
-                    vflag[f] = 0;
-                    immflag[f] = false;
                 }
                 break;
             }
@@ -232,6 +232,14 @@ void optimize_constprop(IRBlock* block) {
                         ADDCV(inst->op1, inst->op2, 0);
                     } else {
                         OPTI(inst->op1 + inst->op2);
+                        if (inst[1].opcode == IR_ADC) {
+                            *inst = (IRInstr){.opcode = IR_SETC,
+                                              .imm1 = 1,
+                                              .imm2 = 1,
+                                              .op1 = 0,
+                                              .op2 = inst->op1 + inst->op2 <
+                                                     inst->op1};
+                        }
                     }
                     break;
                 case IR_SUB:
@@ -344,6 +352,13 @@ void optimize_constprop(IRBlock* block) {
                         OPTV(inst->op1);
                         if (inst[1].opcode == IR_GETC) inst[1] = MOVI(0);
                         if (inst[3].opcode == IR_GETV) inst[3] = MOVI(0);
+                        if (inst[1].opcode == IR_ADC) {
+                            *inst = (IRInstr){.opcode = IR_SETC,
+                                              .imm1 = 1,
+                                              .imm2 = 1,
+                                              .op1 = 0,
+                                              .op2 = 0};
+                        }
                     } else {
                         NOOPT();
                     }
@@ -410,6 +425,13 @@ void optimize_constprop(IRBlock* block) {
                         OPTV(inst->op2);
                         if (inst[1].opcode == IR_GETC) inst[1] = MOVI(0);
                         if (inst[3].opcode == IR_GETV) inst[3] = MOVI(0);
+                        if (inst[1].opcode == IR_ADC) {
+                            *inst = (IRInstr){.opcode = IR_SETC,
+                                              .imm1 = 1,
+                                              .imm2 = 1,
+                                              .op1 = 0,
+                                              .op2 = 0};
+                        }
                     } else {
                         NOOPT();
                     }

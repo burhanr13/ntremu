@@ -413,11 +413,11 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                 } else {
                     if (op2eax) {
-                        mov(cl, al);
+                        mov(ecx, eax);
                     } else {
                         mov(ecx, getOp(inst.op2));
                     }
-                    cmp(cl, 32);
+                    cmp(ecx, 32);
                     inLocalLabel();
                     jl(".normal");
                     mov(dest, 0);
@@ -449,11 +449,11 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                 } else {
                     if (op2eax) {
-                        mov(cl, al);
+                        mov(ecx, eax);
                     } else {
                         mov(ecx, getOp(inst.op2));
                     }
-                    cmp(cl, 32);
+                    cmp(ecx, 32);
                     inLocalLabel();
                     jl(".normal");
                     mov(dest, 0);
@@ -485,11 +485,11 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     }
                 } else {
                     if (op2eax) {
-                        mov(cl, al);
+                        mov(ecx, eax);
                     } else {
                         mov(ecx, getOp(inst.op2));
                     }
-                    cmp(cl, 32);
+                    cmp(ecx, 32);
                     inLocalLabel();
                     jl(".normal");
                     sar(dest, 31);
@@ -517,7 +517,7 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     ror(dest, inst.op2);
                 } else {
                     if (op2eax) {
-                        mov(cl, al);
+                        mov(ecx, eax);
                     } else {
                         mov(ecx, getOp(inst.op2));
                     }
@@ -615,6 +615,24 @@ Code::Code(IRBlock* ir, RegAllocation* regalloc, ArmCore* cpu)
                     mul(msrc);
                 }
                 mov(getOp(i), edx);
+                break;
+            }
+            case IR_SMULW: {
+                if (inst.imm1) {
+                    mov(eax, inst.op1);
+                    movsxd(rax, eax);
+                } else {
+                    movsxd(rax, getOp(inst.op1));
+                }
+                if (inst.imm2) {
+                    mov(edx, inst.op2);
+                    movsxd(rdx, edx);
+                } else {
+                    movsxd(rdx, getOp(inst.op2));
+                }
+                imul(rax, rdx);
+                sar(rax, 16);
+                mov(getOp(i), eax);
                 break;
             }
             case IR_CLZ: {

@@ -2,11 +2,12 @@
 
 #include "backend/backend.h"
 #include "optimizer.h"
-#include "recompiler.h"
+#include "translator.h"
 #include "register_allocator.h"
 
 //#define JIT_DISASM
 //#define JIT_CPULOG
+//#define IR_INTERPRET
 
 #ifdef JIT_DISASM
 #define IR_DISASM
@@ -52,7 +53,12 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 #endif
 
     regalloc_free(&regalloc);
+#ifdef IR_INTERPRET
+    block->ir = malloc(sizeof(IRBlock));
+    *block->ir = ir;
+#else
     irblock_free(&ir);
+#endif
 
     block->cpu = cpu;
 
@@ -60,18 +66,23 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
 }
 
 void destroy_jit_block(JITBlock* block) {
+#ifdef IR_INTERPRET
+    irblock_free(block->ir);
+    free(block->ir);
+#endif
     free_code(block->backend);
     free(block);
 }
 
 void jit_exec(JITBlock* block) {
-#ifdef JIT_LOG
-    printf("executing block at 0x%08x\n", block->start_addr);
-#endif
 #ifdef JIT_CPULOG
     cpu_print_state(block->cpu);
 #endif
+#ifdef IR_INTERPRET
+    ir_interpret(block->ir, block->cpu);
+#else
     block->code();
+#endif
 }
 
 void jit_mark_dirty(ArmCore* cpu, u32 addr) {

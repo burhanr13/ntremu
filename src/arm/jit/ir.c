@@ -262,6 +262,9 @@ void ir_interpret(IRBlock* block, ArmCore* cpu) {
             case IR_SMULH:
                 v[i] = ((s64) (s32) OP(1) * (s64) (s32) OP(2)) >> 32;
                 break;
+            case IR_SMULW:
+                v[i] = ((s64) (s32) OP(1) * (s64) (s32) OP(2)) >> 16;
+                break;
             case IR_CLZ: {
                 u32 op = OP(2);
                 u32 ct = 0;
@@ -492,6 +495,8 @@ void ir_disasm_instr(IRInstr inst, int i) {
             DISASM(umulh, 1, 1, 1);
         case IR_SMULH:
             DISASM(smulh, 1, 1, 1);
+        case IR_SMULW:
+            DISASM(smulw, 1, 1, 1);
         case IR_CLZ:
             DISASM(clz, 1, 0, 1);
         case IR_GETN:

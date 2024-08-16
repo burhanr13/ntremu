@@ -68,6 +68,7 @@ typedef enum {
     IR_MUL,
     IR_SMULH,
     IR_UMULH,
+    IR_SMULW,
     IR_CLZ,
 
     IR_GETN,
