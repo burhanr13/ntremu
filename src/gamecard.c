@@ -16,7 +16,7 @@ GameCard* create_card(char* filename) {
     if (fd < 0) return NULL;
 
     GameCard* card = calloc(1, sizeof *card);
-
+    
     struct stat st;
     fstat(fd, &st);
     u64 v = st.st_size;
@@ -45,8 +45,8 @@ GameCard* create_card(char* filename) {
     fd = open(card->sav_filename, O_RDWR);
     if (fd < 0) {
         card->sav_new = true;
-        card->eeprom = calloc(1 << 16, 1);
         card->eeprom_size = 1 << 16;
+        card->eeprom = calloc(1 << 16, 1);
         card->addrtype = 2;
     } else {
         struct stat st;
@@ -197,7 +197,11 @@ bool card_read_data(GameCard* card, u32* data) {
 void card_spi_write(GameCard* card, u8 data, bool hold) {
     switch (card->eeprom_state) {
         case CARDEEPROM_IDLE:
+            eprintf("command %x ", data);
             switch (data) {
+                case 0x01:
+                    card->eeprom_state = CARDEEPROM_WRSR;
+                    break;
                 case 0x06:
                     card->eepromst.write_enable = true;
                     break;
@@ -242,18 +246,24 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
             if (++card->eepromst.i == card->addrtype) {
                 card->eeprom_state =
                     card->eepromst.read ? CARDEEPROM_READ : CARDEEPROM_WRITE;
+                eprintf("addr %x ", card->eepromst.addr);
             }
             break;
         case CARDEEPROM_READ:
             card->eepromst.i++;
             card->spidata = card->eeprom[card->eepromst.addr++];
+            card->eepromst.addr &= card->eeprom_size - 1;
             break;
         case CARDEEPROM_WRITE:
             card->eepromst.i++;
             card->eeprom[card->eepromst.addr++] = data;
+            card->eepromst.addr &= card->eeprom_size - 1;
             break;
         case CARDEEPROM_STAT:
-            card->spidata = card->eepromst.write_enable ? 2 : 0;
+            card->spidata = (card->eepromst.write_enable ? 2 : 0) |
+                            (card->addrtype == 1 ? 0xf0 : 0);
+            break;
+        case CARDEEPROM_WRSR:
             break;
         case CARDEEPROM_ID:
             card->spidata = 0xff;

@@ -46,7 +46,8 @@ typedef enum {
     CARDEEPROM_READ,
     CARDEEPROM_WRITE,
     CARDEEPROM_STAT,
-    CARDEEPROM_ID
+    CARDEEPROM_ID,
+    CARDEEPROM_WRSR,
 } CardEepromState;
 
 typedef struct {
