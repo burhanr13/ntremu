@@ -197,7 +197,6 @@ bool card_read_data(GameCard* card, u32* data) {
 void card_spi_write(GameCard* card, u8 data, bool hold) {
     switch (card->eeprom_state) {
         case CARDEEPROM_IDLE:
-            eprintf("command %x ", data);
             switch (data) {
                 case 0x01:
                     card->eeprom_state = CARDEEPROM_WRSR;
@@ -246,7 +245,6 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
             if (++card->eepromst.i == card->addrtype) {
                 card->eeprom_state =
                     card->eepromst.read ? CARDEEPROM_READ : CARDEEPROM_WRITE;
-                eprintf("addr %x ", card->eepromst.addr);
             }
             break;
         case CARDEEPROM_READ:
