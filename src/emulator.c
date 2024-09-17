@@ -3,13 +3,14 @@
 #include <SDL2/SDL.h>
 #include <fcntl.h>
 #include <math.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include "arm/arm.h"
-#include "arm/thumb.h"
 #include "arm/jit/jit.h"
+#include "arm/thumb.h"
 #include "emulator_state.h"
 #include "nds.h"
 
@@ -268,13 +269,7 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds,
             SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX);
         int y =
             SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY);
-        x -= 3000;
-        y -= 400;
-        if (x >= BIT(15)) x = BIT(15) - 1;
-        if (x < INT16_MIN) x = INT16_MIN;
-        if (y >= BIT(15)) y = BIT(15) - 1;
-        if (y < INT16_MIN) y = INT16_MIN;
-        if (abs(x) >= 3000 || abs(y) >= 3000) {
+        if (abs(x) >= 4000 || abs(y) >= 4000) {
             pressed = true;
 
             if (ntremu.abs_touch) {
@@ -283,33 +278,35 @@ void update_input_touch(NDS* nds, SDL_Rect* ts_bounds,
                 nds->tsc.y =
                     NDS_SCREEN_H / 2 + (y * (NDS_SCREEN_H / 2 - 10) >> 15);
             } else {
-                static int prev_x, prev_y, target_x, target_y;
-                if (nds->tsc.x == (u8) -1) {
+                static int prev_x = 0, prev_y = 0;
+
+                x >>= 13, y >>= 13;
+
+                if (nds->tsc.y == (u8) -1) {
                     nds->tsc.x = NDS_SCREEN_W / 2;
                     nds->tsc.y = NDS_SCREEN_H / 2;
-                    prev_x = x, prev_y = y;
-                    target_x = NDS_SCREEN_W / 2;
-                    target_y = NDS_SCREEN_H / 2;
-                } else if (abs(x - prev_x) > 10 || abs(y - prev_y) > 10) {
-                    prev_x = x, prev_y = y;
-                    int tx = target_x + (x >> 12);
-                    int ty = target_y + (y >> 12);
-                    if (tx >= 0 && tx < NDS_SCREEN_W && ty >= 0 &&
-                        ty < NDS_SCREEN_H) {
-                        target_x = tx;
-                        target_y = ty;
-                    }
-                    nds->tsc.x = (nds->tsc.x + target_x) / 2;
-                    nds->tsc.y = (nds->tsc.y + target_y) / 2;
+                } else if (prev_x != x || prev_y != y) {
+                    int tmpx = nds->tsc.x;
+                    int tmpy = nds->tsc.y;
+                    tmpx += x;
+                    tmpy += y;
+                    if (tmpx < 0) tmpx = 0;
+                    if (tmpx >= NDS_SCREEN_W) tmpx = NDS_SCREEN_W - 1;
+                    if (tmpy < 0) tmpy = 0;
+                    if (tmpy >= NDS_SCREEN_H) tmpy = NDS_SCREEN_H - 1;
+
+                    nds->tsc.x = tmpx;
+                    nds->tsc.y = tmpy;
                 }
+                prev_x = x, prev_y = y;
             }
         }
     }
 
     nds->io7.extkeyin.pen = !pressed;
     if (!pressed) {
-        ntremu.nds->tsc.x = -1;
-        ntremu.nds->tsc.y = -1;
+        nds->tsc.x = -1;
+        nds->tsc.y = -1;
     }
 }
 

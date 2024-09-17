@@ -45,8 +45,8 @@ GameCard* create_card(char* filename) {
     fd = open(card->sav_filename, O_RDWR);
     if (fd < 0) {
         card->sav_new = true;
-        card->eeprom = calloc(BIT(16), 1);
         card->eeprom_size = BIT(16);
+        card->eeprom = calloc(card->eeprom_size, 1);
         card->addrtype = 2;
     } else {
         struct stat st;
@@ -198,6 +198,9 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
     switch (card->eeprom_state) {
         case CARDEEPROM_IDLE:
             switch (data) {
+                case 0x01:
+                    card->eeprom_state = CARDEEPROM_WRSR;
+                    break;
                 case 0x06:
                     card->eepromst.write_enable = true;
                     break;
@@ -247,13 +250,18 @@ void card_spi_write(GameCard* card, u8 data, bool hold) {
         case CARDEEPROM_READ:
             card->eepromst.i++;
             card->spidata = card->eeprom[card->eepromst.addr++];
+            card->eepromst.addr &= card->eeprom_size - 1;
             break;
         case CARDEEPROM_WRITE:
             card->eepromst.i++;
             card->eeprom[card->eepromst.addr++] = data;
+            card->eepromst.addr &= card->eeprom_size - 1;
             break;
         case CARDEEPROM_STAT:
-            card->spidata = card->eepromst.write_enable ? 2 : 0;
+            card->spidata = (card->eepromst.write_enable ? 2 : 0) |
+                            (card->addrtype == 1 ? 0xf0 : 0);
+            break;
+        case CARDEEPROM_WRSR:
             break;
         case CARDEEPROM_ID:
             card->spidata = 0xff;
