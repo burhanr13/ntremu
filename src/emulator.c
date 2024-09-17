@@ -3,6 +3,7 @@
 #include <SDL2/SDL.h>
 #include <fcntl.h>
 #include <math.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>

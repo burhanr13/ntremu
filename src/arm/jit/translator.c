@@ -517,7 +517,7 @@ DECL_ARM_COMPILE(multiply_short) {
             EMITV_STORE_REG(instr.multiply_short.rd, vres);
             break;
         }
-        case 1:
+        case 1: {
             u32 vres = EMITVV(SMULW, vop1, vop2);
             if (!instr.multiply_short.x) {
                 EMIT_LOAD_REG(instr.multiply_short.rn, true);
@@ -528,6 +528,7 @@ DECL_ARM_COMPILE(multiply_short) {
             }
             EMITV_STORE_REG(instr.multiply_short.rd, vres);
             break;
+        }
         case 2: {
             u32 vres = EMITVV(MUL, vop1, vop2);
             u32 vsx = EMITVI(ASR, vres, 31);
