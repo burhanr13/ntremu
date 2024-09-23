@@ -101,6 +101,7 @@ void destroy_jit_block(JITBlock* block) {
 }
 
 void jit_exec(JITBlock* block) {
+    eprintf("executing %08x\n", block->start_addr);
 #ifdef JIT_CPULOG
     cpu_print_state(block->cpu);
 #endif
@@ -156,6 +157,7 @@ void invalidate_l2(ArmCore* cpu, u32 attr, u32 addrhi, u32 startlo, u32 endlo) {
 }
 
 void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
+    eprintf("[%08x - %08x]\n", start_addr, end_addr);
     if (start_addr >= end_addr) return;
     start_addr &= ~0x3f;
     end_addr = ((end_addr + 0x3f) & ~0x3f) - 1;
@@ -217,6 +219,7 @@ bool jit_isdirty(ArmCore* cpu, u32 start, u32 end) {
 }
 
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
+    eprintf("getting %08x\n", addr);
     u32 addrhi = addr >> 16;
     u32 addrlo = (addr & 0xffff) >> 1;
 
