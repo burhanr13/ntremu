@@ -7,7 +7,7 @@
 
 // #define JIT_DISASM
 // #define JIT_CPULOG
-#define IR_INTERPRET
+//#define IR_INTERPRET
 
 #ifdef JIT_DISASM
 #define IR_DISASM
@@ -19,7 +19,7 @@
 JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     JITBlock* block = malloc(sizeof *block);
     block->start_addr = addr;
-    block->attrs = cpu->cpsr.w & 0x3f;
+    block->attrs = cpu->cpsr.jitattrs;
     Vec_init(block->linkingblocks);
     block->created = false;
 
@@ -101,7 +101,6 @@ void destroy_jit_block(JITBlock* block) {
 }
 
 void jit_exec(JITBlock* block) {
-    eprintf("executing %08x\n", block->start_addr);
 #ifdef JIT_CPULOG
     cpu_print_state(block->cpu);
 #endif
@@ -157,7 +156,6 @@ void invalidate_l2(ArmCore* cpu, u32 attr, u32 addrhi, u32 startlo, u32 endlo) {
 }
 
 void jit_invalidate_range(ArmCore* cpu, u32 start_addr, u32 end_addr) {
-    eprintf("[%08x - %08x]\n", start_addr, end_addr);
     if (start_addr >= end_addr) return;
     start_addr &= ~0x3f;
     end_addr = ((end_addr + 0x3f) & ~0x3f) - 1;
@@ -219,7 +217,6 @@ bool jit_isdirty(ArmCore* cpu, u32 start, u32 end) {
 }
 
 JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
-    eprintf("getting %08x\n", addr);
     u32 addrhi = addr >> 16;
     u32 addrlo = (addr & 0xffff) >> 1;
 
@@ -242,12 +239,18 @@ JITBlock* get_jitblock(ArmCore* cpu, u32 attrs, u32 addr) {
         if (jit_isdirty(cpu, addr, addr + MAX_BLOCK_SIZE)) {
             jit_invalidate_range(cpu, addr, addr + MAX_BLOCK_SIZE);
         }
+        u32 old = cpu->cpsr.jitattrs;
+        cpu->cpsr.jitattrs = attrs;
         block = create_jit_block(cpu, addr);
+        cpu->cpsr.jitattrs = old;
     } else {
         block = cpu->jit_cache[attrs][addrhi][addrlo];
         if (jit_isdirty(cpu, block->start_addr, block->end_addr)) {
             jit_invalidate_range(cpu, addr, addr + MAX_BLOCK_SIZE);
+            u32 old = cpu->cpsr.jitattrs;
+            cpu->cpsr.jitattrs = attrs;
             block = create_jit_block(cpu, addr);
+            cpu->cpsr.jitattrs = old;
         }
     }
 
@@ -283,7 +286,7 @@ void jit_free_all(ArmCore* cpu) {
 
 void arm_exec_jit(ArmCore* cpu) {
     JITBlock* block =
-        get_jitblock(cpu, cpu->cpsr.w & 0x3f, cpu->cur_instr_addr);
+        get_jitblock(cpu, cpu->cpsr.jitattrs, cpu->cur_instr_addr);
     if (block) {
         jit_exec(block);
     } else {

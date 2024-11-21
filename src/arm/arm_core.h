@@ -45,6 +45,10 @@ typedef struct _ArmCore {
     union {
         u32 w;
         struct {
+            u32 jitattrs : 6;
+            u32 _6_31 : 26;
+        };
+        struct {
             u32 m : 5; // mode
             u32 t : 1; // thumb state
             u32 f : 1; // disable fiq
