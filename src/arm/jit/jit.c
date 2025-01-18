@@ -23,6 +23,8 @@ JITBlock* create_jit_block(ArmCore* cpu, u32 addr) {
     Vec_init(block->linkingblocks);
     block->created = false;
 
+    Vec_init(block->linkingblocks);
+
     IRBlock ir;
     irblock_init(&ir);
 
